@@ -20,6 +20,7 @@ const HABITS = [
 // GLOBAL STATE
 let habitData = {};
 let goalsData = [];
+let moodData = {};
 let notificationsOn = true;
 let timerInterval = null;
 let timerSeconds = 1500;
@@ -65,6 +66,122 @@ function initGoalsData() {
 
 function saveGoalsData() {
     localStorage.setItem('goalsData', JSON.stringify(goalsData));
+}
+
+// ============================================
+// MOOD & ENERGY TRACKING
+// ============================================
+
+function initMoodData() {
+    const saved = localStorage.getItem('moodData');
+    if (saved) {
+        moodData = JSON.parse(saved);
+    }
+    renderMoodTracker();
+}
+
+function saveMoodData() {
+    localStorage.setItem('moodData', JSON.stringify(moodData));
+}
+
+function setEnergy(value) {
+    const today = new Date().toISOString().split('T')[0];
+    if (!moodData[today]) {
+        moodData[today] = { energy: 5, mood: '' };
+    }
+    moodData[today].energy = parseInt(value);
+    saveMoodData();
+    renderMoodTracker();
+}
+
+function setMood(emoji) {
+    const today = new Date().toISOString().split('T')[0];
+    if (!moodData[today]) {
+        moodData[today] = { energy: 5, mood: '' };
+    }
+    moodData[today].mood = emoji;
+    saveMoodData();
+    renderMoodTracker();
+}
+
+function renderMoodTracker() {
+    const container = document.getElementById('moodTracker');
+    if (!container) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const currentEnergy = moodData[today]?.energy || 5;
+    const currentMood = moodData[today]?.mood || '';
+    
+    const moods = ['😃', '💪', '😴', '😤', '🧘'];
+    
+    // Get last 7 days
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const isToday = i === 0;
+        last7Days.push({
+            date: dateKey,
+            isToday: isToday,
+            label: isToday ? 'TODAY' : date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+            monthDay: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            data: moodData[dateKey] || { energy: 0, mood: '' }
+        });
+    }
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Left: Today's Input -->
+            <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 25px;">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 How are you feeling today?</h3>
+                
+                <!-- Energy Slider -->
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">⚡ Energy Level: <span id="energyValue" style="color: #10B981; font-size: 18px;">${currentEnergy}/10</span></label>
+                    <input type="range" min="1" max="10" value="${currentEnergy}" oninput="setEnergy(this.value); document.getElementById('energyValue').textContent = this.value + '/10';" style="width: 100%; height: 8px; border-radius: 5px; background: linear-gradient(to right, #EF4444 0%, #FBBF24 50%, #10B981 100%); outline: none; -webkit-appearance: none; cursor: pointer;">
+                </div>
+                
+                <!-- Mood Selector -->
+                <div>
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">😊 Mood</label>
+                    <div style="display: flex; gap: 10px; justify-content: space-between;">
+                        ${moods.map(mood => `
+                            <button onclick="setMood('${mood}')" style="background: ${currentMood === mood ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${currentMood === mood ? '#8B5CF6' : 'rgba(139, 92, 246, 0.3)'}; border-radius: 12px; padding: 15px; font-size: 32px; cursor: pointer; transition: all 0.2s; flex: 1;">
+                                ${mood}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: #9CA3AF;">
+                        <span>Happy</span>
+                        <span>Energized</span>
+                        <span>Tired</span>
+                        <span>Stressed</span>
+                        <span>Calm</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Last 7 Days Comparison -->
+            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px;">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Past 7 Days</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
+                    ${last7Days.map(day => `
+                        <div style="background: ${day.isToday ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${day.isToday ? '#8B5CF6' : 'rgba(16, 185, 129, 0.3)'}; border-radius: 12px; padding: 10px; text-align: center;">
+                            <div style="font-size: 9px; color: #9CA3AF; margin-bottom: 5px; font-weight: 600;">${day.monthDay}</div>
+                            <div style="font-size: 8px; color: ${day.isToday ? '#A78BFA' : '#6B7280'}; margin-bottom: 8px;">${day.label}</div>
+                            <div style="font-size: 28px; margin-bottom: 8px;">${day.data.mood || '—'}</div>
+                            <div style="font-size: 14px; font-weight: 900; color: ${day.data.energy >= 7 ? '#10B981' : day.data.energy >= 4 ? '#FBBF24' : '#EF4444'};">
+                                ${day.data.energy > 0 ? day.data.energy : '—'}
+                            </div>
+                            <div style="font-size: 8px; color: #9CA3AF;">energy</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function addGoal() {
@@ -1374,6 +1491,7 @@ async function fetchWeather() {
 
 initHabitData();
 initGoalsData();
+initMoodData();
 renderHabitGrid();
 updateStreakDisplay();
 makeStatsClickable();
