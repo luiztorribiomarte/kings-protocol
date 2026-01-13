@@ -19,6 +19,7 @@ const HABITS = [
 
 // GLOBAL STATE
 let habitData = {};
+let goalsData = [];
 let notificationsOn = true;
 let timerInterval = null;
 let timerSeconds = 1500;
@@ -48,6 +49,232 @@ function initHabitData() {
 
 function saveHabitData() {
     localStorage.setItem('habitData', JSON.stringify(habitData));
+}
+
+// ============================================
+// GOALS MANAGEMENT SYSTEM
+// ============================================
+
+function initGoalsData() {
+    const saved = localStorage.getItem('goalsData');
+    if (saved) {
+        goalsData = JSON.parse(saved);
+    }
+    renderGoals();
+}
+
+function saveGoalsData() {
+    localStorage.setItem('goalsData', JSON.stringify(goalsData));
+}
+
+function addGoal() {
+    const title = prompt('Goal Title (e.g. "25K YouTube Subscribers"):');
+    if (!title) return;
+    
+    const target = prompt('Target Number (e.g. 25000):');
+    if (!target) return;
+    
+    const current = prompt('Current Progress (e.g. 750):');
+    if (!current) return;
+    
+    const deadline = prompt('Deadline (e.g. "May 2026" or leave blank):');
+    
+    const goal = {
+        id: Date.now(),
+        title: title,
+        target: parseFloat(target),
+        current: parseFloat(current),
+        deadline: deadline || '',
+        history: [{
+            date: new Date().toISOString(),
+            value: parseFloat(current)
+        }]
+    };
+    
+    goalsData.push(goal);
+    saveGoalsData();
+    renderGoals();
+}
+
+function updateGoalProgress(goalId) {
+    const goal = goalsData.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const newValue = prompt(`Update "${goal.title}" progress:\nCurrent: ${goal.current}`, goal.current);
+    if (newValue === null) return;
+    
+    const value = parseFloat(newValue);
+    if (isNaN(value)) {
+        alert('Please enter a valid number!');
+        return;
+    }
+    
+    goal.current = value;
+    goal.history.push({
+        date: new Date().toISOString(),
+        value: value
+    });
+    
+    saveGoalsData();
+    renderGoals();
+}
+
+function editGoal(goalId) {
+    const goal = goalsData.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const title = prompt('Goal Title:', goal.title);
+    if (title) goal.title = title;
+    
+    const target = prompt('Target Number:', goal.target);
+    if (target) goal.target = parseFloat(target);
+    
+    const deadline = prompt('Deadline:', goal.deadline);
+    if (deadline !== null) goal.deadline = deadline;
+    
+    saveGoalsData();
+    renderGoals();
+}
+
+function deleteGoal(goalId) {
+    if (!confirm('Delete this goal?')) return;
+    
+    goalsData = goalsData.filter(g => g.id !== goalId);
+    saveGoalsData();
+    renderGoals();
+}
+
+function showGoalChart(goalId) {
+    const goal = goalsData.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const modalContent = createModal();
+    
+    const percentage = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+    
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
+        
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${percentage}%</div>
+            <div style="font-size: 18px; color: #9CA3AF;">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()}</div>
+            ${goal.deadline ? `<div style="font-size: 14px; color: #FBBF24; margin-top: 10px;">📅 Target: ${goal.deadline}</div>` : ''}
+        </div>
+        
+        <canvas id="goalChart" style="max-height: 400px;"></canvas>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="updateGoalProgress(${goalId}); showGoalChart(${goalId});" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; margin-right: 10px;">📈 Update Progress</button>
+            <button onclick="editGoal(${goalId}); closeModal();" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">✏️ Edit Goal</button>
+        </div>
+    `;
+    
+    // Draw chart
+    const labels = [];
+    const data = [];
+    
+    goal.history.forEach(entry => {
+        const date = new Date(entry.date);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        data.push(entry.value);
+    });
+    
+    const canvas = document.getElementById('goalChart');
+    if (!canvas) return;
+    
+    if (window.goalChartInstance) {
+        window.goalChartInstance.destroy();
+    }
+    
+    window.goalChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Progress',
+                data: data,
+                borderColor: '#10B981',
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Target',
+                data: Array(labels.length).fill(goal.target),
+                borderColor: '#FBBF24',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#ffffff' } }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#ffffff' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                }
+            }
+        }
+    });
+}
+
+function renderGoals() {
+    const container = document.querySelector('.goals-grid');
+    if (!container) return;
+    
+    if (goalsData.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(139, 92, 246, 0.1); border: 2px dashed rgba(139, 92, 246, 0.4); border-radius: 16px;">
+                <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
+                <div style="font-size: 18px; font-weight: 600; color: #A78BFA; margin-bottom: 10px;">No Goals Yet</div>
+                <div style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">Start by adding your first goal!</div>
+                <button onclick="addGoal()" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">➕ Add Goal</button>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    goalsData.forEach(goal => {
+        const percentage = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+        
+        html += `
+            <div class="goal-card" onclick="showGoalChart(${goal.id})" style="cursor: pointer; transition: transform 0.2s;">
+                <div class="goal-cover">📈</div>
+                <div class="goal-content">
+                    <div class="goal-title">${goal.title}</div>
+                    <span class="property-pill">In Progress</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%;"></div>
+                    </div>
+                    <div class="progress-text">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()} (${percentage}%)</div>
+                    ${goal.deadline ? `<div style="font-size: 12px; color: #FBBF24; margin-top: 8px;">📅 ${goal.deadline}</div>` : ''}
+                </div>
+                <button onclick="event.stopPropagation(); deleteGoal(${goal.id})" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
+            </div>
+        `;
+    });
+    
+    // Add "Add Goal" button
+    html += `
+        <div onclick="addGoal()" style="cursor: pointer; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 2px dashed rgba(139, 92, 246, 0.5); border-radius: 16px; padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.3s; min-height: 200px;">
+            <div style="font-size: 48px; margin-bottom: 10px;">➕</div>
+            <div style="font-size: 16px; font-weight: 700; color: #A78BFA;">Add New Goal</div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
 }
 
 // ============================================
@@ -107,6 +334,7 @@ function toggleHabit(dateKey, habitIndex) {
     habitData[dateKey][habitIndex] = !habitData[dateKey][habitIndex];
     saveHabitData();
     renderHabitGrid();
+    updateStreakDisplay();
 }
 
 // ============================================
@@ -164,6 +392,117 @@ function calculateStreak() {
     }
     
     return streak;
+}
+
+function calculateBestStreak() {
+    let bestStreak = 0;
+    let currentStreak = 0;
+    
+    const dates = Object.keys(habitData).sort();
+    
+    dates.forEach(dateKey => {
+        const completed = habitData[dateKey].filter(h => h).length;
+        const percentage = (completed / HABITS.length) * 100;
+        
+        if (percentage >= 80) {
+            currentStreak++;
+            if (currentStreak > bestStreak) {
+                bestStreak = currentStreak;
+            }
+        } else {
+            currentStreak = 0;
+        }
+    });
+    
+    return bestStreak;
+}
+
+function updateStreakDisplay() {
+    const currentStreak = calculateStreak();
+    const bestStreak = calculateBestStreak();
+    
+    // Update current streak display
+    const streakDisplay = document.querySelector('.current-streak');
+    if (streakDisplay) {
+        streakDisplay.textContent = currentStreak;
+    }
+    
+    // Update best streak text
+    const bestStreakText = document.querySelector('.streak-display').querySelector('div[style*="font-size: 14px"]');
+    if (bestStreakText) {
+        if (currentStreak === bestStreak && currentStreak > 0) {
+            bestStreakText.innerHTML = `🏆 Best Streak: ${bestStreak} days (Current!)`;
+        } else {
+            bestStreakText.innerHTML = `🏆 Best Streak: ${bestStreak} days`;
+        }
+    }
+    
+    // Update milestone cards
+    updateMilestones(currentStreak);
+}
+
+function updateMilestones(streak) {
+    const milestones = [
+        { days: 7, icon: '🥉', name: '7 Days' },
+        { days: 15, icon: '🥈', name: '15 Days' },
+        { days: 30, icon: '🥇', name: '30 Days' }
+    ];
+    
+    const milestoneCards = document.querySelectorAll('.milestone-card');
+    
+    milestones.forEach((milestone, index) => {
+        if (milestoneCards[index]) {
+            const card = milestoneCards[index];
+            
+            if (streak >= milestone.days) {
+                card.classList.add('achieved');
+                const statusDiv = card.querySelector('div[style*="font-size: 10px"]');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '✓ UNLOCKED';
+                    statusDiv.style.color = '#10B981';
+                }
+            } else {
+                card.classList.remove('achieved');
+                const statusDiv = card.querySelector('div[style*="font-size: 10px"]');
+                if (statusDiv) {
+                    const daysAway = milestone.days - streak;
+                    statusDiv.innerHTML = `${daysAway} days away`;
+                    statusDiv.style.color = '#FBBF24';
+                }
+            }
+        }
+    });
+    
+    // Update rewards based on milestones
+    const rewardCards = document.querySelectorAll('.habit-section')[2].querySelectorAll('.milestone-card');
+    if (rewardCards.length >= 2) {
+        // Cheat Meal (7 days)
+        if (streak >= 7) {
+            rewardCards[0].classList.add('achieved');
+            const statusDiv = rewardCards[0].querySelector('div[style*="font-size: 10px"]');
+            if (statusDiv) {
+                statusDiv.innerHTML = '✓ Unlocked';
+                statusDiv.style.color = '#10B981';
+            }
+        }
+        
+        // New Gear (30 days)
+        if (streak >= 30) {
+            rewardCards[1].classList.add('achieved');
+            const statusDiv = rewardCards[1].querySelector('div[style*="font-size: 10px"]');
+            if (statusDiv) {
+                statusDiv.innerHTML = '✓ Unlocked';
+                statusDiv.style.color = '#10B981';
+            }
+        } else {
+            const daysAway = 30 - streak;
+            const statusDiv = rewardCards[1].querySelector('div[style*="font-size: 10px"]');
+            if (statusDiv) {
+                statusDiv.innerHTML = `🔒 ${daysAway} days away`;
+                statusDiv.style.color = '#FBBF24';
+            }
+        }
+    }
 }
 
 // ============================================
@@ -880,7 +1219,9 @@ async function fetchWeather() {
 // ============================================
 
 initHabitData();
+initGoalsData();
 renderHabitGrid();
+updateStreakDisplay();
 makeStatsClickable();
 fetchYouTubeStats();
 fetchWeather();
