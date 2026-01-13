@@ -599,18 +599,19 @@ function updateHabitChart(habitIndex) {
 // ============================================
 
 function makeStatsClickable() {
-    const statCards = document.querySelectorAll('.stat-card');
-    if (statCards[0]) {
-        statCards[0].style.cursor = 'pointer';
-        statCards[0].onclick = showCompletionChart;
+    // Only target the dashboard page stats (inside dashboardPage)
+    const dashboardStats = document.querySelectorAll('#dashboardPage .stats-grid .stat-card');
+    if (dashboardStats[0]) {
+        dashboardStats[0].style.cursor = 'pointer';
+        dashboardStats[0].onclick = showCompletionChart;
     }
-    if (statCards[1]) {
-        statCards[1].style.cursor = 'pointer';
-        statCards[1].onclick = showWeeklyChart;
+    if (dashboardStats[1]) {
+        dashboardStats[1].style.cursor = 'pointer';
+        dashboardStats[1].onclick = showWeeklyChart;
     }
-    if (statCards[2]) {
-        statCards[2].style.cursor = 'pointer';
-        statCards[2].onclick = showStreakChart;
+    if (dashboardStats[2]) {
+        dashboardStats[2].style.cursor = 'pointer';
+        dashboardStats[2].onclick = showStreakChart;
     }
 }
 
