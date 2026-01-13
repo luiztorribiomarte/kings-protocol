@@ -641,7 +641,7 @@ function showGoalChart(goalId) {
 }
 
 function renderGoals() {
-    const container = document.querySelector('.goals-grid');
+    const container = document.getElementById('goalsGrid');
     if (!container) return;
     
     if (goalsData.length === 0) {
@@ -1402,8 +1402,14 @@ function showPage(pageName) {
     });
     document.getElementById(pageName + 'Page').classList.add('active');
     const tabs = document.querySelectorAll('.nav-tab');
-    const pageIndex = {dashboard: 0, wins: 1, stats: 2, workout: 3, books: 4, settings: 5};
+    const pageIndex = {dashboard: 0, goals: 1, workout: 2, journal: 3, vision: 4, content: 5, books: 6, settings: 7};
     tabs[pageIndex[pageName]].classList.add('active');
+    
+    // Load analytics when goals page is opened
+    if (pageName === 'goals') {
+        renderGoals();
+        updateHabitAnalytics();
+    }
 }
 
 // ============================================
@@ -1628,6 +1634,224 @@ async function fetchWeather() {
         }
     } catch (error) {
         console.error('Error fetching weather:', error);
+    }
+}
+
+// ============================================
+// HABIT ANALYTICS
+// ============================================
+
+function updateHabitAnalytics() {
+    const range = document.getElementById('habitAnalyticsRange')?.value || '7';
+    const days = range === 'all' ? 90 : parseInt(range);
+    
+    const habitStats = {};
+    const habits = ['Wake Up At 7 AM', 'Morning Sunlight', 'Skincare', 'Gym/Workout', '3L Water', 'Content Creation Work', 'No Weed', 'No Porn', 'No Junk Food', 'Cold Shower', 'Journal/Reflect'];
+    
+    // Initialize stats
+    habits.forEach(habit => {
+        habitStats[habit] = { completed: 0, total: 0, percentage: 0 };
+    });
+    
+    // Calculate completion rates
+    for (let i = 0; i < days; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        
+        if (habitData[dateKey]) {
+            habits.forEach(habit => {
+                habitStats[habit].total++;
+                if (habitData[dateKey][habit]) {
+                    habitStats[habit].completed++;
+                }
+            });
+        }
+    }
+    
+    // Calculate percentages
+    habits.forEach(habit => {
+        if (habitStats[habit].total > 0) {
+            habitStats[habit].percentage = Math.round((habitStats[habit].completed / habitStats[habit].total) * 100);
+        }
+    });
+    
+    // Sort habits by percentage
+    const sortedHabits = habits.sort((a, b) => habitStats[b].percentage - habitStats[a].percentage);
+    
+    // Render top habits
+    const topHabitsDiv = document.getElementById('topHabits');
+    if (topHabitsDiv) {
+        const top3 = sortedHabits.slice(0, 3);
+        topHabitsDiv.innerHTML = top3.map((habit, index) => `
+            <div style="background: rgba(255, 255, 255, 0.95); padding: 15px; margin-bottom: 12px; border-radius: 8px; border-left: 4px solid #10B981; color: #1a1a1a;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div><strong>${index + 1}.</strong> ${habit}</div>
+                    <div style="font-size: 20px; font-weight: 900; color: #10B981;">${habitStats[habit].percentage}%</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Render bottom habits
+    const bottomHabitsDiv = document.getElementById('bottomHabits');
+    if (bottomHabitsDiv) {
+        const bottom3 = sortedHabits.slice(-3).reverse();
+        bottomHabitsDiv.innerHTML = bottom3.map((habit, index) => `
+            <div style="background: rgba(255, 255, 255, 0.95); padding: 15px; margin-bottom: 12px; border-radius: 8px; border-left: 4px solid #EF4444; color: #1a1a1a;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div><strong>${index + 1}.</strong> ${habit}</div>
+                    <div style="font-size: 20px; font-weight: 900; color: #EF4444;">${habitStats[habit].percentage}%</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Generate insights
+    const insightsDiv = document.getElementById('habitInsights');
+    if (insightsDiv) {
+        const worst = sortedHabits[sortedHabits.length - 1];
+        const best = sortedHabits[0];
+        insightsDiv.innerHTML = `
+            <p style="margin-bottom: 10px;">Your strongest habit is <strong>${best}</strong> at ${habitStats[best].percentage}%! Keep it up! 💪</p>
+            <p>Focus on improving <strong>${worst}</strong> - small improvements here will have the biggest impact.</p>
+        `;
+    }
+    
+    // Render trends chart
+    renderHabitTrendsChart(days, habits, habitStats);
+    
+    // Render day analysis
+    renderDayAnalysis(days);
+}
+
+function renderHabitTrendsChart(days, habits, habitStats) {
+    const canvas = document.getElementById('habitTrendsChart');
+    if (!canvas) return;
+    
+    const labels = [];
+    const datasets = [];
+    
+    // Generate date labels
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    
+    // Get top 5 habits to display
+    const topHabits = habits.slice(0, 5);
+    const colors = ['#10B981', '#8B5CF6', '#EC4899', '#FBBF24', '#3B82F6'];
+    
+    topHabits.forEach((habit, index) => {
+        const data = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateKey = date.toISOString().split('T')[0];
+            data.push(habitData[dateKey]?.[habit] ? 1 : 0);
+        }
+        
+        datasets.push({
+            label: habit,
+            data: data,
+            borderColor: colors[index],
+            backgroundColor: colors[index] + '40',
+            borderWidth: 2,
+            tension: 0.4
+        });
+    });
+    
+    if (window.habitTrendsChartInstance) {
+        window.habitTrendsChartInstance.destroy();
+    }
+    
+    window.habitTrendsChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#ffffff' } }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: { color: '#ffffff', stepSize: 1 },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                }
+            }
+        }
+    });
+}
+
+function renderDayAnalysis(days) {
+    const dayStats = {
+        'Sunday': { completed: 0, total: 0 },
+        'Monday': { completed: 0, total: 0 },
+        'Tuesday': { completed: 0, total: 0 },
+        'Wednesday': { completed: 0, total: 0 },
+        'Thursday': { completed: 0, total: 0 },
+        'Friday': { completed: 0, total: 0 },
+        'Saturday': { completed: 0, total: 0 }
+    };
+    
+    for (let i = 0; i < days; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+        
+        if (habitData[dateKey]) {
+            const habits = Object.keys(habitData[dateKey]);
+            const completed = habits.filter(h => habitData[dateKey][h]).length;
+            dayStats[dayName].completed += completed;
+            dayStats[dayName].total += habits.length;
+        }
+    }
+    
+    const dayPercentages = Object.keys(dayStats).map(day => ({
+        day,
+        percentage: dayStats[day].total > 0 ? Math.round((dayStats[day].completed / dayStats[day].total) * 100) : 0
+    })).sort((a, b) => b.percentage - a.percentage);
+    
+    const bestDay = dayPercentages[0];
+    const worstDay = dayPercentages[dayPercentages.length - 1];
+    
+    const dayAnalysisDiv = document.getElementById('dayAnalysis');
+    if (dayAnalysisDiv) {
+        dayAnalysisDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                <div style="background: rgba(16, 185, 129, 0.2); border: 2px solid rgba(16, 185, 129, 0.5); border-radius: 12px; padding: 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🌟</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #10B981; margin-bottom: 5px;">${bestDay.day}</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #34D399;">${bestDay.percentage}%</div>
+                    <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Best Day</div>
+                </div>
+                <div style="background: rgba(239, 68, 68, 0.2); border: 2px solid rgba(239, 68, 68, 0.5); border-radius: 12px; padding: 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #EF4444; margin-bottom: 5px;">${worstDay.day}</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #F87171;">${worstDay.percentage}%</div>
+                    <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Needs Attention</div>
+                </div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 20px;">
+                <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 15px; color: #FBBF24;">📊 All Days Breakdown</h4>
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;">
+                    ${dayPercentages.map(d => `
+                        <div style="text-align: center; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                            <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 8px;">${d.day.slice(0, 3)}</div>
+                            <div style="font-size: 20px; font-weight: 900; color: ${d.percentage >= 80 ? '#10B981' : d.percentage >= 50 ? '#FBBF24' : '#EF4444'};">${d.percentage}%</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
 }
 
