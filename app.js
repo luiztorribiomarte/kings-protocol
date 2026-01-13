@@ -68,40 +68,124 @@ function saveGoalsData() {
 }
 
 function addGoal() {
-    const title = prompt('Goal Title (e.g. "25K YouTube Subscribers"):');
-    if (!title) return;
+    const modalContent = createModal();
     
-    const target = prompt('Target Number (e.g. 25000):');
-    if (!target) return;
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Goal</h2>
+        
+        <div style="background: rgba(139, 92, 246, 0.1); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 30px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Goal Title *</label>
+                <input type="text" id="goalTitle" placeholder="e.g. 25K YouTube Subscribers, Get in Shape, Learn Spanish..." style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Target Number (optional)</label>
+                <input type="number" id="goalTarget" placeholder="e.g. 25000 (leave blank if not applicable)" style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">💡 Only needed for measurable goals (subscribers, money, weight, etc.)</div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Current Progress (optional)</label>
+                <input type="number" id="goalCurrent" placeholder="e.g. 750 (leave blank if starting from 0)" style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Deadline (optional)</label>
+                <input type="text" id="goalDeadline" placeholder="e.g. May 2026, End of 2026, Summer 2027..." style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="text-align: center;">
+                <button onclick="saveNewGoal()" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); margin-right: 10px;">✓ Save Goal</button>
+                <button onclick="closeModal()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    `;
     
-    const current = prompt('Current Progress (e.g. 750):');
-    if (!current) return;
+    // Focus on title input
+    setTimeout(() => {
+        document.getElementById('goalTitle')?.focus();
+    }, 100);
+}
+
+function saveNewGoal() {
+    const title = document.getElementById('goalTitle')?.value.trim();
     
-    const deadline = prompt('Deadline (e.g. "May 2026" or leave blank):');
+    if (!title) {
+        alert('Please enter a goal title!');
+        return;
+    }
+    
+    const targetInput = document.getElementById('goalTarget')?.value;
+    const currentInput = document.getElementById('goalCurrent')?.value;
+    const deadline = document.getElementById('goalDeadline')?.value.trim();
+    
+    const target = targetInput ? parseFloat(targetInput) : null;
+    const current = currentInput ? parseFloat(currentInput) : 0;
     
     const goal = {
         id: Date.now(),
         title: title,
-        target: parseFloat(target),
-        current: parseFloat(current),
+        target: target,
+        current: current,
         deadline: deadline || '',
-        history: [{
+        history: current > 0 ? [{
             date: new Date().toISOString(),
-            value: parseFloat(current)
-        }]
+            value: current
+        }] : []
     };
     
     goalsData.push(goal);
     saveGoalsData();
     renderGoals();
+    closeModal();
 }
 
 function updateGoalProgress(goalId) {
     const goal = goalsData.find(g => g.id === goalId);
     if (!goal) return;
     
-    const newValue = prompt(`Update "${goal.title}" progress:\nCurrent: ${goal.current}`, goal.current);
-    if (newValue === null) return;
+    closeModal();
+    
+    const modalContent = createModal();
+    
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📈 Update Progress</h2>
+        
+        <div style="background: rgba(139, 92, 246, 0.1); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 30px;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 20px; font-weight: 600; color: #A78BFA; margin-bottom: 10px;">${goal.title}</div>
+                ${goal.target ? `<div style="font-size: 14px; color: #9CA3AF;">Target: ${goal.target.toLocaleString()}</div>` : ''}
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">New Progress Value</label>
+                <input type="number" id="newProgressValue" value="${goal.current}" placeholder="Enter new value..." style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 18px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a; text-align: center; font-weight: 700;">
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px; text-align: center;">Current: ${goal.current.toLocaleString()}</div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button onclick="saveProgressUpdate(${goalId})" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(10, 185, 129, 0.4); margin-right: 10px;">✓ Update</button>
+                <button onclick="closeModal()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    setTimeout(() => {
+        document.getElementById('newProgressValue')?.focus();
+    }, 100);
+}
+
+function saveProgressUpdate(goalId) {
+    const goal = goalsData.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const newValue = document.getElementById('newProgressValue')?.value;
+    
+    if (!newValue) {
+        alert('Please enter a value!');
+        return;
+    }
     
     const value = parseFloat(newValue);
     if (isNaN(value)) {
@@ -117,23 +201,64 @@ function updateGoalProgress(goalId) {
     
     saveGoalsData();
     renderGoals();
+    closeModal();
 }
 
 function editGoal(goalId) {
     const goal = goalsData.find(g => g.id === goalId);
     if (!goal) return;
     
-    const title = prompt('Goal Title:', goal.title);
-    if (title) goal.title = title;
+    closeModal();
     
-    const target = prompt('Target Number:', goal.target);
-    if (target) goal.target = parseFloat(target);
+    const modalContent = createModal();
     
-    const deadline = prompt('Deadline:', goal.deadline);
-    if (deadline !== null) goal.deadline = deadline;
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✏️ Edit Goal</h2>
+        
+        <div style="background: rgba(139, 92, 246, 0.1); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 30px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Goal Title</label>
+                <input type="text" id="editGoalTitle" value="${goal.title}" style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Target Number (optional)</label>
+                <input type="number" id="editGoalTarget" value="${goal.target || ''}" placeholder="Leave blank if not applicable" style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #A78BFA;">Deadline (optional)</label>
+                <input type="text" id="editGoalDeadline" value="${goal.deadline}" placeholder="e.g. May 2026" style="width: 100%; padding: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #1a1a1a;">
+            </div>
+            
+            <div style="text-align: center;">
+                <button onclick="saveGoalEdit(${goalId})" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); margin-right: 10px;">✓ Save Changes</button>
+                <button onclick="closeModal()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    `;
+}
+
+function saveGoalEdit(goalId) {
+    const goal = goalsData.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const title = document.getElementById('editGoalTitle')?.value.trim();
+    const targetInput = document.getElementById('editGoalTarget')?.value;
+    const deadline = document.getElementById('editGoalDeadline')?.value.trim();
+    
+    if (!title) {
+        alert('Please enter a goal title!');
+        return;
+    }
+    
+    goal.title = title;
+    goal.target = targetInput ? parseFloat(targetInput) : null;
+    goal.deadline = deadline || '';
     
     saveGoalsData();
     renderGoals();
+    closeModal();
 }
 
 function deleteGoal(goalId) {
@@ -150,7 +275,31 @@ function showGoalChart(goalId) {
     
     const modalContent = createModal();
     
-    const percentage = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+    const hasTarget = goal.target !== null && goal.target !== undefined;
+    const percentage = hasTarget && goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+    
+    if (!hasTarget) {
+        // Non-measurable goal
+        modalContent.innerHTML = `
+            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
+            
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
+                <div style="font-size: 18px; color: #9CA3AF;">Non-measurable goal</div>
+                ${goal.deadline ? `<div style="font-size: 14px; color: #FBBF24; margin-top: 10px;">📅 Target: ${goal.deadline}</div>` : ''}
+            </div>
+            
+            <div style="background: rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 14px; color: #A78BFA; margin-bottom: 10px;">This goal doesn't have measurable progress tracking.</div>
+                <div style="font-size: 12px; color: #9CA3AF;">You can edit it to add a target number if needed.</div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button onclick="editGoal(${goalId});" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">✏️ Edit Goal</button>
+            </div>
+        `;
+        return;
+    }
     
     modalContent.innerHTML = `
         <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
@@ -164,8 +313,8 @@ function showGoalChart(goalId) {
         <canvas id="goalChart" style="max-height: 400px;"></canvas>
         
         <div style="margin-top: 20px; text-align: center;">
-            <button onclick="updateGoalProgress(${goalId}); showGoalChart(${goalId});" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; margin-right: 10px;">📈 Update Progress</button>
-            <button onclick="editGoal(${goalId}); closeModal();" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">✏️ Edit Goal</button>
+            <button onclick="updateGoalProgress(${goalId});" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; margin-right: 10px;">📈 Update Progress</button>
+            <button onclick="editGoal(${goalId});" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">✏️ Edit Goal</button>
         </div>
     `;
     
@@ -247,7 +396,8 @@ function renderGoals() {
     let html = '';
     
     goalsData.forEach(goal => {
-        const percentage = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+        const hasTarget = goal.target !== null && goal.target !== undefined;
+        const percentage = hasTarget && goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
         
         html += `
             <div class="goal-card" onclick="showGoalChart(${goal.id})" style="cursor: pointer; transition: transform 0.2s;">
@@ -255,10 +405,14 @@ function renderGoals() {
                 <div class="goal-content">
                     <div class="goal-title">${goal.title}</div>
                     <span class="property-pill">In Progress</span>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%;"></div>
-                    </div>
-                    <div class="progress-text">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()} (${percentage}%)</div>
+                    ${hasTarget ? `
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%;"></div>
+                        </div>
+                        <div class="progress-text">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()} (${percentage}%)</div>
+                    ` : `
+                        <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Non-measurable goal</div>
+                    `}
                     ${goal.deadline ? `<div style="font-size: 12px; color: #FBBF24; margin-top: 8px;">📅 ${goal.deadline}</div>` : ''}
                 </div>
                 <button onclick="event.stopPropagation(); deleteGoal(${goal.id})" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
