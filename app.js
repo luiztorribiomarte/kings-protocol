@@ -162,8 +162,8 @@ function renderMoodTracker() {
                 </div>
             </div>
             
-            <!-- Right: Last 7 Days Comparison -->
-            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px;">
+            <!-- Right: Last 7 Days Comparison - CLICKABLE -->
+            <div onclick="showMoodChart()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Past 7 Days</h3>
                 
                 <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
@@ -172,7 +172,7 @@ function renderMoodTracker() {
                             <div style="font-size: 9px; color: #9CA3AF; margin-bottom: 5px; font-weight: 600;">${day.monthDay}</div>
                             <div style="font-size: 8px; color: ${day.isToday ? '#A78BFA' : '#6B7280'}; margin-bottom: 8px;">${day.label}</div>
                             <div style="font-size: 28px; margin-bottom: 8px;">${day.data.mood || '—'}</div>
-                            <div style="font-size: 14px; font-weight: 900; color: ${day.data.energy >= 7 ? '#10B981' : day.data.energy >= 4 ? '#FBBF24' : '#EF4444'};">
+                            <div style="font-size: 14px; font-weight: 900; color: ${day.data.energy >= 7 ? '#10B981' : day.data.energy >= 4 ? '#FBBF24' : day.data.energy > 0 ? '#EF4444' : '#6B7280'};">
                                 ${day.data.energy > 0 ? day.data.energy : '—'}
                             </div>
                             <div style="font-size: 8px; color: #9CA3AF;">energy</div>
@@ -182,6 +182,152 @@ function renderMoodTracker() {
             </div>
         </div>
     `;
+}
+
+function showMoodChart() {
+    const modalContent = createModal();
+    
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 Energy & Mood History</h2>
+        
+        <div style="margin-bottom: 20px;">
+            <select id="moodTimeRange" onchange="updateMoodChart()" style="padding: 10px; border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600;">
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="all">All Time</option>
+            </select>
+        </div>
+        
+        <canvas id="moodChart" style="max-height: 400px;"></canvas>
+        
+        <div style="margin-top: 30px; padding: 20px; background: rgba(16, 185, 129, 0.2); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.4);">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #34D399;">📊 Stats</h3>
+            <div id="moodStats"></div>
+        </div>
+    `;
+    
+    updateMoodChart();
+}
+
+function updateMoodChart() {
+    const range = document.getElementById('moodTimeRange')?.value || '7';
+    const days = range === 'all' ? Math.min(Object.keys(moodData).length, 90) : parseInt(range);
+    
+    const labels = [];
+    const energyData = [];
+    const moodEmojis = [];
+    let totalEnergy = 0;
+    let daysWithData = 0;
+    
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        labels.push(label);
+        
+        if (moodData[dateKey]) {
+            const energy = moodData[dateKey].energy || 0;
+            energyData.push(energy);
+            moodEmojis.push(moodData[dateKey].mood || '');
+            if (energy > 0) {
+                totalEnergy += energy;
+                daysWithData++;
+            }
+        } else {
+            energyData.push(null);
+            moodEmojis.push('');
+        }
+    }
+    
+    const avgEnergy = daysWithData > 0 ? (totalEnergy / daysWithData).toFixed(1) : 0;
+    const highEnergyDays = energyData.filter(e => e >= 7).length;
+    const lowEnergyDays = energyData.filter(e => e > 0 && e <= 3).length;
+    
+    // Update stats
+    const statsDiv = document.getElementById('moodStats');
+    if (statsDiv) {
+        statsDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: 900; color: #10B981;">${avgEnergy}</div>
+                    <div style="font-size: 12px; color: #9CA3AF;">Avg Energy</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: 900; color: #34D399;">${highEnergyDays}</div>
+                    <div style="font-size: 12px; color: #9CA3AF;">High Energy Days</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: 900; color: #EF4444;">${lowEnergyDays}</div>
+                    <div style="font-size: 12px; color: #9CA3AF;">Low Energy Days</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                <div style="font-size: 14px; color: #A78BFA; margin-bottom: 10px;">🗓️ Mood Pattern:</div>
+                <div style="font-size: 24px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    ${moodEmojis.filter(m => m).slice(-14).join(' ')}
+                </div>
+            </div>
+        `;
+    }
+    
+    const canvas = document.getElementById('moodChart');
+    if (!canvas) return;
+    
+    if (window.moodChartInstance) {
+        window.moodChartInstance.destroy();
+    }
+    
+    window.moodChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Energy Level',
+                data: energyData,
+                borderColor: '#10B981',
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: energyData.map(e => {
+                    if (!e) return '#6B7280';
+                    if (e >= 7) return '#10B981';
+                    if (e >= 4) return '#FBBF24';
+                    return '#EF4444';
+                })
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#ffffff' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const mood = moodEmojis[context.dataIndex];
+                            return `Energy: ${context.parsed.y}/10 ${mood ? '• ' + mood : ''}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 10,
+                    ticks: { color: '#ffffff', stepSize: 1 },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                }
+            }
+        }
+    });
 }
 
 function addGoal() {
