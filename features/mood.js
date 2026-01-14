@@ -73,7 +73,7 @@ function renderMoodTracker() {
     container.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <!-- Left: Today's Input -->
-            <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 25px;">
+            <div style="background: linear-gradient(135deg, rgba(58, 58, 58, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 16px; padding: 25px;">
                 <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 How are you feeling today?</h3>
                 
                 <!-- Energy Slider -->
@@ -87,7 +87,7 @@ function renderMoodTracker() {
                     <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">😊 Mood</label>
                     <div style="display: flex; gap: 10px; justify-content: space-between;">
                         ${moods.map(mood => `
-                            <button onclick="setMood('${mood}')" style="background: ${currentMood === mood ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${currentMood === mood ? '#ffffff' : 'rgba(139, 92, 246, 0.3)'}; border-radius: 12px; padding: 15px; font-size: 32px; cursor: pointer; transition: all 0.2s; flex: 1;">
+                            <button onclick="setMood('${mood}')" style="background: ${currentMood === mood ? 'rgba(58, 58, 58, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${currentMood === mood ? '#ffffff' : 'rgba(58, 58, 58, 0.3)'}; border-radius: 12px; padding: 15px; font-size: 32px; cursor: pointer; transition: all 0.2s; flex: 1;">
                                 ${mood}
                             </button>
                         `).join('')}
@@ -103,12 +103,12 @@ function renderMoodTracker() {
             </div>
             
             <!-- Right: Last 7 Days Comparison - CLICKABLE -->
-            <div onclick="showMoodChart()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+            <div onclick="showMoodChart()" style="background: linear-gradient(135deg, rgba(26, 26, 26, 0.1), rgba(38, 38, 38, 0.1)); border: 2px solid rgba(26, 26, 26, 0.4); border-radius: 16px; padding: 25px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #6B7280); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Past 7 Days</h3>
                 
                 <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
                     ${last7Days.map(day => `
-                        <div style="background: ${day.isToday ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${day.isToday ? '#ffffff' : 'rgba(16, 185, 129, 0.3)'}; border-radius: 12px; padding: 10px; text-align: center;">
+                        <div style="background: ${day.isToday ? 'rgba(58, 58, 58, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${day.isToday ? '#ffffff' : 'rgba(26, 26, 26, 0.3)'}; border-radius: 12px; padding: 10px; text-align: center;">
                             <div style="font-size: 9px; color: #9CA3AF; margin-bottom: 5px; font-weight: 600;">${day.monthDay}</div>
                             <div style="font-size: 8px; color: ${day.isToday ? '#6B7280' : '#6B7280'}; margin-bottom: 8px;">${day.label}</div>
                             <div style="font-size: 28px; margin-bottom: 8px;">${day.data.mood || '—'}</div>
@@ -131,7 +131,7 @@ function showMoodChart() {
         <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #6B7280); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 Energy & Mood History</h2>
         
         <div style="margin-bottom: 20px;">
-            <select id="moodTimeRange" onchange="updateMoodChart()" style="padding: 10px; border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600;">
+            <select id="moodTimeRange" onchange="updateMoodChart()" style="padding: 10px; border: 2px solid rgba(26, 26, 26, 0.4); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600;">
                 <option value="7">Last 7 Days</option>
                 <option value="30">Last 30 Days</option>
                 <option value="all">All Time</option>
@@ -140,7 +140,7 @@ function showMoodChart() {
         
         <canvas id="moodChart" style="max-height: 400px;"></canvas>
         
-        <div style="margin-top: 30px; padding: 20px; background: rgba(16, 185, 129, 0.2); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.4);">
+        <div style="margin-top: 30px; padding: 20px; background: rgba(26, 26, 26, 0.2); border-radius: 12px; border: 2px solid rgba(26, 26, 26, 0.4);">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #6B7280;">📊 Stats</h3>
             <div id="moodStats"></div>
         </div>
@@ -227,7 +227,7 @@ function updateMoodChart() {
                 label: 'Energy Level',
                 data: energyData,
                 borderColor: '#ffffff',
-                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                backgroundColor: 'rgba(26, 26, 26, 0.2)',
                 borderWidth: 3,
                 fill: true,
                 tension: 0.4,
