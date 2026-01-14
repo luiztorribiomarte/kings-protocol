@@ -11,12 +11,12 @@
         }
 
         body.zen-mode {
-            background: linear-gradient(135deg, #FFF5F7 0%, #E0F2FE 50%, #FAF5FF 100%);
+            background: linear-gradient(135deg, #F5F5F0 0%, #E8E8E8 50%, #F5F5F0 100%);
             color: #1a1a1a;
         }
 
         body.fire-mode {
-            background: linear-gradient(135deg, #0a0a0f 0%, #1a0b2e 50%, #0a0a0f 100%);
+            background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
             color: #ffffff;
         }
 
@@ -30,13 +30,13 @@
         }
 
         .zen-mode .container {
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 8px 40px rgba(139, 92, 246, 0.15);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
         }
 
         .fire-mode .container {
-            background: linear-gradient(135deg, #1a0b2e 0%, #16213e 50%, #1a0b2e 100%);
-            box-shadow: 0 0 60px rgba(139, 92, 246, 0.4);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+            box-shadow: 0 0 60px rgba(212, 175, 55, 0.3);
         }
 
         /* Header */
@@ -61,7 +61,7 @@
         .page-title {
             font-size: 40px;
             font-weight: 700;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #D4AF37, #B8941E);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -87,11 +87,11 @@
             background: transparent;
         }
 
-        .zen-mode .mode-btn { color: #8B5CF6; }
-        .fire-mode .mode-btn { color: #A78BFA; }
+        .zen-mode .mode-btn { color: #D4AF37; }
+        .fire-mode .mode-btn { color: #F4E5B8; }
 
         .mode-btn.active {
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #D4AF37, #B8941E);
             color: white !important;
             box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
         }
@@ -121,7 +121,7 @@
 
         .nav-tab.active {
             background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
-            color: #8B5CF6 !important;
+            color: #D4AF37 !important;
             box-shadow: 0 -4px 15px rgba(139, 92, 246, 0.2);
         }
 
@@ -142,7 +142,7 @@
 
         /* Buttons */
         .export-btn {
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #D4AF37, #B8941E);
             color: white;
             border: none;
             padding: 12px 30px;
@@ -196,7 +196,7 @@
         .stat-value {
             font-size: 36px;
             font-weight: 900;
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
+            background: linear-gradient(135deg, #D4AF37, #F59E0B);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 8px;
@@ -220,7 +220,7 @@
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 20px;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #D4AF37, #B8941E);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -267,11 +267,11 @@
 
         .habit-cell.header {
             background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15)) !important;
-            color: #8B5CF6 !important;
+            color: #D4AF37 !important;
         }
 
         .habit-cell.today {
-            border: 2px solid #EC4899 !important;
+            border: 2px solid #B8941E !important;
             box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
         }
 
@@ -325,7 +325,7 @@
             align-items: center;
             justify-content: center;
             font-size: 64px;
-            background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+            background: linear-gradient(135deg, #D4AF37, #F4E5B8);
         }
 
         .goal-content {
@@ -348,7 +348,7 @@
             font-size: 11px;
             font-weight: 500;
             background: rgba(251, 191, 36, 0.2);
-            color: #FBBF24;
+            color: #D4AF37;
             margin-bottom: 10px;
         }
 
@@ -363,7 +363,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #8B5CF6, #EC4899);
+            background: linear-gradient(90deg, #D4AF37, #B8941E);
             border-radius: 4px;
             transition: width 0.5s ease;
         }
@@ -423,14 +423,14 @@
 
         .timer-mode-btn.active {
             background: rgba(139, 92, 246, 0.2);
-            border-color: #8B5CF6;
-            color: #A78BFA !important;
+            border-color: #D4AF37;
+            color: #F4E5B8 !important;
         }
 
         .timer-display {
             font-size: 72px;
             font-weight: 700;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #D4AF37, #B8941E);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin: 30px 0;
@@ -439,7 +439,7 @@
         .control-btn {
             padding: 12px 30px;
             border-radius: 50px;
-            border: 2px solid #8B5CF6;
+            border: 2px solid #D4AF37;
             background: rgba(139, 92, 246, 0.2);
             color: white;
             font-size: 15px;
@@ -516,7 +516,7 @@
         }
 
         .milestone-card.achieved {
-            border-color: #EC4899 !important;
+            border-color: #B8941E !important;
             box-shadow: 0 0 30px rgba(236, 72, 153, 0.5);
         }
 
@@ -537,7 +537,7 @@
         .toggle-switch {
             width: 60px;
             height: 30px;
-            background: #10B981;
+            background: #D4AF37;
             border-radius: 50px;
             position: relative;
             cursor: pointer;
@@ -593,7 +593,7 @@
         .notification-title {
             font-size: 20px;
             font-weight: 700;
-            color: #10B981;
+            color: #D4AF37;
         }
 
         /* Two Column Layout */
