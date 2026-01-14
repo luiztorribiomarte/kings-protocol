@@ -374,7 +374,13 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Load feature modules first -->
+    <script src="features/habits.js"></script>
+    <script src="features/goals.js"></script>
+    <script src="features/mood.js"></script>
     <script src="features/workout.js"></script>
+    
+    <!-- Load core app last -->
+    <script src="app-core.js"></script>
 </body>
 </html>
