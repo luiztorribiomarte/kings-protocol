@@ -30,28 +30,28 @@ function addGoal() {
         <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Goal</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Goal Title</label>
-            <input type="text" id="goalTitle" placeholder="e.g., Reach 25K subscribers" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Goal Title</label>
+            <input type="text" id="goalTitle" placeholder="e.g., Reach 25K subscribers" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Target Number <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
-            <input type="number" id="goalTarget" placeholder="e.g., 25000" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Target Number <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <input type="number" id="goalTarget" placeholder="e.g., 25000" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Current Progress <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
-            <input type="number" id="goalCurrent" placeholder="e.g., 750" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Current Progress <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <input type="number" id="goalCurrent" placeholder="e.g., 750" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Deadline <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
-            <input type="date" id="goalDeadline" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Deadline <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <input type="date" id="goalDeadline" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveNewGoal()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(58, 58, 58, 0.4);">Add Goal</button>
+            <button onclick="saveNewGoal()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">Add Goal</button>
         </div>
     `;
 }
@@ -95,13 +95,13 @@ function updateGoalProgress(goalId) {
         <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Update Progress</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">${goal.title}</label>
-            <input type="number" id="newProgress" placeholder="Enter new value" value="${goal.current}" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">${goal.title}</label>
+            <input type="number" id="newProgress" placeholder="Enter new value" value="${goal.current}" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveProgressUpdate(${goalId})" style="background: linear-gradient(135deg, #ffffff, #6B7280); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(26, 26, 26, 0.4);">Update</button>
+            <button onclick="saveProgressUpdate(${goalId})" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(31, 41, 55, 0.4);">Update</button>
         </div>
     `;
 }
@@ -143,9 +143,9 @@ function renderGoals() {
     
     if (goalsData.length === 0) {
         container.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(58, 58, 58, 0.3);">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(255, 255, 255, 0.2, 0.3);">
                 <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
-                <div style="font-size: 18px; font-weight: 600; color: #6B7280; margin-bottom: 10px;">No goals yet!</div>
+                <div style="font-size: 18px; font-weight: 600; color: #9CA3AF; margin-bottom: 10px;">No goals yet!</div>
                 <div style="font-size: 14px; color: #9CA3AF;">Click "Add New Goal" to get started</div>
             </div>
         `;
@@ -195,7 +195,7 @@ function showGoalChart(goalId) {
                 <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
                 <div style="font-size: 16px; color: #9CA3AF;">This is a non-measurable goal or has no progress data yet.</div>
             </div>
-            <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #ffffff, #6B7280); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(26, 26, 26, 0.4); margin-top: 20px;">Update Progress</button>
+            <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(31, 41, 55, 0.4); margin-top: 20px;">Update Progress</button>
         `;
         return;
     }
@@ -205,7 +205,7 @@ function showGoalChart(goalId) {
         
         <canvas id="goalChart" style="max-height: 400px; margin-bottom: 20px;"></canvas>
         
-        <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #ffffff, #6B7280); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(26, 26, 26, 0.4);">Update Progress</button>
+        <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(31, 41, 55, 0.4);">Update Progress</button>
     `;
     
     renderGoalChart(goal);
@@ -231,7 +231,7 @@ function renderGoalChart(goal) {
                     label: 'Progress',
                     data: data,
                     borderColor: '#ffffff',
-                    backgroundColor: 'rgba(26, 26, 26, 0.2)',
+                    backgroundColor: 'rgba(31, 41, 55, 0.2)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4
