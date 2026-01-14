@@ -40,7 +40,7 @@ function renderVisionBoard() {
     container.innerHTML = `
         <!-- Instructions -->
         <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2)); border: 2px solid rgba(139, 92, 246, 0.5); border-radius: 16px; padding: 20px; margin-bottom: 30px;">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Create Your Vision</h3>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Create Your Vision</h3>
             <p style="font-size: 14px; color: #9CA3AF; line-height: 1.6;">
                 Click any card to add an image URL. Add images that represent your goals, dreams, and the life you're manifesting. Each card has an affirmation you can customize.
             </p>
@@ -98,7 +98,7 @@ function openVisionCardModal(index) {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Vision Card ${index + 1}</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Vision Card ${index + 1}</h2>
         
         <!-- Image Preview -->
         ${image ? `
@@ -109,7 +109,7 @@ function openVisionCardModal(index) {
         
         <!-- Image URL Input -->
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">🖼️ Image URL</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">🖼️ Image URL</label>
             <input type="text" 
                    id="visionImageUrl" 
                    value="${image || ''}" 
@@ -120,7 +120,7 @@ function openVisionCardModal(index) {
         
         <!-- Quote Input -->
         <div style="margin-bottom: 25px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">💬 Affirmation / Quote</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">💬 Affirmation / Quote</label>
             <input type="text" 
                    id="visionQuote" 
                    value="${quote}" 
@@ -131,7 +131,7 @@ function openVisionCardModal(index) {
         <!-- Action Buttons -->
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveVisionCard(${index})" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Save Vision</button>
+            <button onclick="saveVisionCard(${index})" style="background: linear-gradient(135deg, #D4AF37, #B8941E); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Save Vision</button>
         </div>
     `;
 }
