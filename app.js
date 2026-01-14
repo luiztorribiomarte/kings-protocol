@@ -66,6 +66,10 @@ function showPage(pageName) {
     if (pageName === 'workout') {
         renderExerciseCards();
     }
+    
+    if (pageName === 'journal') {
+        renderJournalPage();
+    }
 }
 
 // ============================================
@@ -332,6 +336,7 @@ initGoalsData();
 initMoodData();
 initHabitsList();
 initWorkoutData();
+initJournalData();
 
 // Render initial views
 renderHabitGrid();
