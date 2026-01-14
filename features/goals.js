@@ -27,31 +27,31 @@ function addGoal() {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Goal</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Goal</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">Goal Title</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">Goal Title</label>
             <input type="text" id="goalTitle" placeholder="e.g., Reach 25K subscribers" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">Target Number <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">Target Number <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
             <input type="number" id="goalTarget" placeholder="e.g., 25000" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">Current Progress <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">Current Progress <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
             <input type="number" id="goalCurrent" placeholder="e.g., 750" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">Deadline <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">Deadline <span style="font-weight: 400; color: #9CA3AF;">(optional)</span></label>
             <input type="date" id="goalDeadline" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveNewGoal()" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Add Goal</button>
+            <button onclick="saveNewGoal()" style="background: linear-gradient(135deg, #D4AF37, #B8941E); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Add Goal</button>
         </div>
     `;
 }
@@ -92,16 +92,16 @@ function updateGoalProgress(goalId) {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Update Progress</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Update Progress</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">${goal.title}</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">${goal.title}</label>
             <input type="number" id="newProgress" placeholder="Enter new value" value="${goal.current}" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveProgressUpdate(${goalId})" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">Update</button>
+            <button onclick="saveProgressUpdate(${goalId})" style="background: linear-gradient(135deg, #D4AF37, #F4E5B8); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">Update</button>
         </div>
     `;
 }
@@ -145,7 +145,7 @@ function renderGoals() {
         container.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(139, 92, 246, 0.3);">
                 <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
-                <div style="font-size: 18px; font-weight: 600; color: #A78BFA; margin-bottom: 10px;">No goals yet!</div>
+                <div style="font-size: 18px; font-weight: 600; color: #F4E5B8; margin-bottom: 10px;">No goals yet!</div>
                 <div style="font-size: 14px; color: #9CA3AF;">Click "Add New Goal" to get started</div>
             </div>
         `;
@@ -172,7 +172,7 @@ function renderGoals() {
                     ` : `
                         <div style="font-size: 14px; color: #9CA3AF; margin-top: 10px;">Non-measurable goal</div>
                     `}
-                    ${goal.deadline ? `<div style="font-size: 12px; color: #FBBF24; margin-top: 8px;">📅 ${goal.deadline}</div>` : ''}
+                    ${goal.deadline ? `<div style="font-size: 12px; color: #D4AF37; margin-top: 8px;">📅 ${goal.deadline}</div>` : ''}
                 </div>
                 <button onclick="event.stopPropagation(); deleteGoal(${goal.id})" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
             </div>
@@ -190,22 +190,22 @@ function showGoalChart(goalId) {
     
     if (!goal.target || goal.history.length === 0) {
         modalContent.innerHTML = `
-            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
+            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
             <div style="text-align: center; padding: 40px;">
                 <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
                 <div style="font-size: 16px; color: #9CA3AF;">This is a non-measurable goal or has no progress data yet.</div>
             </div>
-            <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); margin-top: 20px;">Update Progress</button>
+            <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #D4AF37, #F4E5B8); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); margin-top: 20px;">Update Progress</button>
         `;
         return;
     }
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${goal.title}</h2>
         
         <canvas id="goalChart" style="max-height: 400px; margin-bottom: 20px;"></canvas>
         
-        <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">Update Progress</button>
+        <button onclick="updateGoalProgress(${goalId})" style="width: 100%; background: linear-gradient(135deg, #D4AF37, #F4E5B8); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">Update Progress</button>
     `;
     
     renderGoalChart(goal);
@@ -230,7 +230,7 @@ function renderGoalChart(goal) {
                 {
                     label: 'Progress',
                     data: data,
-                    borderColor: '#10B981',
+                    borderColor: '#D4AF37',
                     backgroundColor: 'rgba(16, 185, 129, 0.2)',
                     borderWidth: 3,
                     fill: true,
@@ -239,7 +239,7 @@ function renderGoalChart(goal) {
                 {
                     label: 'Target',
                     data: Array(labels.length).fill(goal.target),
-                    borderColor: '#FBBF24',
+                    borderColor: '#D4AF37',
                     borderWidth: 2,
                     borderDash: [5, 5],
                     fill: false,
