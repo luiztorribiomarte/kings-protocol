@@ -42,14 +42,14 @@ function renderJournalPage() {
                 <h2 style="font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Today's Journal</h2>
                 <div style="font-size: 14px; color: #9CA3AF; margin-top: 5px;">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
             </div>
-            <select id="journalDateSelector" onchange="loadJournalDate(this.value)" style="padding: 12px 20px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600; cursor: pointer;">
+            <select id="journalDateSelector" onchange="loadJournalDate(this.value)" style="padding: 12px 20px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600; cursor: pointer;">
                 <option value="${today}">Today</option>
                 ${getPastDates().map(date => `<option value="${date}">${formatDate(date)}</option>`).join('')}
             </select>
         </div>
 
         <!-- Daily Wins -->
-        <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.1)); border: 2px solid rgba(251, 191, 36, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(156, 163, 175, 0.1)); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
             <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🏆 Daily Wins</h3>
             <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What did you accomplish today?</p>
             ${todayData.wins.map((win, i) => `
@@ -58,12 +58,12 @@ function renderJournalPage() {
                        value="${win}" 
                        onchange="saveJournalField('wins', ${i}, this.value)"
                        placeholder="Win #${i + 1}"
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
             `).join('')}
         </div>
 
         <!-- Gratitude -->
-        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+        <div style="background: linear-gradient(135deg, rgba(26, 26, 26, 0.1), rgba(38, 38, 38, 0.1)); border: 2px solid rgba(26, 26, 26, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
             <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🙏 Gratitude</h3>
             <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What are you thankful for today?</p>
             ${todayData.gratitude.map((item, i) => `
@@ -72,12 +72,12 @@ function renderJournalPage() {
                        value="${item}" 
                        onchange="saveJournalField('gratitude', ${i}, this.value)"
                        placeholder="I'm grateful for..."
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(16, 185, 129, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(26, 26, 26, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
             `).join('')}
         </div>
 
         <!-- Affirmations -->
-        <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+        <div style="background: linear-gradient(135deg, rgba(58, 58, 58, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
             <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎 I AM Affirmations</h3>
             <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">Declare who you are becoming</p>
             ${todayData.affirmations.map((affirmation, i) => `
@@ -86,12 +86,12 @@ function renderJournalPage() {
                        value="${affirmation}" 
                        onchange="saveJournalField('affirmations', ${i}, this.value)"
                        placeholder="I AM ${['successful', 'confident', 'disciplined', 'focused', 'unstoppable'][i]}"
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(58, 58, 58, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a;">
             `).join('')}
         </div>
 
         <!-- Daily Entry -->
-        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.1)); border: 2px solid rgba(59, 130, 246, 0.4); border-radius: 16px; padding: 25px;">
+        <div style="background: linear-gradient(135deg, rgba(38, 38, 38, 0.1), rgba(147, 197, 253, 0.1)); border: 2px solid rgba(38, 38, 38, 0.4); border-radius: 16px; padding: 25px;">
             <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #8B8B8B;">📖 Daily Journal Entry</h3>
             <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">How was your day? Thoughts, reflections, feelings...</p>
             <textarea 
@@ -100,7 +100,7 @@ function renderJournalPage() {
                 placeholder="Dear Journal,
 
 Today was..."
-                style="width: 100%; min-height: 250px; padding: 20px; border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; resize: vertical;"
+                style="width: 100%; min-height: 250px; padding: 20px; border: 2px solid rgba(38, 38, 38, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; resize: vertical;"
             >${todayData.entry}</textarea>
             
             <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
@@ -113,15 +113,15 @@ Today was..."
 
         <!-- Journal Stats -->
         <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-            <div style="background: rgba(139, 92, 246, 0.2); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: rgba(58, 58, 58, 0.2); border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${Object.keys(journalData).length}</div>
                 <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Entries</div>
             </div>
-            <div style="background: rgba(16, 185, 129, 0.2); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: rgba(26, 26, 26, 0.2); border: 2px solid rgba(26, 26, 26, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${calculateStreak()}</div>
                 <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Day Streak</div>
             </div>
-            <div style="background: rgba(251, 191, 36, 0.2); border: 2px solid rgba(251, 191, 36, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${getTotalWords()}</div>
                 <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Words</div>
             </div>
