@@ -74,6 +74,10 @@ function showPage(pageName) {
     if (pageName === 'vision') {
         renderVisionBoard();
     }
+    
+    if (pageName === 'content') {
+        renderContentTracker();
+    }
 }
 
 // ============================================
@@ -342,6 +346,7 @@ initHabitsList();
 initWorkoutData();
 initJournalData();
 initVisionBoardData();
+initContentData();
 
 // Render initial views
 renderHabitGrid();
