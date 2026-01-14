@@ -184,6 +184,87 @@ function togglePlaylist() {
 }
 
 // ============================================
+// LIVE CLOCK WITH GEOLOCATION
+// ============================================
+
+function updateClock() {
+    const now = new Date();
+    
+    // Format time (12-hour format with AM/PM)
+    let hours = now.getHours();
+    const minutes = now.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+    const timeString = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    
+    // Format date
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    const dateString = now.toLocaleDateString('en-US', options);
+    
+    // Update display
+    const clockElement = document.getElementById('liveClock');
+    const dateElement = document.getElementById('liveDate');
+    
+    if (clockElement) clockElement.textContent = timeString;
+    if (dateElement) dateElement.textContent = dateString;
+}
+
+function updateLocation() {
+    const locationElement = document.getElementById('clockLocation');
+    
+    if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                try {
+                    // Use OpenStreetMap's Nominatim API (free, no key required)
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
+                    const data = await response.json();
+                    
+                    // Get city/neighborhood
+                    const city = data.address.city || 
+                                data.address.town || 
+                                data.address.village || 
+                                data.address.suburb || 
+                                data.address.neighbourhood || 
+                                data.address.county ||
+                                'Unknown';
+                    
+                    if (locationElement) {
+                        locationElement.textContent = city;
+                    }
+                    
+                    // Save location to localStorage
+                    localStorage.setItem('userLocation', city);
+                } catch (error) {
+                    console.error('Error getting location name:', error);
+                    if (locationElement) {
+                        locationElement.textContent = 'New York';
+                    }
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                // Try to use saved location
+                const savedLocation = localStorage.getItem('userLocation');
+                if (locationElement) {
+                    locationElement.textContent = savedLocation || 'New York';
+                }
+            }
+        );
+    } else {
+        // Geolocation not supported, use saved or default
+        const savedLocation = localStorage.getItem('userLocation');
+        if (locationElement) {
+            locationElement.textContent = savedLocation || 'New York';
+        }
+    }
+}
+
+// ============================================
 // API FETCHING
 // ============================================
 
@@ -257,6 +338,13 @@ renderHabitGrid();
 updateStreakDisplay();
 fetchYouTubeStats();
 fetchWeather();
+
+// Initialize and update clock
+updateClock();
+setInterval(updateClock, 1000); // Update every second
+
+// Get user location
+updateLocation();
 
 // Set up intervals
 setInterval(fetchYouTubeStats, 300000);
