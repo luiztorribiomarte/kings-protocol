@@ -12,11 +12,11 @@
 
         body.zen-mode {
             background: linear-gradient(135deg, #F5F5F0 0%, #E8E8E8 50%, #F5F5F0 100%);
-            color: #1a1a1a;
+            color: #374151;
         }
 
         body.fire-mode {
-            background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
             color: #ffffff;
         }
 
@@ -35,7 +35,7 @@
         }
 
         .fire-mode .container {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+            background: linear-gradient(135deg, #374151 0%, #4B5563 50%, #374151 100%);
             box-shadow: 0 0 60px rgba(255, 255, 255, 0.3);
         }
 
@@ -88,7 +88,7 @@
         }
 
         .zen-mode .mode-btn { color: #ffffff; }
-        .fire-mode .mode-btn { color: #6B7280; }
+        .fire-mode .mode-btn { color: #9CA3AF; }
 
         .mode-btn.active {
             background: linear-gradient(135deg, #ffffff, #9CA3AF);
@@ -116,7 +116,7 @@
             transition: all 0.3s ease;
         }
 
-        .zen-mode .nav-tab { color: #6B7280; }
+        .zen-mode .nav-tab { color: #9CA3AF; }
         .fire-mode .nav-tab { color: #9CA3AF; }
 
         .nav-tab.active {
@@ -208,7 +208,7 @@
             text-transform: uppercase;
         }
 
-        .zen-mode .stat-label { color: #6B7280; }
+        .zen-mode .stat-label { color: #9CA3AF; }
         .fire-mode .stat-label { color: #9CA3AF; }
 
         /* Habit Tracker */
@@ -256,7 +256,7 @@
         .zen-mode .habit-cell {
             background: white;
             border: 1px solid rgba(58, 58, 58, 0.2);
-            color: #1a1a1a;
+            color: #374151;
         }
 
         .fire-mode .habit-cell {
@@ -325,7 +325,7 @@
             align-items: center;
             justify-content: center;
             font-size: 64px;
-            background: linear-gradient(135deg, #ffffff, #6B7280);
+            background: linear-gradient(135deg, #ffffff, #9CA3AF);
         }
 
         .goal-content {
@@ -338,7 +338,7 @@
             margin-bottom: 12px;
         }
 
-        .zen-mode .goal-title { color: #1a1a1a; }
+        .zen-mode .goal-title { color: #374151; }
         .fire-mode .goal-title { color: #E5E7EB; }
 
         .property-pill {
@@ -374,7 +374,7 @@
         }
 
         .zen-mode .progress-text { color: #9CA3AF; }
-        .fire-mode .progress-text { color: #6B7280; }
+        .fire-mode .progress-text { color: #9CA3AF; }
 
         /* Timer */
         .timer-widget {
@@ -413,7 +413,7 @@
 
         .zen-mode .timer-mode-btn {
             border: 2px solid rgba(58, 58, 58, 0.3);
-            color: #6B7280;
+            color: #9CA3AF;
         }
 
         .fire-mode .timer-mode-btn {
@@ -424,7 +424,7 @@
         .timer-mode-btn.active {
             background: rgba(58, 58, 58, 0.2);
             border-color: #ffffff;
-            color: #6B7280 !important;
+            color: #9CA3AF !important;
         }
 
         .timer-display {
@@ -487,7 +487,7 @@
             margin-top: 15px;
         }
 
-        .zen-mode .streak-label { color: #6B7280; }
+        .zen-mode .streak-label { color: #9CA3AF; }
         .fire-mode .streak-label { color: #9CA3AF; }
 
         /* Milestone Cards */
@@ -546,7 +546,7 @@
         }
 
         .toggle-switch.off {
-            background: #6B7280;
+            background: #9CA3AF;
         }
 
         .toggle-switch::after {
