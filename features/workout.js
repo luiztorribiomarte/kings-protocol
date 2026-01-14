@@ -88,7 +88,7 @@ function renderExerciseCards() {
         container.innerHTML = `
             <div style="text-align: center; padding: 60px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(139, 92, 246, 0.3); margin-bottom: 30px;">
                 <div style="font-size: 48px; margin-bottom: 15px;">💪</div>
-                <div style="font-size: 18px; font-weight: 600; color: #A78BFA; margin-bottom: 10px;">No exercises tracked yet!</div>
+                <div style="font-size: 18px; font-weight: 600; color: #F4E5B8; margin-bottom: 10px;">No exercises tracked yet!</div>
                 <div style="font-size: 14px; color: #9CA3AF;">Log your first workout above to get started</div>
             </div>
         `;
@@ -108,7 +108,7 @@ function renderExerciseCards() {
             <div onclick="showExerciseChart('${exercise.replace(/'/g, "\\'")})" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <button onclick="event.stopPropagation(); deleteExercise('${exercise.replace(/'/g, "\\'")}')" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
                 
-                <h3 style="font-size: 18px; font-weight: 700; color: #10B981; margin-bottom: 15px;">🏋️ ${exercise}</h3>
+                <h3 style="font-size: 18px; font-weight: 700; color: #D4AF37; margin-bottom: 15px;">🏋️ ${exercise}</h3>
                 
                 <div style="background: rgba(255, 255, 255, 0.9); border-radius: 8px; padding: 15px; margin-bottom: 12px; color: #1a1a1a;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
@@ -121,7 +121,7 @@ function renderExerciseCards() {
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span style="font-size: 13px; color: #6B7280;">Gain</span>
-                        <span style="font-weight: 700; color: ${totalGain >= 0 ? '#10B981' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs (${percentGain >= 0 ? '+' : ''}${percentGain}%)</span>
+                        <span style="font-weight: 700; color: ${totalGain >= 0 ? '#D4AF37' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs (${percentGain >= 0 ? '+' : ''}${percentGain}%)</span>
                     </div>
                 </div>
                 
@@ -144,17 +144,17 @@ function showExerciseChart(exerciseName) {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🏋️ ${exerciseName} Progress</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #F4E5B8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🏋️ ${exerciseName} Progress</h2>
         
         <canvas id="exerciseChart" style="max-height: 400px; margin-bottom: 30px;"></canvas>
         
         <div style="background: rgba(16, 185, 129, 0.2); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.4); padding: 20px;">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #34D399;">📊 Stats</h3>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #F4E5B8;">📊 Stats</h3>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;" id="exerciseStats"></div>
         </div>
         
         <div style="margin-top: 20px; max-height: 200px; overflow-y: auto; background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px;">
-            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #A78BFA;">📝 Recent Workouts</h4>
+            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #F4E5B8;">📝 Recent Workouts</h4>
             ${workouts.slice(-10).reverse().map(w => `
                 <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; font-size: 13px;">
                     <strong>${new Date(w.date).toLocaleDateString()}</strong>: ${w.weight} lbs × ${w.reps} reps × ${w.sets} sets
@@ -182,15 +182,15 @@ function renderExerciseChart(exerciseName, workouts) {
     if (statsDiv) {
         statsDiv.innerHTML = `
             <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #8B5CF6;">${first.weight} lbs</div>
+                <div style="font-size: 28px; font-weight: 900; color: #D4AF37;">${first.weight} lbs</div>
                 <div style="font-size: 12px; color: #9CA3AF;">Starting</div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #10B981;">${latest.weight} lbs</div>
+                <div style="font-size: 28px; font-weight: 900; color: #D4AF37;">${latest.weight} lbs</div>
                 <div style="font-size: 12px; color: #9CA3AF;">Current</div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: ${totalGain >= 0 ? '#FBBF24' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs</div>
+                <div style="font-size: 28px; font-weight: 900; color: ${totalGain >= 0 ? '#D4AF37' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs</div>
                 <div style="font-size: 12px; color: #9CA3AF;">Gain</div>
             </div>
         `;
@@ -207,14 +207,14 @@ function renderExerciseChart(exerciseName, workouts) {
             datasets: [{
                 label: 'Weight (lbs)',
                 data: weights,
-                borderColor: '#10B981',
+                borderColor: '#D4AF37',
                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
                 borderWidth: 3,
                 fill: true,
                 tension: 0.4,
                 pointRadius: 6,
                 pointHoverRadius: 8,
-                pointBackgroundColor: '#10B981'
+                pointBackgroundColor: '#D4AF37'
             }]
         },
         options: {
