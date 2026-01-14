@@ -1,296 +1,262 @@
 // ============================================
-// WORKOUT MODULE - Workout tracking
+// JOURNAL MODULE - Daily journaling & reflections
 // ============================================
 
-let workoutData = {};
-let lifetimePushups = 0;
-let lifetimePullups = 0;
+let journalData = {};
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
-function initWorkoutData() {
-    const saved = localStorage.getItem('workoutData');
+function initJournalData() {
+    const saved = localStorage.getItem('journalData');
     if (saved) {
-        workoutData = JSON.parse(saved);
-    }
-    
-    const savedPushups = localStorage.getItem('lifetimePushups');
-    if (savedPushups) {
-        lifetimePushups = parseInt(savedPushups);
-        const display = document.getElementById('totalPushups');
-        if (display) display.textContent = lifetimePushups.toLocaleString();
-    }
-    
-    const savedPullups = localStorage.getItem('lifetimePullups');
-    if (savedPullups) {
-        lifetimePullups = parseInt(savedPullups);
-        const display = document.getElementById('totalPullups');
-        if (display) display.textContent = lifetimePullups.toLocaleString();
+        journalData = JSON.parse(saved);
     }
 }
 
-function saveWorkoutData() {
-    localStorage.setItem('workoutData', JSON.stringify(workoutData));
+function saveJournalData() {
+    localStorage.setItem('journalData', JSON.stringify(journalData));
 }
 
 // ============================================
-// WORKOUT LOGGING
+// JOURNAL RENDERING
 // ============================================
 
-function logWorkout() {
-    const name = document.getElementById('exerciseName')?.value.trim();
-    const weight = parseFloat(document.getElementById('exerciseWeight')?.value);
-    const reps = parseInt(document.getElementById('exerciseReps')?.value);
-    const sets = parseInt(document.getElementById('exerciseSets')?.value);
+function renderJournalPage() {
+    const container = document.getElementById('journalContainer');
+    if (!container) return;
     
-    if (!name) {
-        alert('Please enter an exercise name');
-        return;
+    const today = new Date().toISOString().split('T')[0];
+    const todayData = journalData[today] || {
+        wins: ['', '', ''],
+        gratitude: ['', '', ''],
+        affirmations: ['', '', '', '', ''],
+        entry: ''
+    };
+    
+    container.innerHTML = `
+        <!-- Date Selector -->
+        <div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 style="font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Today's Journal</h2>
+                <div style="font-size: 14px; color: #9CA3AF; margin-top: 5px;">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+            <select id="journalDateSelector" onchange="loadJournalDate(this.value)" style="padding: 12px 20px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600; cursor: pointer;">
+                <option value="${today}">Today</option>
+                ${getPastDates().map(date => `<option value="${date}">${formatDate(date)}</option>`).join('')}
+            </select>
+        </div>
+
+        <!-- Daily Wins -->
+        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(156, 163, 175, 0.1)); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🏆 Daily Wins</h3>
+            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What did you accomplish today?</p>
+            ${todayData.wins.map((win, i) => `
+                <input type="text" 
+                       id="win${i}" 
+                       value="${win}" 
+                       onchange="saveJournalField('wins', ${i}, this.value)"
+                       placeholder="Win #${i + 1}"
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
+            `).join('')}
+        </div>
+
+        <!-- Gratitude -->
+        <div style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.1), rgba(75, 85, 99, 0.1)); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🙏 Gratitude</h3>
+            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What are you thankful for today?</p>
+            ${todayData.gratitude.map((item, i) => `
+                <input type="text" 
+                       id="gratitude${i}" 
+                       value="${item}" 
+                       onchange="saveJournalField('gratitude', ${i}, this.value)"
+                       placeholder="I'm grateful for..."
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(31, 41, 55, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
+            `).join('')}
+        </div>
+
+        <!-- Affirmations -->
+        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎 I AM Affirmations</h3>
+            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">Declare who you are becoming</p>
+            ${todayData.affirmations.map((affirmation, i) => `
+                <input type="text" 
+                       id="affirmation${i}" 
+                       value="${affirmation}" 
+                       onchange="saveJournalField('affirmations', ${i}, this.value)"
+                       placeholder="I AM ${['successful', 'confident', 'disciplined', 'focused', 'unstoppable'][i]}"
+                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
+            `).join('')}
+        </div>
+
+        <!-- Daily Entry -->
+        <div style="background: linear-gradient(135deg, rgba(75, 85, 99, 0.1), rgba(147, 197, 253, 0.1)); border: 2px solid rgba(75, 85, 99, 0.4); border-radius: 16px; padding: 25px;">
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #8B8B8B;">📖 Daily Journal Entry</h3>
+            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">How was your day? Thoughts, reflections, feelings...</p>
+            <textarea 
+                id="journalEntry" 
+                onchange="saveJournalField('entry', null, this.value)"
+                placeholder="Dear Journal,
+
+Today was..."
+                style="width: 100%; min-height: 250px; padding: 20px; border: 2px solid rgba(75, 85, 99, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; resize: vertical;"
+            >${todayData.entry}</textarea>
+            
+            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: #9CA3AF;">
+                    <span id="wordCount">0 words</span> • Auto-saves as you type
+                </div>
+                <button onclick="clearTodayJournal()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">Clear Today</button>
+            </div>
+        </div>
+
+        <!-- Journal Stats -->
+        <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+            <div style="background: rgba(255, 255, 255, 0.2, 0.2); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${Object.keys(journalData).length}</div>
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Entries</div>
+            </div>
+            <div style="background: rgba(31, 41, 55, 0.2); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${calculateStreak()}</div>
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Day Streak</div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${getTotalWords()}</div>
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Words</div>
+            </div>
+        </div>
+    `;
+    
+    updateWordCount();
+}
+
+// ============================================
+// JOURNAL ACTIONS
+// ============================================
+
+function saveJournalField(field, index, value) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!journalData[today]) {
+        journalData[today] = {
+            wins: ['', '', ''],
+            gratitude: ['', '', ''],
+            affirmations: ['', '', '', '', ''],
+            entry: ''
+        };
     }
     
-    if (isNaN(weight) || isNaN(reps) || isNaN(sets)) {
-        alert('Please enter valid numbers for weight, reps, and sets');
+    if (field === 'entry') {
+        journalData[today].entry = value;
+    } else {
+        journalData[today][field][index] = value;
+    }
+    
+    saveJournalData();
+    updateWordCount();
+    
+    // Update stats
+    renderJournalPage();
+}
+
+function loadJournalDate(dateString) {
+    const data = journalData[dateString] || {
+        wins: ['', '', ''],
+        gratitude: ['', '', ''],
+        affirmations: ['', '', '', '', ''],
+        entry: ''
+    };
+    
+    // Update all fields
+    data.wins.forEach((win, i) => {
+        const el = document.getElementById(`win${i}`);
+        if (el) el.value = win;
+    });
+    
+    data.gratitude.forEach((item, i) => {
+        const el = document.getElementById(`gratitude${i}`);
+        if (el) el.value = item;
+    });
+    
+    data.affirmations.forEach((affirmation, i) => {
+        const el = document.getElementById(`affirmation${i}`);
+        if (el) el.value = affirmation;
+    });
+    
+    const entryEl = document.getElementById('journalEntry');
+    if (entryEl) entryEl.value = data.entry;
+    
+    updateWordCount();
+}
+
+function clearTodayJournal() {
+    if (!confirm('Clear all entries for today? This cannot be undone.')) {
         return;
     }
     
     const today = new Date().toISOString().split('T')[0];
-    
-    if (!workoutData[name]) {
-        workoutData[name] = [];
-    }
-    
-    workoutData[name].push({
-        date: today,
-        weight: weight,
-        reps: reps,
-        sets: sets
-    });
-    
-    saveWorkoutData();
-    renderExerciseCards();
-    
-    // Clear inputs
-    document.getElementById('exerciseName').value = '';
-    document.getElementById('exerciseWeight').value = '';
-    document.getElementById('exerciseReps').value = '';
-    document.getElementById('exerciseSets').value = '';
+    delete journalData[today];
+    saveJournalData();
+    renderJournalPage();
 }
 
-function renderExerciseCards() {
-    const container = document.getElementById('exerciseCardsContainer');
-    if (!container) return;
-    
-    const exercises = Object.keys(workoutData);
-    
-    if (exercises.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 60px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(255, 255, 255, 0.2, 0.3); margin-bottom: 30px;">
-                <div style="font-size: 48px; margin-bottom: 15px;">💪</div>
-                <div style="font-size: 18px; font-weight: 600; color: #9CA3AF; margin-bottom: 10px;">No exercises tracked yet!</div>
-                <div style="font-size: 14px; color: #9CA3AF;">Log your first workout above to get started</div>
-            </div>
-        `;
-        return;
+function updateWordCount() {
+    const entry = document.getElementById('journalEntry')?.value || '';
+    const words = entry.trim() ? entry.trim().split(/\s+/).length : 0;
+    const wordCountEl = document.getElementById('wordCount');
+    if (wordCountEl) {
+        wordCountEl.textContent = `${words} word${words !== 1 ? 's' : ''}`;
     }
-    
-    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">';
-    
-    exercises.forEach(exercise => {
-        const workouts = workoutData[exercise];
-        const latest = workouts[workouts.length - 1];
-        const first = workouts[0];
-        const totalGain = latest.weight - first.weight;
-        const percentGain = first.weight > 0 ? Math.round((totalGain / first.weight) * 100) : 0;
-        
-        html += `
-            <div onclick="showExerciseChart('${exercise.replace(/'/g, "\\'")})" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.1), rgba(75, 85, 99, 0.1)); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <button onclick="event.stopPropagation(); deleteExercise('${exercise.replace(/'/g, "\\'")}')" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
-                
-                <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 15px;">🏋️ ${exercise}</h3>
-                
-                <div style="background: rgba(255, 255, 255, 0.9); border-radius: 8px; padding: 15px; margin-bottom: 12px; color: #374151;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Latest</span>
-                        <span style="font-weight: 700;">${latest.weight} lbs × ${latest.reps} × ${latest.sets}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Starting</span>
-                        <span style="font-weight: 700;">${first.weight} lbs</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Gain</span>
-                        <span style="font-weight: 700; color: ${totalGain >= 0 ? '#ffffff' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs (${percentGain >= 0 ? '+' : ''}${percentGain}%)</span>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(31, 41, 55, 0.1); border-radius: 8px; padding: 12px;">
-                    <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 8px;">Total Workouts: ${workouts.length}</div>
-                    <div style="font-size: 11px; color: #9CA3AF;">Click to see progress chart</div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
 }
 
-function showExerciseChart(exerciseName) {
-    const workouts = workoutData[exerciseName];
-    if (!workouts || workouts.length === 0) return;
-    
-    const modalContent = createModal();
-    
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🏋️ ${exerciseName} Progress</h2>
-        
-        <canvas id="exerciseChart" style="max-height: 400px; margin-bottom: 30px;"></canvas>
-        
-        <div style="background: rgba(31, 41, 55, 0.2); border-radius: 12px; border: 2px solid rgba(31, 41, 55, 0.4); padding: 20px;">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #9CA3AF;">📊 Stats</h3>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;" id="exerciseStats"></div>
-        </div>
-        
-        <div style="margin-top: 20px; max-height: 200px; overflow-y: auto; background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px;">
-            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #9CA3AF;">📝 Recent Workouts</h4>
-            ${workouts.slice(-10).reverse().map(w => `
-                <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; font-size: 13px;">
-                    <strong>${new Date(w.date).toLocaleDateString()}</strong>: ${w.weight} lbs × ${w.reps} reps × ${w.sets} sets
-                </div>
-            `).join('')}
-        </div>
-    `;
-    
-    renderExerciseChart(exerciseName, workouts);
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function getPastDates() {
+    const dates = [];
+    for (let i = 1; i <= 30; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        dates.push(dateKey);
+    }
+    return dates;
 }
 
-function renderExerciseChart(exerciseName, workouts) {
-    const canvas = document.getElementById('exerciseChart');
-    if (!canvas) return;
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function calculateStreak() {
+    let streak = 0;
+    const dates = Object.keys(journalData).sort().reverse();
+    const today = new Date().toISOString().split('T')[0];
     
-    const labels = workouts.map(w => new Date(w.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-    const weights = workouts.map(w => w.weight);
-    
-    const first = workouts[0];
-    const latest = workouts[workouts.length - 1];
-    const totalGain = latest.weight - first.weight;
-    
-    // Update stats
-    const statsDiv = document.getElementById('exerciseStats');
-    if (statsDiv) {
-        statsDiv.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #ffffff;">${first.weight} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Starting</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #ffffff;">${latest.weight} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Current</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: ${totalGain >= 0 ? '#ffffff' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Gain</div>
-            </div>
-        `;
+    for (let i = 0; i < 365; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        
+        if (journalData[dateKey] && journalData[dateKey].entry) {
+            streak++;
+        } else {
+            break;
+        }
     }
     
-    if (window.exerciseChartInstance) {
-        window.exerciseChartInstance.destroy();
-    }
-    
-    window.exerciseChartInstance = new Chart(canvas, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Weight (lbs)',
-                data: weights,
-                borderColor: '#ffffff',
-                backgroundColor: 'rgba(31, 41, 55, 0.2)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { labels: { color: '#ffffff' } },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const workout = workouts[context.dataIndex];
-                            return `${workout.weight} lbs × ${workout.reps} reps × ${workout.sets} sets`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    ticks: { color: '#ffffff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                },
-                x: {
-                    ticks: { color: '#ffffff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                }
-            }
+    return streak;
+}
+
+function getTotalWords() {
+    let total = 0;
+    Object.values(journalData).forEach(day => {
+        if (day.entry) {
+            const words = day.entry.trim().split(/\s+/).length;
+            total += words;
         }
     });
-}
-
-function deleteExercise(exerciseName) {
-    if (!confirm(`Delete all data for "${exerciseName}"? This cannot be undone.`)) {
-        return;
-    }
-    
-    delete workoutData[exerciseName];
-    saveWorkoutData();
-    renderExerciseCards();
-}
-
-// ============================================
-// LIFETIME COUNTERS
-// ============================================
-
-function addPushups() {
-    const input = document.getElementById('pushupInput');
-    const amount = parseInt(input?.value);
-    
-    if (isNaN(amount) || amount <= 0) {
-        alert('Please enter a valid number');
-        return;
-    }
-    
-    lifetimePushups += amount;
-    localStorage.setItem('lifetimePushups', lifetimePushups);
-    
-    const display = document.getElementById('totalPushups');
-    if (display) display.textContent = lifetimePushups.toLocaleString();
-    
-    input.value = '';
-}
-
-function addPullups() {
-    const input = document.getElementById('pullupInput');
-    const amount = parseInt(input?.value);
-    
-    if (isNaN(amount) || amount <= 0) {
-        alert('Please enter a valid number');
-        return;
-    }
-    
-    lifetimePullups += amount;
-    localStorage.setItem('lifetimePullups', lifetimePullups);
-    
-    const display = document.getElementById('totalPullups');
-    if (display) display.textContent = lifetimePullups.toLocaleString();
-    
-    input.value = '';
+    return total;
 }
