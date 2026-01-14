@@ -86,7 +86,7 @@ function renderExerciseCards() {
     
     if (exercises.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 60px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(139, 92, 246, 0.3); margin-bottom: 30px;">
+            <div style="text-align: center; padding: 60px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(58, 58, 58, 0.3); margin-bottom: 30px;">
                 <div style="font-size: 48px; margin-bottom: 15px;">💪</div>
                 <div style="font-size: 18px; font-weight: 600; color: #6B7280; margin-bottom: 10px;">No exercises tracked yet!</div>
                 <div style="font-size: 14px; color: #9CA3AF;">Log your first workout above to get started</div>
@@ -105,7 +105,7 @@ function renderExerciseCards() {
         const percentGain = first.weight > 0 ? Math.round((totalGain / first.weight) * 100) : 0;
         
         html += `
-            <div onclick="showExerciseChart('${exercise.replace(/'/g, "\\'")})" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+            <div onclick="showExerciseChart('${exercise.replace(/'/g, "\\'")})" style="background: linear-gradient(135deg, rgba(26, 26, 26, 0.1), rgba(38, 38, 38, 0.1)); border: 2px solid rgba(26, 26, 26, 0.4); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <button onclick="event.stopPropagation(); deleteExercise('${exercise.replace(/'/g, "\\'")}')" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
                 
                 <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 15px;">🏋️ ${exercise}</h3>
@@ -125,7 +125,7 @@ function renderExerciseCards() {
                     </div>
                 </div>
                 
-                <div style="background: rgba(16, 185, 129, 0.1); border-radius: 8px; padding: 12px;">
+                <div style="background: rgba(26, 26, 26, 0.1); border-radius: 8px; padding: 12px;">
                     <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px;">Total Workouts: ${workouts.length}</div>
                     <div style="font-size: 11px; color: #9CA3AF;">Click to see progress chart</div>
                 </div>
@@ -148,7 +148,7 @@ function showExerciseChart(exerciseName) {
         
         <canvas id="exerciseChart" style="max-height: 400px; margin-bottom: 30px;"></canvas>
         
-        <div style="background: rgba(16, 185, 129, 0.2); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.4); padding: 20px;">
+        <div style="background: rgba(26, 26, 26, 0.2); border-radius: 12px; border: 2px solid rgba(26, 26, 26, 0.4); padding: 20px;">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #6B7280;">📊 Stats</h3>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;" id="exerciseStats"></div>
         </div>
@@ -208,7 +208,7 @@ function renderExerciseChart(exerciseName, workouts) {
                 label: 'Weight (lbs)',
                 data: weights,
                 borderColor: '#ffffff',
-                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                backgroundColor: 'rgba(26, 26, 26, 0.2)',
                 borderWidth: 3,
                 fill: true,
                 tension: 0.4,
