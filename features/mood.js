@@ -74,20 +74,20 @@ function renderMoodTracker() {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <!-- Left: Today's Input -->
             <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 25px;">
-                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 How are you feeling today?</h3>
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 How are you feeling today?</h3>
                 
                 <!-- Energy Slider -->
                 <div style="margin-bottom: 25px;">
-                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">⚡ Energy Level: <span id="energyValue" style="color: #10B981; font-size: 18px;">${currentEnergy}/10</span></label>
-                    <input type="range" min="1" max="10" value="${currentEnergy}" oninput="setEnergy(this.value); document.getElementById('energyValue').textContent = this.value + '/10';" style="width: 100%; height: 8px; border-radius: 5px; background: linear-gradient(to right, #EF4444 0%, #FBBF24 50%, #10B981 100%); outline: none; -webkit-appearance: none; cursor: pointer;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">⚡ Energy Level: <span id="energyValue" style="color: #D4AF37; font-size: 18px;">${currentEnergy}/10</span></label>
+                    <input type="range" min="1" max="10" value="${currentEnergy}" oninput="setEnergy(this.value); document.getElementById('energyValue').textContent = this.value + '/10';" style="width: 100%; height: 8px; border-radius: 5px; background: linear-gradient(to right, #EF4444 0%, #D4AF37 50%, #D4AF37 100%); outline: none; -webkit-appearance: none; cursor: pointer;">
                 </div>
                 
                 <!-- Mood Selector -->
                 <div>
-                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">😊 Mood</label>
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">😊 Mood</label>
                     <div style="display: flex; gap: 10px; justify-content: space-between;">
                         ${moods.map(mood => `
-                            <button onclick="setMood('${mood}')" style="background: ${currentMood === mood ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${currentMood === mood ? '#8B5CF6' : 'rgba(139, 92, 246, 0.3)'}; border-radius: 12px; padding: 15px; font-size: 32px; cursor: pointer; transition: all 0.2s; flex: 1;">
+                            <button onclick="setMood('${mood}')" style="background: ${currentMood === mood ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${currentMood === mood ? '#D4AF37' : 'rgba(139, 92, 246, 0.3)'}; border-radius: 12px; padding: 15px; font-size: 32px; cursor: pointer; transition: all 0.2s; flex: 1;">
                                 ${mood}
                             </button>
                         `).join('')}
@@ -104,15 +104,15 @@ function renderMoodTracker() {
             
             <!-- Right: Last 7 Days Comparison - CLICKABLE -->
             <div onclick="showMoodChart()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1)); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 25px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Past 7 Days</h3>
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #F4E5B8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📊 Past 7 Days</h3>
                 
                 <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
                     ${last7Days.map(day => `
-                        <div style="background: ${day.isToday ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${day.isToday ? '#8B5CF6' : 'rgba(16, 185, 129, 0.3)'}; border-radius: 12px; padding: 10px; text-align: center;">
+                        <div style="background: ${day.isToday ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; border: 2px solid ${day.isToday ? '#D4AF37' : 'rgba(16, 185, 129, 0.3)'}; border-radius: 12px; padding: 10px; text-align: center;">
                             <div style="font-size: 9px; color: #9CA3AF; margin-bottom: 5px; font-weight: 600;">${day.monthDay}</div>
-                            <div style="font-size: 8px; color: ${day.isToday ? '#A78BFA' : '#6B7280'}; margin-bottom: 8px;">${day.label}</div>
+                            <div style="font-size: 8px; color: ${day.isToday ? '#F4E5B8' : '#6B7280'}; margin-bottom: 8px;">${day.label}</div>
                             <div style="font-size: 28px; margin-bottom: 8px;">${day.data.mood || '—'}</div>
-                            <div style="font-size: 14px; font-weight: 900; color: ${day.data.energy >= 7 ? '#10B981' : day.data.energy >= 4 ? '#FBBF24' : day.data.energy > 0 ? '#EF4444' : '#6B7280'};">
+                            <div style="font-size: 14px; font-weight: 900; color: ${day.data.energy >= 7 ? '#D4AF37' : day.data.energy >= 4 ? '#D4AF37' : day.data.energy > 0 ? '#EF4444' : '#6B7280'};">
                                 ${day.data.energy > 0 ? day.data.energy : '—'}
                             </div>
                             <div style="font-size: 8px; color: #9CA3AF;">energy</div>
@@ -128,7 +128,7 @@ function showMoodChart() {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #10B981, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 Energy & Mood History</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #F4E5B8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">😊 Energy & Mood History</h2>
         
         <div style="margin-bottom: 20px;">
             <select id="moodTimeRange" onchange="updateMoodChart()" style="padding: 10px; border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600;">
@@ -141,7 +141,7 @@ function showMoodChart() {
         <canvas id="moodChart" style="max-height: 400px;"></canvas>
         
         <div style="margin-top: 30px; padding: 20px; background: rgba(16, 185, 129, 0.2); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.4);">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #34D399;">📊 Stats</h3>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #F4E5B8;">📊 Stats</h3>
             <div id="moodStats"></div>
         </div>
     `;
@@ -191,11 +191,11 @@ function updateMoodChart() {
         statsDiv.innerHTML = `
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
                 <div style="text-align: center;">
-                    <div style="font-size: 32px; font-weight: 900; color: #10B981;">${avgEnergy}</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #D4AF37;">${avgEnergy}</div>
                     <div style="font-size: 12px; color: #9CA3AF;">Avg Energy</div>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 32px; font-weight: 900; color: #34D399;">${highEnergyDays}</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #F4E5B8;">${highEnergyDays}</div>
                     <div style="font-size: 12px; color: #9CA3AF;">High Energy Days</div>
                 </div>
                 <div style="text-align: center;">
@@ -204,7 +204,7 @@ function updateMoodChart() {
                 </div>
             </div>
             <div style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
-                <div style="font-size: 14px; color: #A78BFA; margin-bottom: 10px;">🗓️ Mood Pattern:</div>
+                <div style="font-size: 14px; color: #F4E5B8; margin-bottom: 10px;">🗓️ Mood Pattern:</div>
                 <div style="font-size: 24px; display: flex; gap: 8px; flex-wrap: wrap;">
                     ${moodEmojis.filter(m => m).slice(-14).join(' ')}
                 </div>
@@ -226,7 +226,7 @@ function updateMoodChart() {
             datasets: [{
                 label: 'Energy Level',
                 data: energyData,
-                borderColor: '#10B981',
+                borderColor: '#D4AF37',
                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
                 borderWidth: 3,
                 fill: true,
@@ -235,8 +235,8 @@ function updateMoodChart() {
                 pointHoverRadius: 8,
                 pointBackgroundColor: energyData.map(e => {
                     if (!e) return '#6B7280';
-                    if (e >= 7) return '#10B981';
-                    if (e >= 4) return '#FBBF24';
+                    if (e >= 7) return '#D4AF37';
+                    if (e >= 4) return '#D4AF37';
                     return '#EF4444';
                 })
             }]
