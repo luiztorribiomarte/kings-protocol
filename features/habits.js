@@ -51,16 +51,16 @@ function addNewHabit() {
     const modalContent = createModal();
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Habit</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Habit</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #F4E5B8;">Habit Name</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Habit Name</label>
             <input type="text" id="newHabitName" placeholder="e.g., Read 30 Minutes" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #D4AF37, #B8941E); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Add Habit</button>
+            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Add Habit</button>
         </div>
     `;
 }
@@ -117,14 +117,14 @@ function manageHabits() {
     `).join('');
     
     modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #D4AF37, #B8941E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📋 Manage Habits</h2>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📋 Manage Habits</h2>
         
         <div style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
             ${habitsHTML}
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: space-between;">
-            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #D4AF37, #F4E5B8); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">➕ Add New Habit</button>
+            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #ffffff, #6B7280); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">➕ Add New Habit</button>
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Close</button>
         </div>
     `;
@@ -143,7 +143,7 @@ function renderHabitGrid() {
     // Header row with Manage button
     html += `<div class="habit-cell header">
         Habit 
-        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(139, 92, 246, 0.3); border: 2px solid #D4AF37; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
+        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(139, 92, 246, 0.3); border: 2px solid #ffffff; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
     </div>`;
     
     for (let i = 6; i >= 0; i--) {
@@ -175,7 +175,7 @@ function renderHabitGrid() {
             const emoji = checked ? '✅' : (isToday ? '●' : '');
             html += `<div class="habit-cell clickable ${isToday ? 'today' : ''}" 
                      onclick="toggleHabit('${dateKey}', '${habit.replace(/'/g, "\\'")}')"
-                     style="color: ${isToday && !checked ? '#D4AF37' : 'inherit'}; font-size: ${isToday && !checked ? '24px' : '20px'}; cursor: pointer;">
+                     style="color: ${isToday && !checked ? '#ffffff' : 'inherit'}; font-size: ${isToday && !checked ? '24px' : '20px'}; cursor: pointer;">
                 ${emoji}
             </div>`;
         }
@@ -274,28 +274,28 @@ function updateMilestones(streak) {
         // 7 day milestone
         if (streak >= 7) {
             milestones[0].classList.add('achieved');
-            milestones[0].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">✓ UNLOCKED</div>';
+            milestones[0].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
         } else {
             milestones[0].classList.remove('achieved');
-            milestones[0].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">${7 - streak} days away</div>`;
+            milestones[0].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${7 - streak} days away</div>`;
         }
         
         // 15 day milestone
         if (streak >= 15) {
             milestones[1].classList.add('achieved');
-            milestones[1].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">✓ UNLOCKED</div>';
+            milestones[1].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
         } else {
             milestones[1].classList.remove('achieved');
-            milestones[1].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">${15 - streak} days away</div>`;
+            milestones[1].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${15 - streak} days away</div>`;
         }
         
         // 30 day milestone
         if (streak >= 30) {
             milestones[2].classList.add('achieved');
-            milestones[2].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">✓ UNLOCKED</div>';
+            milestones[2].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
         } else {
             milestones[2].classList.remove('achieved');
-            milestones[2].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">${30 - streak} days away</div>`;
+            milestones[2].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${30 - streak} days away</div>`;
         }
     }
     
@@ -305,19 +305,19 @@ function updateMilestones(streak) {
         // Cheat meal (7 days)
         if (streak >= 7) {
             rewardCards[3].classList.add('achieved');
-            rewardCards[3].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">✓ Unlocked</div>';
+            rewardCards[3].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ Unlocked</div>';
         } else {
             rewardCards[3].classList.remove('achieved');
-            rewardCards[3].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">🔒 ${7 - streak} days away</div>`;
+            rewardCards[3].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">🔒 ${7 - streak} days away</div>`;
         }
         
         // New gear (30 days)
         if (streak >= 30) {
             rewardCards[4].classList.add('achieved');
-            rewardCards[4].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">✓ Unlocked</div>';
+            rewardCards[4].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ Unlocked</div>';
         } else {
             rewardCards[4].classList.remove('achieved');
-            rewardCards[4].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #D4AF37;">🔒 ${30 - streak} days away</div>`;
+            rewardCards[4].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">🔒 ${30 - streak} days away</div>`;
         }
     }
 }
