@@ -54,13 +54,13 @@ function addNewHabit() {
         <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Habit</h2>
         
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">Habit Name</label>
-            <input type="text" id="newHabitName" placeholder="e.g., Read 30 Minutes" style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Habit Name</label>
+            <input type="text" id="newHabitName" placeholder="e.g., Read 30 Minutes" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(58, 58, 58, 0.4);">Add Habit</button>
+            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">Add Habit</button>
         </div>
     `;
 }
@@ -124,7 +124,7 @@ function manageHabits() {
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: space-between;">
-            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #ffffff, #6B7280); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(26, 26, 26, 0.4);">➕ Add New Habit</button>
+            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(31, 41, 55, 0.4);">➕ Add New Habit</button>
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Close</button>
         </div>
     `;
@@ -143,7 +143,7 @@ function renderHabitGrid() {
     // Header row with Manage button
     html += `<div class="habit-cell header">
         Habit 
-        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(58, 58, 58, 0.3); border: 2px solid #ffffff; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
+        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(255, 255, 255, 0.2, 0.3); border: 2px solid #ffffff; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
     </div>`;
     
     for (let i = 6; i >= 0; i--) {
