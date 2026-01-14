@@ -39,7 +39,7 @@ function renderVisionBoard() {
     
     container.innerHTML = `
         <!-- Instructions -->
-        <div style="background: linear-gradient(135deg, rgba(58, 58, 58, 0.2), rgba(107, 107, 107, 0.2)); border: 2px solid rgba(58, 58, 58, 0.5); border-radius: 16px; padding: 20px; margin-bottom: 30px;">
+        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.2), rgba(107, 107, 107, 0.2)); border: 2px solid rgba(255, 255, 255, 0.2, 0.5); border-radius: 16px; padding: 20px; margin-bottom: 30px;">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Create Your Vision</h3>
             <p style="font-size: 14px; color: #9CA3AF; line-height: 1.6;">
                 Click any card to add an image URL. Add images that represent your goals, dreams, and the life you're manifesting. Each card has an affirmation you can customize.
@@ -63,12 +63,12 @@ function renderVisionCard(image, index) {
     
     return `
         <div onclick="openVisionCardModal(${index})" 
-             style="position: relative; aspect-ratio: 4/3; border-radius: 16px; overflow: hidden; cursor: pointer; background: ${image ? `url('${image}')` : 'linear-gradient(135deg, rgba(58, 58, 58, 0.3), rgba(107, 107, 107, 0.3))'} center/cover; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); transition: transform 0.3s;"
+             style="position: relative; aspect-ratio: 4/3; border-radius: 16px; overflow: hidden; cursor: pointer; background: ${image ? `url('${image}')` : 'linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.3), rgba(107, 107, 107, 0.3))'} center/cover; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); transition: transform 0.3s;"
              onmouseover="this.style.transform='scale(1.05)'"
              onmouseout="this.style.transform='scale(1)'">
             
             ${!image ? `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: linear-gradient(135deg, rgba(58, 58, 58, 0.8), rgba(107, 107, 107, 0.8)); border: 3px dashed rgba(255, 255, 255, 0.5);">
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.8), rgba(107, 107, 107, 0.8)); border: 3px dashed rgba(255, 255, 255, 0.5);">
                     <div style="font-size: 48px; margin-bottom: 10px;">➕</div>
                     <div style="font-size: 14px; font-weight: 600; color: white;">Add Vision</div>
                 </div>
@@ -103,35 +103,35 @@ function openVisionCardModal(index) {
         <!-- Image Preview -->
         ${image ? `
             <div style="margin-bottom: 20px;">
-                <img src="${image}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(58, 58, 58, 0.4);">
+                <img src="${image}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4);">
             </div>
         ` : ''}
         
         <!-- Image URL Input -->
         <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">🖼️ Image URL</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">🖼️ Image URL</label>
             <input type="text" 
                    id="visionImageUrl" 
                    value="${image || ''}" 
                    placeholder="Paste image URL (e.g., https://example.com/image.jpg)"
-                   style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
+                   style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
             <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">💡 Tip: Right-click any image online → Copy Image Address</div>
         </div>
         
         <!-- Quote Input -->
         <div style="margin-bottom: 25px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #6B7280;">💬 Affirmation / Quote</label>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">💬 Affirmation / Quote</label>
             <input type="text" 
                    id="visionQuote" 
                    value="${quote}" 
                    placeholder="I AM..."
-                   style="width: 100%; padding: 15px; border: 2px solid rgba(58, 58, 58, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
+                   style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
         </div>
         
         <!-- Action Buttons -->
         <div style="display: flex; gap: 15px; justify-content: flex-end;">
             <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveVisionCard(${index})" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(58, 58, 58, 0.4);">Save Vision</button>
+            <button onclick="saveVisionCard(${index})" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">Save Vision</button>
         </div>
     `;
 }
