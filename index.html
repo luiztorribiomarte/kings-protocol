@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Getting My Life Together - Complete Interactive Dashboard</title>
+    <title>Kings Protocol - Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -44,7 +44,7 @@
             <div class="page-header" style="justify-content: center; margin-bottom: 0;">
                 <div class="page-icon-title">
                     <div class="page-icon" id="pageIcon">🔥</div>
-                    <div class="page-title">Getting My Life Together</div>
+                    <div class="page-title">Kings Protocol</div>
                 </div>
             </div>
         </div>
@@ -59,11 +59,6 @@
             <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
             <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
             <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
-        </div>
-
-        <!-- Export Button -->
-        <div style="text-align: right; margin-bottom: 20px;">
-            <button class="export-btn" onclick="exportData()">💾 Export Data Backup</button>
         </div>
 
         <!-- DASHBOARD PAGE -->
@@ -92,10 +87,6 @@
                 <div class="stat-card">
                     <div class="stat-value">0</div>
                     <div class="stat-label">Current Streak</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">0</div>
-                    <div class="stat-label">YT Subscribers</div>
                 </div>
             </div>
 
@@ -381,6 +372,6 @@
     <script src="features/workout.js"></script>
     
     <!-- Load core app last -->
-  <script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
