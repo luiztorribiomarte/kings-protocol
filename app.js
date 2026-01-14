@@ -2,25 +2,23 @@
 // ENHANCED CORE APP.JS - With Charts & Analytics
 // ============================================
 
-// HABITS CONFIGURATION
-const HABITS = [
-    '⏰ Wake Up At 7 AM',
-    '☀️ Morning Sunlight',
-    '🧴 Skincare',
-    '🧘 Meditation',
-    '📝 Journal/Reflect',
-    '💪 Work Out',
-    '📚 Read 10 Pages',
-    '🎬 YouTube Work (2hrs)',
-    '🚫 No Porn',
-    '🌿 No Weed',
-    '🧘‍♂️ Nightly Mobility'
-];
-
 // GLOBAL STATE
 let habitData = {};
 let goalsData = [];
 let moodData = {};
+let habitsList = [
+    'Wake Up At 7 AM',
+    'Morning Sunlight', 
+    'Skincare',
+    'Gym/Workout',
+    '3L Water',
+    'Content Creation Work',
+    'No Weed',
+    'No Porn',
+    'No Junk Food',
+    'Cold Shower',
+    'Journal/Reflect'
+];
 let notificationsOn = true;
 let timerInterval = null;
 let timerSeconds = 1500;
@@ -695,6 +693,104 @@ function renderGoals() {
 }
 
 // ============================================
+// HABIT MANAGEMENT
+// ============================================
+
+function initHabitsList() {
+    const saved = localStorage.getItem('habitsList');
+    if (saved) {
+        habitsList = JSON.parse(saved);
+    }
+}
+
+function saveHabitsList() {
+    localStorage.setItem('habitsList', JSON.stringify(habitsList));
+}
+
+function addNewHabit() {
+    const modalContent = createModal();
+    
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Habit</h2>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #A78BFA;">Habit Name</label>
+            <input type="text" id="newHabitName" placeholder="e.g., Read 30 Minutes" style="width: 100%; padding: 15px; border: 2px solid rgba(139, 92, 246, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
+        </div>
+        
+        <div style="display: flex; gap: 15px; justify-content: flex-end;">
+            <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
+            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);">Add Habit</button>
+        </div>
+    `;
+}
+
+function saveNewHabit() {
+    const input = document.getElementById('newHabitName');
+    const habitName = input?.value.trim();
+    
+    if (!habitName) {
+        alert('Please enter a habit name');
+        return;
+    }
+    
+    if (habitsList.includes(habitName)) {
+        alert('This habit already exists!');
+        return;
+    }
+    
+    habitsList.push(habitName);
+    saveHabitsList();
+    renderHabitGrid();
+    closeModal();
+}
+
+function deleteHabit(habitName) {
+    if (!confirm(`Are you sure you want to delete "${habitName}"? All tracking data for this habit will be removed.`)) {
+        return;
+    }
+    
+    // Remove from habits list
+    habitsList = habitsList.filter(h => h !== habitName);
+    saveHabitsList();
+    
+    // Remove from all historical data
+    Object.keys(habitData).forEach(date => {
+        if (habitData[date][habitName] !== undefined) {
+            delete habitData[date][habitName];
+        }
+    });
+    saveHabitData();
+    
+    renderHabitGrid();
+    updateStreakDisplay();
+}
+
+function manageHabits() {
+    const modalContent = createModal();
+    
+    let habitsHTML = habitsList.map(habit => `
+        <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 16px; font-weight: 600;">${habit}</div>
+            <button onclick="deleteHabit('${habit.replace(/'/g, "\\'")}'); manageHabits();" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: 700; cursor: pointer;">Delete</button>
+        </div>
+    `).join('');
+    
+    modalContent.innerHTML = `
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #8B5CF6, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📋 Manage Habits</h2>
+        
+        <div style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
+            ${habitsHTML}
+        </div>
+        
+        <div style="display: flex; gap: 15px; justify-content: space-between;">
+            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #10B981, #34D399); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">➕ Add New Habit</button>
+            <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Close</button>
+        </div>
+    `;
+}
+
+// ============================================
 // HABIT TRACKING SYSTEM  
 // ============================================
 
@@ -704,11 +800,15 @@ function renderHabitGrid() {
     
     let html = '';
 
-    // Header row
-    html += '<div class="habit-cell header">Habit</div>';
+    // Header row with Manage button
+    html += `<div class="habit-cell header">
+        Habit 
+        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(139, 92, 246, 0.3); border: 2px solid #8B5CF6; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
+    </div>`;
+    
     for (let i = 6; i >= 0; i--) {
         const date = new Date();
-        date.setDate(date.getDate() - i);
+        date.setDate(date.setDate() - i);
         const isToday = i === 0;
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -717,9 +817,10 @@ function renderHabitGrid() {
         </div>`;
     }
 
-    // Habit rows - CLICKABLE habit names
-    HABITS.forEach((habit, habitIndex) => {
-        html += `<div class="habit-cell habit-label" onclick="showHabitChart(${habitIndex})" style="cursor: pointer; transition: all 0.2s;">${habit}</div>`;
+    // Habit rows
+    habitsList.forEach(habit => {
+        html += `<div class="habit-cell habit-label" onclick="showHabitChart('${habit.replace(/'/g, "\\'")}', '${habit.replace(/'/g, "\\'")}')" style="cursor: pointer; transition: all 0.2s;">${habit}</div>`;
+        
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
@@ -727,13 +828,13 @@ function renderHabitGrid() {
             const isToday = i === 0;
             
             if (!habitData[dateKey]) {
-                habitData[dateKey] = HABITS.map(() => false);
+                habitData[dateKey] = {};
             }
             
-            const checked = habitData[dateKey][habitIndex];
+            const checked = habitData[dateKey][habit] || false;
             const emoji = checked ? '✅' : (isToday ? '●' : '');
             html += `<div class="habit-cell clickable ${isToday ? 'today' : ''}" 
-                     onclick="toggleHabit('${dateKey}', ${habitIndex})"
+                     onclick="toggleHabit('${dateKey}', '${habit.replace(/'/g, "\\'")}')"
                      style="color: ${isToday && !checked ? '#8B5CF6' : 'inherit'}; font-size: ${isToday && !checked ? '24px' : '20px'}; cursor: pointer;">
                 ${emoji}
             </div>`;
@@ -741,14 +842,19 @@ function renderHabitGrid() {
     });
 
     grid.innerHTML = html;
+}
+        }
+    });
+
+    grid.innerHTML = html;
     updateStats();
 }
 
-function toggleHabit(dateKey, habitIndex) {
+function toggleHabit(dateKey, habitName) {
     if (!habitData[dateKey]) {
-        habitData[dateKey] = HABITS.map(() => false);
+        habitData[dateKey] = {};
     }
-    habitData[dateKey][habitIndex] = !habitData[dateKey][habitIndex];
+    habitData[dateKey][habitName] = !habitData[dateKey][habitName];
     saveHabitData();
     renderHabitGrid();
     updateStreakDisplay();
@@ -798,8 +904,9 @@ function calculateStreak() {
         
         if (!habitData[dateKey]) break;
         
-        const completed = habitData[dateKey].filter(h => h).length;
-        const percentage = (completed / HABITS.length) * 100;
+        const completed = Object.values(habitData[dateKey]).filter(h => h).length;
+        const totalHabits = habitsList.length;
+        const percentage = totalHabits > 0 ? (completed / totalHabits) * 100 : 0;
         
         if (percentage >= 80) {
             streak++;
@@ -818,8 +925,9 @@ function calculateBestStreak() {
     const dates = Object.keys(habitData).sort();
     
     dates.forEach(dateKey => {
-        const completed = habitData[dateKey].filter(h => h).length;
-        const percentage = (completed / HABITS.length) * 100;
+        const completed = Object.values(habitData[dateKey]).filter(h => h).length;
+        const totalHabits = habitsList.length;
+        const percentage = totalHabits > 0 ? (completed / totalHabits) * 100 : 0;
         
         if (percentage >= 80) {
             currentStreak++;
@@ -1646,10 +1754,9 @@ function updateHabitAnalytics() {
     const days = range === 'all' ? 90 : parseInt(range);
     
     const habitStats = {};
-    const habits = ['Wake Up At 7 AM', 'Morning Sunlight', 'Skincare', 'Gym/Workout', '3L Water', 'Content Creation Work', 'No Weed', 'No Porn', 'No Junk Food', 'Cold Shower', 'Journal/Reflect'];
     
     // Initialize stats
-    habits.forEach(habit => {
+    habitsList.forEach(habit => {
         habitStats[habit] = { completed: 0, total: 0, percentage: 0 };
     });
     
@@ -1660,7 +1767,7 @@ function updateHabitAnalytics() {
         const dateKey = date.toISOString().split('T')[0];
         
         if (habitData[dateKey]) {
-            habits.forEach(habit => {
+            habitsList.forEach(habit => {
                 habitStats[habit].total++;
                 if (habitData[dateKey][habit]) {
                     habitStats[habit].completed++;
@@ -1670,14 +1777,14 @@ function updateHabitAnalytics() {
     }
     
     // Calculate percentages
-    habits.forEach(habit => {
+    habitsList.forEach(habit => {
         if (habitStats[habit].total > 0) {
             habitStats[habit].percentage = Math.round((habitStats[habit].completed / habitStats[habit].total) * 100);
         }
     });
     
     // Sort habits by percentage
-    const sortedHabits = habits.sort((a, b) => habitStats[b].percentage - habitStats[a].percentage);
+    const sortedHabits = [...habitsList].sort((a, b) => habitStats[b].percentage - habitStats[a].percentage);
     
     // Render top habits
     const topHabitsDiv = document.getElementById('topHabits');
@@ -1719,13 +1826,13 @@ function updateHabitAnalytics() {
     }
     
     // Render trends chart
-    renderHabitTrendsChart(days, habits, habitStats);
+    renderHabitTrendsChart(days, habitStats);
     
     // Render day analysis
     renderDayAnalysis(days);
 }
 
-function renderHabitTrendsChart(days, habits, habitStats) {
+function renderHabitTrendsChart(days, habitStats) {
     const canvas = document.getElementById('habitTrendsChart');
     if (!canvas) return;
     
@@ -1740,7 +1847,8 @@ function renderHabitTrendsChart(days, habits, habitStats) {
     }
     
     // Get top 5 habits to display
-    const topHabits = habits.slice(0, 5);
+    const sortedHabits = [...habitsList].sort((a, b) => habitStats[b].percentage - habitStats[a].percentage);
+    const topHabits = sortedHabits.slice(0, 5);
     const colors = ['#10B981', '#8B5CF6', '#EC4899', '#FBBF24', '#3B82F6'];
     
     topHabits.forEach((habit, index) => {
@@ -1862,6 +1970,7 @@ function renderDayAnalysis(days) {
 initHabitData();
 initGoalsData();
 initMoodData();
+initHabitsList();
 renderHabitGrid();
 updateStreakDisplay();
 makeStatsClickable();
