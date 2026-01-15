@@ -16,7 +16,7 @@
         }
 
         body.fire-mode {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+            background: linear-gradient(135deg, #0f0f1e 0%, #0a0a18 50%, #0f0f1e 100%);
             color: #ffffff;
         }
 
@@ -35,7 +35,7 @@
         }
 
         .fire-mode .container {
-            background: linear-gradient(135deg, #374151 0%, #4B5563 50%, #374151 100%);
+            background: linear-gradient(135deg, #1f2937 0%, #2d3748 50%, #1f2937 100%);
             box-shadow: 0 0 60px rgba(255, 255, 255, 0.3);
         }
 
