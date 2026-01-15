@@ -159,7 +159,7 @@ function renderHabitGrid() {
 
     // Habit rows
     habitsList.forEach(habit => {
-        html += `<div class="habit-cell habit-label" onclick="showHabitChart('${habit.replace(/'/g, "\\'")}', '${habit.replace(/'/g, "\\'")}')" style="cursor: pointer; transition: all 0.2s;">${habit}</div>`;
+        html += `<div class="habit-cell habit-label" style="cursor: default;">${habit}</div>`;
         
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
