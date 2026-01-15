@@ -1,6 +1,7 @@
 // ============================================
 // CORE APP.JS - Main initialization & utilities
 // ============================================
+// All feature modules are loaded separately
 
 let notificationsOn = true;
 let timerInterval = null;
@@ -17,7 +18,7 @@ function createModal() {
     overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
     
     const content = document.createElement('div');
-    content.style.cssText = 'background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(139, 92, 246, 0.95)); border: 2px solid rgba(59, 130, 246, 0.8); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;';
+    content.style.cssText = 'background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(236, 72, 153, 0.95)); border: 2px solid rgba(139, 92, 246, 0.8); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;';
     
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '×';
@@ -76,6 +77,10 @@ function showPage(pageName) {
     
     if (pageName === 'content') {
         renderContentTracker();
+    }
+    
+    if (pageName === 'books') {
+        renderBooksPage();
     }
 }
 
@@ -145,11 +150,7 @@ function toggleNotifications() {
     const status = document.getElementById('notifStatus');
     
     if (toggle) {
-        if (notificationsOn) {
-            toggle.classList.remove('off');
-        } else {
-            toggle.classList.add('off');
-        }
+        toggle.classList.toggle('active');
     }
     
     if (status) {
@@ -205,16 +206,19 @@ function togglePlaylist() {
 function updateClock() {
     const now = new Date();
     
+    // Format time (12-hour format with AM/PM)
     let hours = now.getHours();
     const minutes = now.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12;
+    hours = hours ? hours : 12; // 0 should be 12
     const timeString = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
     
+    // Format date
     const options = { weekday: 'short', month: 'short', day: 'numeric' };
     const dateString = now.toLocaleDateString('en-US', options);
     
+    // Update display
     const clockElement = document.getElementById('liveClock');
     const dateElement = document.getElementById('liveDate');
     
@@ -232,9 +236,11 @@ function updateLocation() {
                 const lon = position.coords.longitude;
                 
                 try {
+                    // Use OpenStreetMap's Nominatim API (free, no key required)
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
                     const data = await response.json();
                     
+                    // Get city/neighborhood
                     const city = data.address.city || 
                                 data.address.town || 
                                 data.address.village || 
@@ -247,10 +253,8 @@ function updateLocation() {
                         locationElement.textContent = city;
                     }
                     
+                    // Save location to localStorage
                     localStorage.setItem('userLocation', city);
-                    
-                    // Fetch weather for this location
-                    fetchWeather(lat, lon, city);
                 } catch (error) {
                     console.error('Error getting location name:', error);
                     if (locationElement) {
@@ -260,102 +264,34 @@ function updateLocation() {
             },
             (error) => {
                 console.error('Geolocation error:', error);
+                // Try to use saved location
                 const savedLocation = localStorage.getItem('userLocation');
                 if (locationElement) {
                     locationElement.textContent = savedLocation || 'New York';
                 }
-                // Default to NYC coordinates
-                fetchWeather(40.7128, -74.0060, savedLocation || 'New York');
             }
         );
     } else {
+        // Geolocation not supported, use saved or default
         const savedLocation = localStorage.getItem('userLocation');
         if (locationElement) {
             locationElement.textContent = savedLocation || 'New York';
         }
-        fetchWeather(40.7128, -74.0060, savedLocation || 'New York');
     }
 }
 
 // ============================================
-// WEATHER API
+// API FETCHING
 // ============================================
 
-async function fetchWeather(lat, lon, city) {
-    try {
-        // Using Open-Meteo API (free, no key required)
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`);
-        const data = await response.json();
-        
-        if (data.current) {
-            const temp = Math.round(data.current.temperature_2m);
-            const weatherCode = data.current.weather_code;
-            
-            // Weather code to emoji mapping
-            const weatherEmojis = {
-                0: '☀️',   // Clear sky
-                1: '🌤️',  // Mainly clear
-                2: '⛅',  // Partly cloudy
-                3: '☁️',  // Overcast
-                45: '🌫️', // Fog
-                48: '🌫️', // Depositing rime fog
-                51: '🌦️', // Light drizzle
-                53: '🌦️', // Moderate drizzle
-                55: '🌧️', // Dense drizzle
-                61: '🌧️', // Slight rain
-                63: '🌧️', // Moderate rain
-                65: '🌧️', // Heavy rain
-                71: '🌨️', // Slight snow
-                73: '🌨️', // Moderate snow
-                75: '🌨️', // Heavy snow
-                77: '❄️',  // Snow grains
-                80: '🌦️', // Slight rain showers
-                81: '🌧️', // Moderate rain showers
-                82: '⛈️', // Violent rain showers
-                85: '🌨️', // Slight snow showers
-                86: '🌨️', // Heavy snow showers
-                95: '⛈️', // Thunderstorm
-                96: '⛈️', // Thunderstorm with slight hail
-                99: '⛈️'  // Thunderstorm with heavy hail
-            };
-            
-            const emoji = weatherEmojis[weatherCode] || '🌤️';
-            
-            const tempElement = document.getElementById('weatherTemp');
-            const iconElement = document.getElementById('weatherIcon');
-            const locationElement = document.getElementById('weatherLocation');
-            
-            if (tempElement) tempElement.textContent = `${temp}°F`;
-            if (iconElement) iconElement.textContent = emoji;
-            if (locationElement) locationElement.textContent = city;
-            
-            // Cache weather data
-            localStorage.setItem('weatherData', JSON.stringify({
-                temp: temp,
-                emoji: emoji,
-                city: city,
-                timestamp: Date.now()
-            }));
-        }
-    } catch (error) {
-        console.error('Error fetching weather:', error);
-        
-        // Try to load cached data
-        const cached = localStorage.getItem('weatherData');
-        if (cached) {
-            const data = JSON.parse(cached);
-            // Use cached data if it's less than 30 minutes old
-            if (Date.now() - data.timestamp < 1800000) {
-                const tempElement = document.getElementById('weatherTemp');
-                const iconElement = document.getElementById('weatherIcon');
-                const locationElement = document.getElementById('weatherLocation');
-                
-                if (tempElement) tempElement.textContent = `${data.temp}°F`;
-                if (iconElement) iconElement.textContent = data.emoji;
-                if (locationElement) locationElement.textContent = data.city;
-            }
-        }
-    }
+function fetchYouTubeStats() {
+    // Placeholder - implement with YouTube API
+    console.log('YouTube stats would be fetched here');
+}
+
+function fetchWeather() {
+    // Placeholder - implement with weather API  
+    console.log('Weather would be fetched here');
 }
 
 // ============================================
@@ -371,9 +307,6 @@ function exportData() {
         habitsList: habitsList,
         lifetimePushups: lifetimePushups,
         lifetimePullups: lifetimePullups,
-        journalData: journalData,
-        visionBoardData: visionBoardData,
-        contentData: contentData,
         exportDate: new Date().toISOString()
     };
     
@@ -383,8 +316,6 @@ function exportData() {
     a.href = url;
     a.download = `kings-protocol-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
-    
-    alert('✅ Data exported successfully!');
 }
 
 // ============================================
@@ -412,38 +343,29 @@ function switchToFireMode() {
 // ============================================
 
 // Initialize all modules
-if (typeof initHabitData === 'function') initHabitData();
-if (typeof initGoalsData === 'function') initGoalsData();
-if (typeof initMoodData === 'function') initMoodData();
-if (typeof initHabitsList === 'function') initHabitsList();
-if (typeof initWorkoutData === 'function') initWorkoutData();
-if (typeof initJournalData === 'function') initJournalData();
-if (typeof initVisionBoardData === 'function') initVisionBoardData();
-if (typeof initContentData === 'function') initContentData();
+initHabitData();
+initGoalsData();
+initMoodData();
+initHabitsList();
+initWorkoutData();
+initJournalData();
+initVisionBoardData();
+initContentData();
+initBooksData();
 
 // Render initial views
-if (typeof renderHabitGrid === 'function') renderHabitGrid();
-if (typeof updateStreakDisplay === 'function') updateStreakDisplay();
+renderHabitGrid();
+updateStreakDisplay();
+fetchYouTubeStats();
+fetchWeather();
 
-// Initialize clock and weather
+// Initialize and update clock
 updateClock();
-setInterval(updateClock, 1000);
+setInterval(updateClock, 1000); // Update every second
+
+// Get user location
 updateLocation();
 
-// Update weather every 30 minutes
-setInterval(() => {
-    updateLocation();
-}, 1800000);
-
-// Initialize notification toggle state
-const notifToggle = document.getElementById('notifToggle');
-if (notifToggle && !notificationsOn) {
-    notifToggle.classList.add('off');
-}
-
-// Request notification permission if enabled
-if (notificationsOn && 'Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-}
-
-console.log('✅ Kings Protocol initialized successfully!');
+// Set up intervals
+setInterval(fetchYouTubeStats, 300000);
+setInterval(fetchWeather, 1800000);
