@@ -9,10 +9,7 @@
 body {
     margin: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background:
-        radial-gradient(circle at top, rgba(99,102,241,0.15), transparent 40%),
-        radial-gradient(circle at bottom, rgba(236,72,153,0.12), transparent 45%),
-        linear-gradient(180deg, #020617, #020617);
+    background: linear-gradient(180deg, #020617, #020617);
     color: #f9fafb;
 }
 
@@ -39,27 +36,21 @@ body {
 
 .nav-tab {
     padding: 10px 16px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.15);
-    background: linear-gradient(
-        180deg,
-        rgba(255,255,255,0.08),
-        rgba(255,255,255,0.02)
-    );
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
     color: #e5e7eb;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .nav-tab:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    background: rgba(255,255,255,0.12);
 }
 
 .nav-tab.active {
     background: linear-gradient(135deg, #6366f1, #ec4899);
     color: white;
-    box-shadow: 0 12px 30px rgba(99,102,241,0.35);
 }
 
 /* ============================================
@@ -70,20 +61,18 @@ body {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 18px;
-    border-radius: 18px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.18);
 }
 
 .widget-icon {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
 }
 
 .widget-value {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 700;
 }
 
@@ -98,72 +87,61 @@ body {
 }
 
 /* ============================================
-   STATS CARDS
+   BOXED SECTIONS
+============================================ */
+
+.habit-section,
+.stats-grid,
+#dailyStatus,
+.modal-content {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 16px;
+}
+
+/* ============================================
+   STATS GRID
 ============================================ */
 
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 18px;
-    margin-bottom: 22px;
+    gap: 16px;
+    padding: 18px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
-    padding: 22px;
-    border-radius: 18px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 10px 25px rgba(0,0,0,0.35);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 18px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.18);
+    transition: transform 0.15s ease;
 }
 
 .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.1),
-        0 18px 40px rgba(0,0,0,0.45);
+    transform: translateY(-2px);
 }
 
 .stat-value {
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: 800;
-    letter-spacing: 0.5px;
 }
 
 .stat-label {
     margin-top: 6px;
-    color: #9ca3af;
     font-size: 0.9rem;
+    color: #9ca3af;
 }
 
 /* ============================================
-   DAILY STATUS BAR
+   DAILY STATUS
 ============================================ */
 
 #dailyStatus {
-    margin: 18px 0 28px;
-    padding: 16px 20px;
-    border-radius: 16px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.18);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 6px 18px rgba(0,0,0,0.35);
-    font-size: 1rem;
-}
-
-/* ============================================
-   SECTIONS
-============================================ */
-
-.section-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin-bottom: 14px;
+    margin-bottom: 24px;
+    padding: 16px 18px;
+    font-size: 0.95rem;
 }
 
 /* ============================================
@@ -171,15 +149,14 @@ body {
 ============================================ */
 
 .habit-section {
-    margin-bottom: 30px;
-    padding: 22px;
-    border-radius: 20px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 10px 28px rgba(0,0,0,0.4);
+    padding: 20px;
+    margin-bottom: 28px;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 12px;
 }
 
 /* ============================================
@@ -197,9 +174,6 @@ body {
 }
 
 .modal-content {
-    background:
-        linear-gradient(180deg, #020617, #020617);
-    border-radius: 20px;
     padding: 24px;
     max-width: 600px;
     width: 90%;
@@ -214,7 +188,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.25);
     border-radius: 4px;
 }
 
