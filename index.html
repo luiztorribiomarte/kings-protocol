@@ -3,89 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kings Protocol - Dashboard</title>
+    <title>Kings Protocol</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="fire-mode">
     <div class="container">
-        <!-- Header with Widgets -->
+        <!-- Header with Title and Widgets -->
         <div style="margin-bottom: 30px;">
-            <!-- Top Row: Widgets and Mode Toggle -->
+            <!-- Top Row: Clock, Weather, Mode Toggle -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <!-- Live Clock Widget -->
-                    <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.2), rgba(107, 107, 107, 0.2)); border: 2px solid rgba(255, 255, 255, 0.2, 0.5); border-radius: 12px; padding: 15px 20px; text-align: center; min-width: 140px;">
-                        <div id="liveClock" style="font-size: 28px; font-weight: 900; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">--:--</div>
-                        <div id="clockLocation" style="font-size: 10px; color: #9CA3AF; text-transform: uppercase; margin-top: 2px;">Loading...</div>
-                        <div id="liveDate" style="font-size: 12px; color: #9CA3AF; margin-top: 4px;">Loading...</div>
-                    </div>
-                    
-                    <!-- Weather Widget -->
-                    <div style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.2), rgba(75, 85, 99, 0.2)); border: 2px solid rgba(31, 41, 55, 0.5); border-radius: 12px; padding: 15px 20px; text-align: center; min-width: 140px;">
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            <div id="weatherIcon" style="font-size: 32px;">🌤️</div>
-                            <div>
-                                <div id="weatherTemp" style="font-size: 24px; font-weight: 900; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">--°F</div>
-                                <div id="weatherLocation" style="font-size: 9px; color: #9CA3AF; text-transform: uppercase;">Yonkers</div>
-                            </div>
-                        </div>
+                <!-- Clock Widget -->
+                <div class="widget" id="clockWidget" style="flex: 1; margin-right: 10px;">
+                    <div class="widget-icon">🕐</div>
+                    <div>
+                        <div class="widget-value" id="currentTime">--:--</div>
+                        <div class="widget-label" id="currentLocation">New York</div>
+                        <div class="widget-sublabel" id="currentDate">---</div>
                     </div>
                 </div>
-                
+
+                <!-- Weather Widget -->
+                <div class="widget" id="weatherWidget" style="flex: 1; margin-left: 10px; margin-right: 10px;">
+                    <div class="widget-icon">🌤️</div>
+                    <div>
+                        <div class="widget-value">72°F</div>
+                        <div class="widget-label">Yonkers</div>
+                    </div>
+                </div>
+
                 <!-- Mode Toggle -->
-                <div class="mode-toggle">
-                    <button class="mode-btn" id="zenModeBtn" onclick="switchToZenMode()">🧘 Zen Mode</button>
-                    <button class="mode-btn active" id="fireModeBtn" onclick="switchToFireMode()">🔥 Fire Mode</button>
+                <div style="flex: 0;">
+                    <button class="mode-toggle" onclick="toggleMode()">
+                        <span id="modeIcon">🔥</span>
+                        <span id="modeText">Fire Mode</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Title Row -->
-            <div class="page-header" style="justify-content: center; margin-bottom: 0;">
-                <div class="page-icon-title">
-                    <div class="page-icon" id="pageIcon">🔥</div>
-                    <div class="page-title">Kings Protocol</div>
-                </div>
-            </div>
+            <!-- Title -->
+            <h1 style="text-align: center; font-size: 2.5em; margin: 20px 0; background: linear-gradient(135deg, #ffffff 0%, #9CA3AF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Kings Protocol
+            </h1>
         </div>
 
-        <!-- Navigation Tabs -->
+        <!-- Navigation -->
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="showPage('dashboard')">📋 Dashboard</button>
-            <button class="nav-tab" onclick="showPage('goals')">🎯 Goals & Habits</button>
+            <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
             <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
             <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
-            <button class="nav-tab" onclick="showPage('vision')">🖼️ Vision Board</button>
+            <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
             <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
             <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
             <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
         </div>
 
-        <!-- DASHBOARD PAGE -->
-        <div id="dashboardPage" class="page-content active">
-            <!-- Notification Settings -->
-            <div class="notification-panel">
-                <div class="notification-header">
-                    <div class="notification-title">🔔 Desktop Notifications</div>
-                    <div class="toggle-switch" id="notifToggle" onclick="toggleNotifications()"></div>
-                </div>
-                <div style="font-size: 14px; opacity: 0.9;">
-                    Notifications are <strong><span id="notifStatus">ON</span></strong> - You'll get alerts at 8pm if below 80%, streak milestones, and morning reminders
-                </div>
-            </div>
-
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="page active">
             <!-- Weekly Stats -->
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value">0/7</div>
+                <div class="stat-card" onclick="showStatsChart('weeklyCompletion')">
+                    <div class="stat-value" id="daysAt80">0/7</div>
                     <div class="stat-label">Days at 80%+</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value">0%</div>
+                <div class="stat-card" onclick="showStatsChart('habitCompletion')">
+                    <div class="stat-value" id="weeklyCompletion">0%</div>
                     <div class="stat-label">Weekly Completion</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value">0</div>
+                <div class="stat-card" onclick="showStatsChart('streakHistory')">
+                    <div class="stat-value" id="currentStreak">0</div>
                     <div class="stat-label">Current Streak</div>
                 </div>
             </div>
@@ -100,262 +87,155 @@
 
             <!-- Habit Tracker -->
             <div class="habit-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div class="section-title">📋 Daily Habits - This Week</div>
-                    <button onclick="manageHabits()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 10px 20px; border-radius: 50px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2, 0.4);">⚙️ Manage Habits</button>
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>📋 Daily Habits - This Week</span>
+                    <button onclick="openManageHabits()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; font-size: 0.9em;">
+                        ⚙️ Manage Habits
+                    </button>
                 </div>
-                <div class="habit-grid" id="habitGrid">
+                <div id="habitGrid" class="habit-grid">
                     <!-- Generated by JavaScript -->
                 </div>
             </div>
 
-            <!-- Streak System - Full Width -->
-            <div class="habit-section">
-                <div class="section-title">🔥 Streak System</div>
-                <div class="two-col">
-                    <div class="streak-display">
-                        <div class="current-streak">0</div>
-                        <div class="streak-label">DAYS</div>
-                        <div style="font-size: 14px; color: #ffffff; margin-top: 15px;">🏆 Best Streak: 0 days</div>
-                    </div>
-
-                    <div>
-                        <div style="margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #FBBF24;">🎖️ Milestone Progress</div>
-                        <div class="milestones-grid">
-                            <div class="milestone-card">
-                                <div class="milestone-icon">🥉</div>
-                                <div style="font-size: 16px; font-weight: 700;">7 Days</div>
-                                <div style="font-size: 10px; margin-top: 5px; color: #FBBF24;">7 days away</div>
-                            </div>
-                            <div class="milestone-card">
-                                <div class="milestone-icon">🥈</div>
-                                <div style="font-size: 16px; font-weight: 700;">15 Days</div>
-                                <div style="font-size: 10px; margin-top: 5px; color: #FBBF24;">15 days away</div>
-                            </div>
-                            <div class="milestone-card">
-                                <div class="milestone-icon">🥇</div>
-                                <div style="font-size: 16px; font-weight: 700;">30 Days</div>
-                                <div style="font-size: 10px; margin-top: 5px; color: #FBBF24;">30 days away</div>
-                            </div>
-                        </div>
-
-                        <div style="margin-top: 25px; margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #ffffff;">🎁 Unlocked Rewards</div>
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
-                            <div class="milestone-card">
-                                <div style="font-size: 40px; margin-bottom: 10px;">🍔</div>
-                                <div style="font-weight: 600; font-size: 14px;">Cheat Meal</div>
-                                <div style="font-size: 10px; margin-top: 5px; color: #FBBF24;">🔒 7 days away</div>
-                            </div>
-                            <div class="milestone-card">
-                                <div style="font-size: 40px; margin-bottom: 10px;">👟</div>
-                                <div style="font-weight: 600; font-size: 14px;">New Gear</div>
-                                <div style="font-size: 10px; margin-top: 5px; color: #FBBF24;">🔒 30 days away</div>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Streak System -->
+            <div class="streak-section">
+                <div class="streak-display">
+                    <div class="streak-number" id="streakNumber">0</div>
+                    <div class="streak-label">DAY STREAK</div>
+                    <div class="streak-best">Best: <span id="bestStreak">0</span> days</div>
+                </div>
+                <div class="milestones" id="milestones">
+                    <!-- Generated by JavaScript -->
                 </div>
             </div>
 
-            <!-- Focus Timer with Playlist -->
-            <div class="habit-section">
+            <!-- Focus Timer -->
+            <div class="timer-section">
                 <div class="section-title">⏱️ Focus Timer</div>
-                <div class="timer-widget">
-                    <div class="timer-modes">
-                        <button class="timer-mode-btn" onclick="setTimerMode('short')">Short Break</button>
-                        <button class="timer-mode-btn active" onclick="setTimerMode('focus')">Focus</button>
-                        <button class="timer-mode-btn" onclick="setTimerMode('long')">Long Break</button>
+                <div class="timer-display">
+                    <div class="timer-time" id="timerDisplay">25:00</div>
+                    <div class="timer-controls">
+                        <button onclick="startTimer(25)">Focus (25m)</button>
+                        <button onclick="startTimer(5)">Short Break (5m)</button>
+                        <button onclick="startTimer(15)">Long Break (15m)</button>
+                        <button onclick="resetTimer()">Reset</button>
                     </div>
-                    <div class="timer-display" id="timerDisplay">25:00</div>
-                    <div>
-                        <button class="control-btn" onclick="startTimer()">▶ Start</button>
-                        <button class="control-btn" onclick="resetTimer()">↻ Reset</button>
-                    </div>
+                </div>
+                <div class="playlist-section">
+                    <div class="section-title">🎵 Playlist</div>
+                    <input type="text" id="playlistUrl" placeholder="Paste Spotify or YouTube playlist URL" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-bottom: 10px;">
+                    <button onclick="loadPlaylist()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Load Playlist</button>
+                    <div id="playlistPlayer" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Playlist Section -->
-                    <div style="margin-top: 30px; padding-top: 30px; border-top: 2px solid rgba(255, 255, 255, 0.2, 0.3);">
-                        <div style="font-size: 18px; font-weight: 700; margin-bottom: 15px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎵 Focus Playlist</div>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <input type="text" id="playlistUrl" placeholder="Paste Spotify/YouTube playlist URL..." style="width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.1); color: inherit;">
-                        </div>
-                        
-                        <button onclick="loadPlaylist()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 10px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(31, 41, 55, 0.4); margin-right: 10px;">🎧 Load Playlist</button>
-                        
-                        <button onclick="togglePlaylist()" id="playlistToggle" style="background: rgba(255, 255, 255, 0.2, 0.2); color: white; border: 2px solid #ffffff; padding: 10px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; display: none;">▶ Play Music</button>
-                        
-                        <div id="playlistFrame" style="margin-top: 20px; display: none;">
-                            <!-- Playlist embed will go here -->
-                        </div>
+        <!-- Goals & Habits Page -->
+        <div id="goalsHabitsPage" class="page">
+            <div class="section-title">🎯 Goals</div>
+            <button onclick="openAddGoal()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; margin-bottom: 20px;">➕ Add New Goal</button>
+            <div id="goalsGrid" class="goals-grid">
+                <!-- Generated by JavaScript -->
+            </div>
+
+            <div class="section-title" style="margin-top: 40px;">📊 Habit Analytics</div>
+            <div style="margin-bottom: 20px;">
+                <label style="color: #9CA3AF; margin-right: 10px;">Time Range:</label>
+                <select id="habitAnalyticsRange" onchange="renderHabitAnalytics()" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+            <div id="habitAnalytics">
+                <!-- Generated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Workout Page -->
+        <div id="workoutPage" class="page">
+            <div class="section-title">💪 Log Today's Workout</div>
+            <div class="workout-log">
+                <input type="text" id="exerciseName" placeholder="Exercise name (e.g., Bench Press)" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-bottom: 10px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="number" id="exerciseWeight" placeholder="Weight (lbs)" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                    <input type="number" id="exerciseReps" placeholder="Reps" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                    <input type="number" id="exerciseSets" placeholder="Sets" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                </div>
+                <button onclick="logWorkout()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; width: 100%;">Log Exercise</button>
+            </div>
+
+            <div id="exerciseCards" style="margin-top: 30px;">
+                <!-- Generated by JavaScript -->
+            </div>
+
+            <div class="section-title" style="margin-top: 40px;">🏆 Lifetime Counters</div>
+            <div style="display: flex; gap: 20px;">
+                <div class="lifetime-counter">
+                    <div class="counter-title">Pushups</div>
+                    <div class="counter-value" id="lifetimePushups">0</div>
+                    <div style="margin-top: 10px;">
+                        <input type="number" id="pushupsToAdd" placeholder="Add reps" style="width: 100px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-right: 10px;">
+                        <button onclick="addPushups()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Add</button>
+                    </div>
+                </div>
+                <div class="lifetime-counter">
+                    <div class="counter-title">Pull-ups</div>
+                    <div class="counter-value" id="lifetimePullups">0</div>
+                    <div style="margin-top: 10px;">
+                        <input type="number" id="pullupsToAdd" placeholder="Add reps" style="width: 100px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-right: 10px;">
+                        <button onclick="addPullups()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Add</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- GOALS & HABITS PAGE -->
-        <div id="goalsPage" class="page-content">
-            <!-- Goals Section -->
-            <div class="habit-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div class="section-title">🎯 Your Goals</div>
-                    <button onclick="addGoal()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2, 0.4);">➕ Add New Goal</button>
-                </div>
-                
-                <div class="goals-grid" id="goalsGrid">
-                    <!-- Generated by JavaScript -->
-                </div>
-            </div>
-
-            <!-- Habit Analytics Section -->
-            <div class="habit-section">
-                <div class="section-title">📊 Habit Analytics</div>
-                
-                <!-- Time Range Selector -->
-                <div style="margin-bottom: 20px; text-align: right;">
-                    <select id="habitAnalyticsRange" onchange="updateHabitAnalytics()" style="padding: 10px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600;">
-                        <option value="7">Last 7 Days</option>
-                        <option value="30">Last 30 Days</option>
-                        <option value="all">All Time</option>
-                    </select>
-                </div>
-
-                <!-- Top Performers & Needs Focus -->
-                <div class="two-col" style="margin-bottom: 30px;">
-                    <!-- Most Consistent -->
-                    <div style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.1), rgba(75, 85, 99, 0.1)); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 16px; padding: 25px;">
-                        <h3 style="margin-bottom: 20px; color: #ffffff; font-size: 20px;">🏆 Most Consistent</h3>
-                        <div id="topHabits">
-                            <!-- Generated by JavaScript -->
-                        </div>
-                    </div>
-
-                    <!-- Needs Focus -->
-                    <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(248, 113, 113, 0.1)); border: 2px solid rgba(239, 68, 68, 0.4); border-radius: 16px; padding: 25px;">
-                        <h3 style="margin-bottom: 20px; color: #EF4444; font-size: 20px;">⚠️ Needs Focus</h3>
-                        <div id="bottomHabits">
-                            <!-- Generated by JavaScript -->
-                        </div>
-                        
-                        <div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.4); margin-top: 20px;">
-                            <h4 style="color: #FBBF24; margin-bottom: 10px;">💡 Insights</h4>
-                            <div id="habitInsights" style="font-size: 14px; line-height: 1.6; color: #E5E7EB;">
-                                <!-- Generated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Habit Trends Chart -->
-                <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 30px;">
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📈 Habit Completion Trends</h3>
-                    <canvas id="habitTrendsChart" style="max-height: 400px;"></canvas>
-                </div>
-
-                <!-- Day of Week Analysis -->
-                <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(156, 163, 175, 0.1)); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 16px; padding: 25px;">
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #FBBF24, #F59E0B); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📅 Best & Worst Days</h3>
-                    <div id="dayAnalysis">
-                        <!-- Generated by JavaScript -->
-                    </div>
-                </div>
+        <!-- Journal Page -->
+        <div id="journalPage" class="page">
+            <div id="journalContainer">
+                <!-- Generated by JavaScript -->
             </div>
         </div>
 
-        <!-- JOURNAL PAGE -->
-        <div id="journalPage" class="page-content">
-            <div class="habit-section">
-                <div class="section-title">📝 Daily Journal</div>
-                <div id="journalContainer">
-                    <!-- Generated by JavaScript -->
-                </div>
+        <!-- Vision Board Page -->
+        <div id="visionBoardPage" class="page">
+            <div id="visionBoardContainer">
+                <!-- Generated by JavaScript -->
             </div>
         </div>
 
-        <!-- VISION BOARD PAGE -->
-        <div id="visionPage" class="page-content">
-            <div class="habit-section">
-                <div id="visionBoardContainer">
-                    <!-- Generated by JavaScript -->
-                </div>
+        <!-- Content Tracker Page -->
+        <div id="contentPage" class="page">
+            <div id="contentContainer">
+                <!-- Generated by JavaScript -->
             </div>
         </div>
 
-        <!-- CONTENT TRACKER PAGE -->
-        <div id="contentPage" class="page-content">
-            <div class="habit-section">
-                <div class="section-title">🎬 Content Tracker</div>
-                <div id="contentTrackerContainer">
-                    <!-- Generated by JavaScript -->
-                </div>
+        <!-- Books Page -->
+        <div id="booksPage" class="page">
+            <div id="booksContainer">
+                <!-- Generated by JavaScript -->
             </div>
         </div>
 
-        <!-- WORKOUT PAGE -->
-        <div id="workoutPage" class="page-content">
-            <div class="habit-section">
-                <div class="section-title">💪 Workout Tracker</div>
-                
-                <!-- Log New Workout -->
-                <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 30px;">
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📝 Log Today's Workout</h3>
-                    
-                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                        <input type="text" id="exerciseName" placeholder="Exercise (e.g. Bench Press)" style="padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                        <input type="number" id="exerciseWeight" placeholder="Weight (lbs)" style="padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                        <input type="number" id="exerciseReps" placeholder="Reps" style="padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                        <input type="number" id="exerciseSets" placeholder="Sets" style="padding: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                    </div>
-                    
-                    <button onclick="logWorkout()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 30px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">➕ Log Exercise</button>
-                </div>
-
-                <!-- Exercise Cards Grid -->
-                <div id="exerciseCardsContainer">
-                    <!-- Generated by JavaScript -->
-                </div>
-            </div>
-
-            <!-- Lifetime Counters at Bottom -->
-            <div class="habit-section">
-                <div class="section-title">🏆 Lifetime Totals</div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
-                    <div style="background: linear-gradient(135deg, rgba(156, 163, 175, 0.15), rgba(239, 68, 68, 0.15)); border: 3px solid rgba(156, 163, 175, 0.6); border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 0 40px rgba(156, 163, 175, 0.3);">
-                        <div style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #F59E0B;">💪 LIFETIME PUSHUPS</div>
-                        <div id="totalPushups" style="font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #F59E0B, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; margin-bottom: 20px;">0</div>
-                        <div style="display: flex; gap: 10px; justify-content: center;">
-                            <input type="number" id="pushupInput" placeholder="0" style="width: 80px; padding: 10px; border: 2px solid rgba(156, 163, 175, 0.5); border-radius: 8px; font-size: 16px; font-weight: 700; text-align: center; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                            <button onclick="addPushups()" style="background: linear-gradient(135deg, #F59E0B, #EF4444); color: white; border: none; padding: 10px 20px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(156, 163, 175, 0.4);">+ Add</button>
-                        </div>
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.15), rgba(75, 85, 99, 0.15)); border: 3px solid rgba(31, 41, 55, 0.6); border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 0 40px rgba(31, 41, 55, 0.3);">
-                        <div style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🏋️ LIFETIME PULL-UPS</div>
-                        <div id="totalPullups" style="font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; margin-bottom: 20px;">0</div>
-                        <div style="display: flex; gap: 10px; justify-content: center;">
-                            <input type="number" id="pullupInput" placeholder="0" style="width: 80px; padding: 10px; border: 2px solid rgba(31, 41, 55, 0.5); border-radius: 8px; font-size: 16px; font-weight: 700; text-align: center; background: rgba(255, 255, 255, 0.9); color: #374151;">
-                            <button onclick="addPullups()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 10px 20px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(31, 41, 55, 0.4);">+ Add</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- BOOKS PAGE -->
-        <div id="booksPage" class="page-content">
-            <!-- Generated by JavaScript -->
-        </div>
-
-        <div id="settingsPage" class="page-content">
-            <div class="habit-section">
-                <div class="section-title">⚙️ Settings</div>
-                <div style="text-align: center; padding: 60px;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">⚙️</div>
-                    <div style="font-size: 18px; font-weight: 600; color: #9CA3AF;">Coming Soon</div>
-                </div>
-            </div>
+        <!-- Settings Page -->
+        <div id="settingsPage" class="page">
+            <div class="section-title">⚙️ Settings</div>
+            <p style="color: #9CA3AF; text-align: center; padding: 40px;">Coming Soon...</p>
         </div>
     </div>
 
-    <!-- Load feature modules first -->
+    <!-- Modal for charts and forms -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="app.js"></script>
     <script src="features/habits.js"></script>
     <script src="features/goals.js"></script>
     <script src="features/mood.js"></script>
@@ -363,9 +243,6 @@
     <script src="features/journal.js"></script>
     <script src="features/vision-board.js"></script>
     <script src="features/content-tracker.js"></script>
-    <script src="features/books.js"></script>
-    
-    <!-- Load core app last -->
-    <script src="app.js"></script>
+    <script src="features/reading-list.js"></script>
 </body>
 </html>
