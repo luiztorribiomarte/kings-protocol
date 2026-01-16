@@ -473,36 +473,36 @@ input, textarea, select{
 }
 
 /* ============================
-   HABIT GRID – SUBTLE HOVER GLOW
+   HABIT GRID – HOVER GLOW (SAFE TARGET)
    ============================ */
 
-/* All habit cells (dots / checks) */
-.habit-cell {
+/* Target habit tracking dots */
+table td {
   transition: 
     box-shadow 0.2s ease,
     transform 0.15s ease,
     background 0.2s ease;
 }
 
-/* Hover glow for empty (hollow) circles */
-.habit-cell:not(.completed):hover {
+/* Hover on empty habit cells */
+table td:hover {
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
   transform: scale(1.05);
 }
 
-/* Hover glow for completed habits */
-.habit-cell.completed:hover {
-  box-shadow: 
+/* Completed habit (green check) */
+table td:has(svg),
+table td:has(.check),
+table td:has(.completed) {
+  box-shadow: none;
+}
+
+/* Completed hover stronger */
+table td:has(svg):hover,
+table td:has(.check):hover,
+table td:has(.completed):hover {
+  box-shadow:
     0 0 0 2px rgba(34, 197, 94, 0.6),
     0 0 10px rgba(34, 197, 94, 0.35);
   transform: scale(1.08);
-}
-
-/* Today column subtle highlight */
-.habit-cell.today {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.habit-cell.today:hover {
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.45);
 }
