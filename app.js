@@ -46,25 +46,19 @@ function closeModal() {
 // ============================================
 
 function showPage(pageName) {
-    // 1) Hide all pages (your HTML uses class="page")
-    document.querySelectorAll('.page').forEach(page => {
+    document.querySelectorAll('.page, .page-content').forEach(page => {
         page.classList.remove('active');
     });
 
-    // 2) Deactivate all tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.classList.remove('active');
     });
 
-    // 3) Activate the selected page
     const pageEl = document.getElementById(pageName + 'Page');
-    if (!pageEl) {
-        console.error(`Page not found: ${pageName}Page`);
-        return;
-    }
+    if (!pageEl) return;
+
     pageEl.classList.add('active');
 
-    // 4) Activate the correct tab
     const tabs = document.querySelectorAll('.nav-tab');
     const pageIndex = {
         dashboard: 0,
@@ -77,302 +71,91 @@ function showPage(pageName) {
         settings: 7
     };
 
-    const tabIndex = pageIndex[pageName];
-    if (tabIndex === undefined || !tabs[tabIndex]) {
-        console.error(`Tab not found for page: ${pageName}`);
-        return;
+    if (tabs[pageIndex[pageName]]) {
+        tabs[pageIndex[pageName]].classList.add('active');
     }
-    tabs[tabIndex].classList.add('active');
 
-    // 5) Render page-specific content
     if (pageName === 'goalsHabits') {
-        if (typeof renderGoals === 'function') renderGoals();
+        renderGoals();
         if (typeof updateHabitAnalytics === 'function') updateHabitAnalytics();
     }
-
-    if (pageName === 'workout') {
-        if (typeof renderExerciseCards === 'function') renderExerciseCards();
-    }
-
-    if (pageName === 'journal') {
-        if (typeof renderJournalPage === 'function') renderJournalPage();
-    }
-
-    if (pageName === 'visionBoard') {
-        if (typeof renderVisionBoard === 'function') renderVisionBoard();
-    }
-
-    if (pageName === 'content') {
-        if (typeof renderContentTracker === 'function') renderContentTracker();
-    }
-
-    if (pageName === 'books') {
-        if (typeof renderReadingList === 'function') renderReadingList();
-    }
-}
-
-
-// ============================================
-// FOCUS TIMER
-// ============================================
-
-function setTimerMode(mode) {
-    timerMode = mode;
-    document.querySelectorAll('.timer-mode-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    if (mode === 'short') timerSeconds = 300;
-    else if (mode === 'focus') timerSeconds = 1500;
-    else if (mode === 'long') timerSeconds = 900;
-    
-    resetTimer();
-}
-
-function startTimer() {
-    if (timerInterval) return;
-    
-    timerInterval = setInterval(() => {
-        timerSeconds--;
-        updateTimerDisplay();
-        
-        if (timerSeconds <= 0) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            if (notificationsOn && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification('Timer Complete!', {
-                    body: timerMode === 'focus' ? 'Great work! Time for a break.' : 'Break over! Back to focus.',
-                    icon: '🔥'
-                });
-            }
-        }
-    }, 1000);
-}
-
-function resetTimer() {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    
-    if (timerMode === 'short') timerSeconds = 300;
-    else if (timerMode === 'focus') timerSeconds = 1500;
-    else if (timerMode === 'long') timerSeconds = 900;
-    
-    updateTimerDisplay();
-}
-
-function updateTimerDisplay() {
-    const mins = Math.floor(timerSeconds / 60);
-    const secs = timerSeconds % 60;
-    const display = document.getElementById('timerDisplay');
-    if (display) {
-        display.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+    if (pageName === 'workout') renderExerciseCards();
+    if (pageName === 'journal') renderJournalPage();
+    if (pageName === 'visionBoard') renderVisionBoard();
+    if (pageName === 'content') renderContentTracker();
+    if (pageName === 'books') renderReadingList();
 }
 
 // ============================================
-// NOTIFICATIONS
-// ============================================
-
-function toggleNotifications() {
-    notificationsOn = !notificationsOn;
-    const toggle = document.getElementById('notifToggle');
-    const status = document.getElementById('notifStatus');
-    
-    if (toggle) {
-        toggle.classList.toggle('active');
-    }
-    
-    if (status) {
-        status.textContent = notificationsOn ? 'ON' : 'OFF';
-    }
-    
-    if (notificationsOn && 'Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
-    }
-}
-
-// ============================================
-// PLAYLIST
-// ============================================
-
-function loadPlaylist() {
-    const url = document.getElementById('playlistUrl')?.value;
-    if (!url) {
-        alert('Please paste a playlist URL');
-        return;
-    }
-    
-    const frame = document.getElementById('playlistFrame');
-    const toggle = document.getElementById('playlistToggle');
-    
-    let embedUrl = '';
-    if (url.includes('spotify')) {
-        const playlistId = url.split('/playlist/')[1]?.split('?')[0];
-        embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
-    } else if (url.includes('youtube')) {
-        const playlistId = url.split('list=')[1]?.split('&')[0];
-        embedUrl = `https://www.youtube.com/embed/videoseries?list=${playlistId}`;
-    }
-    
-    if (embedUrl && frame) {
-        frame.innerHTML = `<iframe src="${embedUrl}" width="100%" height="380" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
-        frame.style.display = 'block';
-        if (toggle) toggle.style.display = 'inline-block';
-    }
-}
-
-function togglePlaylist() {
-    const frame = document.getElementById('playlistFrame');
-    if (frame) {
-        frame.style.display = frame.style.display === 'none' ? 'block' : 'none';
-    }
-}
-
-// ============================================
-// LIVE CLOCK WITH GEOLOCATION
+// LIVE CLOCK (FIXED IDS — THIS WAS THE BUG)
 // ============================================
 
 function updateClock() {
     const now = new Date();
-    
-    // Format time (12-hour format with AM/PM)
+
     let hours = now.getHours();
     const minutes = now.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // 0 should be 12
+    hours = hours % 12 || 12;
+
     const timeString = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-    
-    // Format date
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    const dateString = now.toLocaleDateString('en-US', options);
-    
-    // Update display
-    const clockElement = document.getElementById('liveClock');
-    const dateElement = document.getElementById('liveDate');
-    
+    const dateString = now.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
+
+    // ✅ MATCH HTML IDS
+    const clockElement = document.getElementById('currentTime');
+    const dateElement = document.getElementById('currentDate');
+
     if (clockElement) clockElement.textContent = timeString;
     if (dateElement) dateElement.textContent = dateString;
 }
 
 function updateLocation() {
-    const locationElement = document.getElementById('clockLocation');
-    
+    // ✅ MATCH HTML ID
+    const locationElement = document.getElementById('currentLocation');
+    if (!locationElement) return;
+
     if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
+                const { latitude, longitude } = position.coords;
                 try {
-                    // Use OpenStreetMap's Nominatim API (free, no key required)
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+                    );
                     const data = await response.json();
-                    
-                    // Get city/neighborhood
-                    const city = data.address.city || 
-                                data.address.town || 
-                                data.address.village || 
-                                data.address.suburb || 
-                                data.address.neighbourhood || 
-                                data.address.county ||
-                                'Unknown';
-                    
-                    if (locationElement) {
-                        locationElement.textContent = city;
-                    }
-                    
-                    // Save location to localStorage
+
+                    const city =
+                        data.address.city ||
+                        data.address.town ||
+                        data.address.village ||
+                        data.address.suburb ||
+                        data.address.county ||
+                        'Unknown';
+
+                    locationElement.textContent = city;
                     localStorage.setItem('userLocation', city);
-                } catch (error) {
-                    console.error('Error getting location name:', error);
-                    if (locationElement) {
-                        locationElement.textContent = 'New York';
-                    }
+                } catch {
+                    locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
                 }
             },
-            (error) => {
-                console.error('Geolocation error:', error);
-                // Try to use saved location
-                const savedLocation = localStorage.getItem('userLocation');
-                if (locationElement) {
-                    locationElement.textContent = savedLocation || 'New York';
-                }
+            () => {
+                locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
             }
         );
     } else {
-        // Geolocation not supported, use saved or default
-        const savedLocation = localStorage.getItem('userLocation');
-        if (locationElement) {
-            locationElement.textContent = savedLocation || 'New York';
-        }
+        locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
     }
-}
-
-// ============================================
-// API FETCHING
-// ============================================
-
-function fetchYouTubeStats() {
-    // Placeholder - implement with YouTube API
-    console.log('YouTube stats would be fetched here');
-}
-
-function fetchWeather() {
-    // Placeholder - implement with weather API  
-    console.log('Weather would be fetched here');
-}
-
-// ============================================
-// DATA EXPORT
-// ============================================
-
-function exportData() {
-    const data = {
-        habitData: habitData,
-        goalsData: goalsData,
-        moodData: moodData,
-        workoutData: workoutData,
-        habitsList: habitsList,
-        lifetimePushups: lifetimePushups,
-        lifetimePullups: lifetimePullups,
-        exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kings-protocol-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-}
-
-// ============================================
-// MODE SWITCHING
-// ============================================
-
-function switchToZenMode() {
-    document.body.classList.remove('fire-mode');
-    document.body.classList.add('zen-mode');
-    document.getElementById('pageIcon').textContent = '🧘';
-    document.getElementById('zenModeBtn').classList.add('active');
-    document.getElementById('fireModeBtn').classList.remove('active');
-}
-
-function switchToFireMode() {
-    document.body.classList.remove('zen-mode');
-    document.body.classList.add('fire-mode');
-    document.getElementById('pageIcon').textContent = '🔥';
-    document.getElementById('fireModeBtn').classList.add('active');
-    document.getElementById('zenModeBtn').classList.remove('active');
 }
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
-// Wait for DOM and all scripts to load
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all modules
     initHabitData();
     initGoalsData();
     initMoodData();
@@ -383,21 +166,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initContentData();
     initReadingListData();
 
-    // Render initial views
     renderHabitGrid();
     renderMoodTracker();
     updateStreakDisplay();
-    fetchYouTubeStats();
-    fetchWeather();
 
-    // Initialize and update clock
     updateClock();
-    setInterval(updateClock, 1000); // Update every second
-
-    // Get user location
+    setInterval(updateClock, 1000);
     updateLocation();
 
-    // Set up intervals
-    setInterval(fetchYouTubeStats, 300000);
-    setInterval(fetchWeather, 1800000);
+    showPage('dashboard');
 });
