@@ -7,6 +7,9 @@ let timerInterval = null;
 let timerSeconds = 1500;
 let timerMode = 'focus';
 
+// Chart instances (so we can destroy/re-render cleanly)
+let habitsChartInstance = null;
+
 // ============================================
 // MODAL SYSTEM
 // ============================================
@@ -30,7 +33,7 @@ function openModal(html) {
 }
 
 // ============================================
-// NAVIGATION (THIS WAS A CORE ISSUE)
+// NAVIGATION
 // ============================================
 
 function showPage(page) {
@@ -139,12 +142,12 @@ function loadPlaylist() {
 
     if (url.includes('spotify')) {
         const id = url.split('/playlist/')[1]?.split('?')[0];
-        embed = `https://open.spotify.com/embed/playlist/${id}`;
+        if (id) embed = `https://open.spotify.com/embed/playlist/${id}`;
     }
 
     if (url.includes('youtube')) {
         const id = url.split('list=')[1]?.split('&')[0];
-        embed = `https://www.youtube.com/embed/videoseries?list=${id}`;
+        if (id) embed = `https://www.youtube.com/embed/videoseries?list=${id}`;
     }
 
     if (!embed) {
@@ -156,7 +159,7 @@ function loadPlaylist() {
 }
 
 // ============================================
-// CLOCK + LOCATION (FIXED IDS)
+// CLOCK + LOCATION (matches your HTML ids)
 // ============================================
 
 function updateClock() {
@@ -225,6 +228,214 @@ function toggleMode() {
 }
 
 // ============================================
+// DAILY HABITS CHART (CLICK SECTION -> MODAL)
+// ============================================
+
+function getLocalDayKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function parseDayKey(key) {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, (m - 1), d);
+}
+
+function getRangeDayKeys(range) {
+    if (range === 'all') {
+        // Best effort: use whatever dates exist in habitData
+        const keys = habitData && typeof habitData === 'object'
+            ? Object.keys(habitData).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+            : [];
+        keys.sort((a, b) => parseDayKey(a) - parseDayKey(b));
+        return keys.length ? keys : getRangeDayKeys('7');
+    }
+
+    const days = range === '30' ? 30 : 7;
+    const out = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        out.push(getLocalDayKey(d));
+    }
+    return out;
+}
+
+function getHabitsTotalCount() {
+    // Best effort: habitsList might exist as array
+    if (Array.isArray(window.habitsList) && window.habitsList.length) return window.habitsList.length;
+
+    // If habitsList is object map
+    if (window.habitsList && typeof window.habitsList === 'object') {
+        const keys = Object.keys(window.habitsList);
+        if (keys.length) return keys.length;
+    }
+
+    // Fallback: infer from any day inside habitData
+    if (window.habitData && typeof window.habitData === 'object') {
+        const anyKey = Object.keys(window.habitData).find(k => typeof window.habitData[k] === 'object');
+        if (anyKey) return Object.keys(window.habitData[anyKey]).length;
+    }
+
+    return 0;
+}
+
+function getDayCompletion(dayKey) {
+    // Returns { done, total, percent }
+    const total = getHabitsTotalCount();
+
+    // Common shape: habitData[dayKey] = { habitId/name: true/false }
+    if (window.habitData && typeof window.habitData === 'object' && window.habitData[dayKey] && typeof window.habitData[dayKey] === 'object') {
+        const values = Object.values(window.habitData[dayKey]);
+        const done = values.filter(Boolean).length;
+        const denom = total || values.length || 0;
+        const percent = denom ? Math.round((done / denom) * 100) : 0;
+        return { done, total: denom, percent };
+    }
+
+    // If no data stored for this day
+    return { done: 0, total: total || 0, percent: 0 };
+}
+
+function openHabitsGraph(range = '7') {
+    const title = range === '30' ? 'Last 30 Days' : range === 'all' ? 'All Time' : 'Last 7 Days';
+
+    const html = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;">
+        <div style="font-size:1.15rem; font-weight:900; color:white;">📈 Habit Completion (${title})</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div style="color:#9ca3af; font-size:0.9rem;">Range</div>
+          <select id="habitsRangeSelect"
+            style="padding:8px 10px; border-radius:10px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:white; outline:none;"
+          >
+            <option value="7" ${range === '7' ? 'selected' : ''}>7 days</option>
+            <option value="30" ${range === '30' ? 'selected' : ''}>30 days</option>
+            <option value="all" ${range === 'all' ? 'selected' : ''}>All time</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="color:#9ca3af; font-size:0.9rem; margin-bottom:12px;">
+        Line shows your daily completion %. Hover a point to see “done / total”.
+      </div>
+
+      <div style="width:100%; height:320px;">
+        <canvas id="habitsChartCanvas" height="320"></canvas>
+      </div>
+    `;
+
+    if (typeof openModal === 'function') openModal(html);
+    else return;
+
+    const select = document.getElementById('habitsRangeSelect');
+    if (select) select.onchange = () => openHabitsGraph(select.value);
+
+    setTimeout(() => renderHabitsChart(range), 0);
+}
+
+function renderHabitsChart(range) {
+    const canvas = document.getElementById('habitsChartCanvas');
+    if (!canvas) return;
+
+    if (habitsChartInstance) {
+        try { habitsChartInstance.destroy(); } catch (e) {}
+        habitsChartInstance = null;
+    }
+
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js not found. (You already load it in HTML, so this should not happen.)');
+        return;
+    }
+
+    const keys = getRangeDayKeys(range);
+    const labels = keys.map(k => {
+        const d = parseDayKey(k);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    const dayStats = keys.map(k => getDayCompletion(k));
+    const percents = dayStats.map(s => s.total ? s.percent : null);
+
+    const ctx = canvas.getContext('2d');
+    habitsChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Completion %',
+                data: percents,
+                tension: 0.35,
+                spanGaps: true,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: 'rgba(255,255,255,0.8)' } },
+                tooltip: {
+                    callbacks: {
+                        afterBody: (items) => {
+                            const idx = items?.[0]?.dataIndex ?? 0;
+                            const s = dayStats[idx];
+                            const k = keys[idx];
+                            return [
+                                `Done: ${s.done} / ${s.total}`,
+                                `Date: ${k}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: 'rgba(255,255,255,0.65)' },
+                    grid: { color: 'rgba(255,255,255,0.08)' }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: { stepSize: 10, color: 'rgba(255,255,255,0.65)' },
+                    grid: { color: 'rgba(255,255,255,0.08)' }
+                }
+            }
+        }
+    });
+}
+
+function attachHabitsChartClick() {
+    const grid = document.getElementById('habitGrid');
+    if (!grid) return;
+
+    const section = grid.closest('.habit-section');
+    if (!section) return;
+
+    const titleRow = section.querySelector('.section-title');
+    if (!titleRow) return;
+
+    // Avoid adding multiple listeners
+    if (titleRow.dataset.habitsChartBound === '1') return;
+    titleRow.dataset.habitsChartBound = '1';
+
+    titleRow.style.cursor = 'pointer';
+    titleRow.title = 'Click to view habit chart';
+
+    titleRow.addEventListener('click', (e) => {
+        // If they click "Manage Habits" button, do NOT open chart
+        const target = e.target;
+        if (target && target.tagName === 'BUTTON') return;
+        openHabitsGraph('7');
+    });
+}
+
+// ============================================
 // INIT
 // ============================================
 
@@ -246,4 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     updateLocation();
     setInterval(updateClock, 1000);
+
+    // After habit grid renders, bind chart click
+    setTimeout(attachHabitsChartClick, 50);
 });
