@@ -11,60 +11,37 @@ let timerMode = 'focus';
 // MODAL SYSTEM
 // ============================================
 
-function createModal() {
-    const overlay = document.createElement('div');
-    overlay.id = 'modalOverlay';
-    overlay.style.cssText =
-        'position: fixed; inset: 0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000;';
+function closeModal(e) {
+    const modal = document.getElementById('modal');
+    if (!modal) return;
 
-    const content = document.createElement('div');
-    content.style.cssText =
-        'background: linear-gradient(135deg, rgba(139,92,246,.95), rgba(236,72,153,.95)); border-radius:20px; padding:30px; max-width:600px; width:90%; max-height:90vh; overflow:auto; position:relative;';
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.onclick = closeModal;
-    closeBtn.style.cssText =
-        'position:absolute; top:15px; right:15px; background:rgba(255,255,255,.2); border:2px solid white; color:white; font-size:28px; width:40px; height:40px; border-radius:50%; cursor:pointer;';
-
-    content.appendChild(closeBtn);
-    overlay.appendChild(content);
-    document.body.appendChild(overlay);
-
-    overlay.onclick = e => {
-        if (e.target === overlay) closeModal();
-    };
-
-    return content;
+    if (!e || e.target === modal) {
+        modal.style.display = 'none';
+    }
 }
 
-function closeModal() {
-    const overlay = document.getElementById('modalOverlay');
-    if (overlay) overlay.remove();
+function openModal(html) {
+    const modal = document.getElementById('modal');
+    const body = document.getElementById('modalBody');
+    if (!modal || !body) return;
+
+    body.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
 // ============================================
-// NAVIGATION (STABLE)
+// NAVIGATION (THIS WAS A CORE ISSUE)
 // ============================================
 
-function showPage(pageName) {
-    document.querySelectorAll('[id$="Page"]').forEach(page => {
-        page.style.display = 'none';
-        page.classList.remove('active');
-    });
+function showPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-
-    const pageEl = document.getElementById(pageName + 'Page');
-    if (!pageEl) return;
-
-    pageEl.style.display = 'block';
-    pageEl.classList.add('active');
+    const pageEl = document.getElementById(page + 'Page');
+    if (pageEl) pageEl.classList.add('active');
 
     const tabs = document.querySelectorAll('.nav-tab');
-    const pageIndex = {
+    const map = {
         dashboard: 0,
         goalsHabits: 1,
         workout: 2,
@@ -75,125 +52,183 @@ function showPage(pageName) {
         settings: 7
     };
 
-    if (tabs[pageIndex[pageName]]) {
-        tabs[pageIndex[pageName]].classList.add('active');
-    }
+    if (tabs[map[page]]) tabs[map[page]].classList.add('active');
 
-    if (pageName === 'goalsHabits') {
-        if (typeof renderGoals === 'function') renderGoals();
+    if (page === 'goalsHabits' && typeof renderGoals === 'function') {
+        renderGoals();
         if (typeof updateHabitAnalytics === 'function') updateHabitAnalytics();
     }
-    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
-    if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
-    if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
-    if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
-    if (pageName === 'books' && typeof renderReadingList === 'function') renderReadingList();
+
+    if (page === 'workout' && typeof renderExerciseCards === 'function') {
+        renderExerciseCards();
+    }
+
+    if (page === 'journal' && typeof renderJournalPage === 'function') {
+        renderJournalPage();
+    }
+
+    if (page === 'visionBoard' && typeof renderVisionBoard === 'function') {
+        renderVisionBoard();
+    }
+
+    if (page === 'content' && typeof renderContentTracker === 'function') {
+        renderContentTracker();
+    }
+
+    if (page === 'books' && typeof renderReadingList === 'function') {
+        renderReadingList();
+    }
 }
 
 // ============================================
-// LIVE CLOCK + LOCATION (FIXED IDS)
+// TIMER
+// ============================================
+
+function startTimer(minutes) {
+    if (typeof minutes === 'number') {
+        timerSeconds = minutes * 60;
+        timerMode = minutes === 25 ? 'focus' : minutes === 5 ? 'short' : 'long';
+        updateTimerDisplay();
+    }
+
+    if (timerInterval) return;
+
+    timerInterval = setInterval(() => {
+        timerSeconds--;
+        updateTimerDisplay();
+
+        if (timerSeconds <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+
+            if (notificationsOn && 'Notification' in window && Notification.permission === 'granted') {
+                new Notification('Timer Complete!', {
+                    body: timerMode === 'focus' ? 'Time to rest.' : 'Back to focus.',
+                });
+            }
+        }
+    }, 1000);
+}
+
+function resetTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerSeconds = 1500;
+    updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+    const el = document.getElementById('timerDisplay');
+    if (!el) return;
+    const m = Math.floor(timerSeconds / 60);
+    const s = timerSeconds % 60;
+    el.textContent = `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ============================================
+// PLAYLIST
+// ============================================
+
+function loadPlaylist() {
+    const input = document.getElementById('playlistUrl');
+    const player = document.getElementById('playlistPlayer');
+    if (!input || !player) return;
+
+    const url = input.value;
+    let embed = '';
+
+    if (url.includes('spotify')) {
+        const id = url.split('/playlist/')[1]?.split('?')[0];
+        embed = `https://open.spotify.com/embed/playlist/${id}`;
+    }
+
+    if (url.includes('youtube')) {
+        const id = url.split('list=')[1]?.split('&')[0];
+        embed = `https://www.youtube.com/embed/videoseries?list=${id}`;
+    }
+
+    if (!embed) {
+        alert('Invalid playlist URL');
+        return;
+    }
+
+    player.innerHTML = `<iframe src="${embed}" width="100%" height="380" loading="lazy"></iframe>`;
+}
+
+// ============================================
+// CLOCK + LOCATION (FIXED IDS)
 // ============================================
 
 function updateClock() {
     const now = new Date();
-    let hours = now.getHours();
-    const minutes = now.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-
-    const timeString = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-    const dateString = now.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric'
-    });
+    const h = now.getHours() % 12 || 12;
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
 
     const timeEl = document.getElementById('currentTime');
     const dateEl = document.getElementById('currentDate');
 
-    if (timeEl) timeEl.textContent = timeString;
-    if (dateEl) dateEl.textContent = dateString;
+    if (timeEl) timeEl.textContent = `${h}:${m} ${ampm}`;
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
 }
 
 function updateLocation() {
-    const locationEl = document.getElementById('currentLocation');
-    if (!locationEl) return;
+    const el = document.getElementById('currentLocation');
+    const cached = localStorage.getItem('userLocation');
+    if (cached && el) el.textContent = cached;
 
-    if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-            async pos => {
-                try {
-                    const { latitude, longitude } = pos.coords;
-                    const res = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
-                    );
-                    const data = await res.json();
+    if (!navigator.geolocation) return;
 
-                    const city =
-                        data.address.city ||
-                        data.address.town ||
-                        data.address.village ||
-                        data.address.suburb ||
-                        data.address.county ||
-                        'Unknown';
+    navigator.geolocation.getCurrentPosition(async pos => {
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
+            );
+            const data = await res.json();
+            const city =
+                data.address.city ||
+                data.address.town ||
+                data.address.village ||
+                data.address.county ||
+                'Unknown';
 
-                    locationEl.textContent = city;
-                    localStorage.setItem('userLocation', city);
-                } catch {
-                    locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
-                }
-            },
-            () => {
-                locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
-            }
-        );
+            localStorage.setItem('userLocation', city);
+            if (el) el.textContent = city;
+        } catch {}
+    });
+}
+
+// ============================================
+// MODE TOGGLE
+// ============================================
+
+function toggleMode() {
+    const body = document.body;
+    const icon = document.getElementById('modeIcon');
+    const text = document.getElementById('modeText');
+
+    if (body.classList.contains('fire-mode')) {
+        body.classList.remove('fire-mode');
+        body.classList.add('zen-mode');
+        if (icon) icon.textContent = '🧘';
+        if (text) text.textContent = 'Zen Mode';
     } else {
-        locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
+        body.classList.remove('zen-mode');
+        body.classList.add('fire-mode');
+        if (icon) icon.textContent = '🔥';
+        if (text) text.textContent = 'Fire Mode';
     }
 }
 
 // ============================================
-// DASHBOARD SMART STATUS (NEW)
+// INIT
 // ============================================
 
-function updateDailyStatus() {
-    const el = document.getElementById('dailyStatus');
-    if (!el) return;
-
-    const streak = parseInt(document.getElementById('currentStreak')?.textContent || 0);
-    const weekly = parseInt(document.getElementById('weeklyCompletion')?.textContent || 0);
-
-    let message = '⚠️ Let’s get started today.';
-    let color = '#FBBF24';
-
-    if (streak >= 5) {
-        message = '🔥 Strong momentum. Protect the streak.';
-        color = '#34D399';
-    } else if (weekly >= 50) {
-        message = '✅ You’re on track this week.';
-        color = '#60A5FA';
-    }
-
-    el.textContent = message;
-    el.style.borderColor = color;
-}
-
-// ============================================
-// STAT PULSE (ALIVE FEEL)
-// ============================================
-
-function pulseStat(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.classList.add('updated');
-    setTimeout(() => el.classList.remove('updated'), 150);
-}
-
-// ============================================
-// INITIALIZATION
-// ============================================
-
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (typeof initHabitData === 'function') initHabitData();
     if (typeof initGoalsData === 'function') initGoalsData();
     if (typeof initMoodData === 'function') initMoodData();
@@ -209,9 +244,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof updateStreakDisplay === 'function') updateStreakDisplay();
 
     updateClock();
-    setInterval(updateClock, 1000);
     updateLocation();
-    updateDailyStatus();
-
-    showPage('dashboard');
+    setInterval(updateClock, 1000);
 });
