@@ -46,43 +46,71 @@ function closeModal() {
 // ============================================
 
 function showPage(pageName) {
-    document.querySelectorAll('.page-content').forEach(page => {
+    // 1) Hide all pages (your HTML uses class="page")
+    document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
+
+    // 2) Deactivate all tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.getElementById(pageName + 'Page').classList.add('active');
+
+    // 3) Activate the selected page
+    const pageEl = document.getElementById(pageName + 'Page');
+    if (!pageEl) {
+        console.error(`Page not found: ${pageName}Page`);
+        return;
+    }
+    pageEl.classList.add('active');
+
+    // 4) Activate the correct tab
     const tabs = document.querySelectorAll('.nav-tab');
-    const pageIndex = {dashboard: 0, goals: 1, workout: 2, journal: 3, vision: 4, content: 5, books: 6, settings: 7};
-    tabs[pageIndex[pageName]].classList.add('active');
-    
-    // Load page-specific data
-    if (pageName === 'goals') {
-        renderGoals();
+    const pageIndex = {
+        dashboard: 0,
+        goalsHabits: 1,
+        workout: 2,
+        journal: 3,
+        visionBoard: 4,
+        content: 5,
+        books: 6,
+        settings: 7
+    };
+
+    const tabIndex = pageIndex[pageName];
+    if (tabIndex === undefined || !tabs[tabIndex]) {
+        console.error(`Tab not found for page: ${pageName}`);
+        return;
+    }
+    tabs[tabIndex].classList.add('active');
+
+    // 5) Render page-specific content
+    if (pageName === 'goalsHabits') {
+        if (typeof renderGoals === 'function') renderGoals();
         if (typeof updateHabitAnalytics === 'function') updateHabitAnalytics();
     }
-    
+
     if (pageName === 'workout') {
-        renderExerciseCards();
+        if (typeof renderExerciseCards === 'function') renderExerciseCards();
     }
-    
+
     if (pageName === 'journal') {
-        renderJournalPage();
+        if (typeof renderJournalPage === 'function') renderJournalPage();
     }
-    
-    if (pageName === 'vision') {
-        renderVisionBoard();
+
+    if (pageName === 'visionBoard') {
+        if (typeof renderVisionBoard === 'function') renderVisionBoard();
     }
-    
+
     if (pageName === 'content') {
-        renderContentTracker();
+        if (typeof renderContentTracker === 'function') renderContentTracker();
     }
-    
+
     if (pageName === 'books') {
-        renderReadingList();
+        if (typeof renderReadingList === 'function') renderReadingList();
     }
 }
+
 
 // ============================================
 // FOCUS TIMER
