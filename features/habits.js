@@ -1,26 +1,24 @@
 // ============================================
-// HABITS MODULE - Habit tracking & management
+// HABITS MODULE
 // ============================================
 
+// Habit data structure
 let habitData = {};
 let habitsList = [
-    'Wake Up At 7 AM',
-    'Morning Sunlight', 
-    'Skincare',
-    'Gym/Workout',
-    '3L Water',
-    'Content Creation Work',
-    'No Weed',
-    'No Porn',
-    'No Junk Food',
-    'Cold Shower',
-    'Journal/Reflect'
+    '⏰ Wake Up At 7 AM',
+    '☀️ Morning Sunlight',
+    '🧴 Skincare',
+    '🧘 Meditation',
+    '📝 Journal/Reflect',
+    '💪 Work Out',
+    '📚 Read 10 Pages',
+    '🎬 YouTube Work (2hrs)',
+    '🚫 No Porn',
+    '🌿 No Weed',
+    '🧘‍♂️ Nightly Mobility'
 ];
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
+// Initialize habit data
 function initHabitData() {
     const saved = localStorage.getItem('habitData');
     if (saved) {
@@ -28,193 +26,113 @@ function initHabitData() {
     }
 }
 
+// Initialize habits list
 function initHabitsList() {
     const saved = localStorage.getItem('habitsList');
     if (saved) {
         habitsList = JSON.parse(saved);
+    } else {
+        localStorage.setItem('habitsList', JSON.stringify(habitsList));
     }
 }
 
+// Save habit data
 function saveHabitData() {
     localStorage.setItem('habitData', JSON.stringify(habitData));
 }
 
-function saveHabitsList() {
-    localStorage.setItem('habitsList', JSON.stringify(habitsList));
+// Get date string
+function getDateString(date) {
+    const d = date || new Date();
+    return d.toISOString().split('T')[0];
 }
 
-// ============================================
-// HABIT MANAGEMENT
-// ============================================
-
-function addNewHabit() {
-    const modalContent = createModal();
-    
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">➕ Add New Habit</h2>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Habit Name</label>
-            <input type="text" id="newHabitName" placeholder="e.g., Read 30 Minutes" style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 16px; background: rgba(255, 255, 255, 0.1); color: white;" autofocus>
-        </div>
-        
-        <div style="display: flex; gap: 15px; justify-content: flex-end;">
-            <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveNewHabit()" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">Add Habit</button>
-        </div>
-    `;
-}
-
-function saveNewHabit() {
-    const input = document.getElementById('newHabitName');
-    const habitName = input?.value.trim();
-    
-    if (!habitName) {
-        alert('Please enter a habit name');
-        return;
-    }
-    
-    if (habitsList.includes(habitName)) {
-        alert('This habit already exists!');
-        return;
-    }
-    
-    habitsList.push(habitName);
-    saveHabitsList();
-    renderHabitGrid();
-    closeModal();
-}
-
-function deleteHabit(habitName) {
-    if (!confirm(`Are you sure you want to delete "${habitName}"? All tracking data for this habit will be removed.`)) {
-        return;
-    }
-    
-    // Remove from habits list
-    habitsList = habitsList.filter(h => h !== habitName);
-    saveHabitsList();
-    
-    // Remove from all historical data
-    Object.keys(habitData).forEach(date => {
-        if (habitData[date][habitName] !== undefined) {
-            delete habitData[date][habitName];
-        }
-    });
-    saveHabitData();
-    
-    renderHabitGrid();
-    updateStreakDisplay();
-}
-
-function manageHabits() {
-    const modalContent = createModal();
-    
-    let habitsHTML = habitsList.map(habit => `
-        <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div style="font-size: 16px; font-weight: 600;">${habit}</div>
-            <button onclick="deleteHabit('${habit.replace(/'/g, "\\'")}'); manageHabits();" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: 700; cursor: pointer;">Delete</button>
-        </div>
-    `).join('');
-    
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📋 Manage Habits</h2>
-        
-        <div style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
-            ${habitsHTML}
-        </div>
-        
-        <div style="display: flex; gap: 15px; justify-content: space-between;">
-            <button onclick="closeModal(); addNewHabit();" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(31, 41, 55, 0.4);">➕ Add New Habit</button>
-            <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Close</button>
-        </div>
-    `;
-}
-
-// ============================================
-// HABIT TRACKING
-// ============================================
-
+// Render habit grid
 function renderHabitGrid() {
     const grid = document.getElementById('habitGrid');
     if (!grid) return;
-    
-    let html = '';
 
-    // Header row with Manage button
-    html += `<div class="habit-cell header">
-        Habit 
-        <button onclick="manageHabits()" style="margin-left: 10px; background: rgba(255, 255, 255, 0.2, 0.3); border: 2px solid #ffffff; color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer;">⚙️ Manage</button>
-    </div>`;
+    const today = new Date();
+    const dates = [];
     
+    // Get last 7 days
     for (let i = 6; i >= 0; i--) {
-        const date = new Date();
+        const date = new Date(today);
         date.setDate(date.getDate() - i);
-        const isToday = i === 0;
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        html += `<div class="habit-cell header ${isToday ? 'today' : ''}">
-            ${monthDay}<br><span style="font-size: 11px;">${isToday ? '📍 TODAY' : dayName.toUpperCase()}</span>
-        </div>`;
+        dates.push(date);
     }
+
+    let html = '<table><thead><tr><th>Habit</th>';
+    
+    // Header row with dates
+    dates.forEach((date, index) => {
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const isToday = index === 6;
+        html += `<th class="${isToday ? 'today' : ''}">${isToday ? '📍 ' : ''}${dayName}<br>${date.getDate()}</th>`;
+    });
+    
+    html += '</tr></thead><tbody>';
 
     // Habit rows
-    habitsList.forEach(habit => {
-        html += `<div class="habit-cell habit-label" style="cursor: default;">${habit}</div>`;
+    habitsList.forEach((habit, habitIndex) => {
+        html += `<tr><td onclick="showHabitChart('${habit}')" style="cursor: pointer;">${habit}</td>`;
         
-        for (let i = 6; i >= 0; i--) {
-            const date = new Date();
-            date.setDate(date.getDate() - i);
-            const dateKey = date.toISOString().split('T')[0];
-            const isToday = i === 0;
+        dates.forEach((date, dateIndex) => {
+            const dateStr = getDateString(date);
+            const isChecked = habitData[dateStr] && habitData[dateStr][habit];
+            const isToday = dateIndex === 6;
+            const symbol = isChecked ? '✅' : (isToday ? '●' : '');
             
-            if (!habitData[dateKey]) {
-                habitData[dateKey] = {};
-            }
-            
-            const checked = habitData[dateKey][habit] || false;
-            const emoji = checked ? '✅' : (isToday ? '●' : '');
-            html += `<div class="habit-cell clickable ${isToday ? 'today' : ''}" 
-                     onclick="toggleHabit('${dateKey}', '${habit.replace(/'/g, "\\'")}')"
-                     style="color: ${isToday && !checked ? '#ffffff' : 'inherit'}; font-size: ${isToday && !checked ? '24px' : '20px'}; cursor: pointer;">
-                ${emoji}
-            </div>`;
-        }
+            html += `<td class="${isToday ? 'today' : ''}" onclick="toggleHabit('${dateStr}', '${habit}')">${symbol}</td>`;
+        });
+        
+        html += '</tr>';
     });
 
+    html += '</tbody></table>';
+    
+    // Add completion percentage for today
+    const todayStr = getDateString(today);
+    const completion = calculateDayCompletion(todayStr);
+    html += `<div style="margin-top: 20px; text-align: center; color: #9CA3AF;">Today's Progress: <strong style="color: ${completion >= 80 ? '#10B981' : '#EF4444'};">${completion}%</strong> (Need 80% for streak)</div>`;
+    
     grid.innerHTML = html;
+    updateStreakDisplay();
 }
 
-function toggleHabit(dateKey, habitName) {
-    if (!habitData[dateKey]) {
-        habitData[dateKey] = {};
+// Toggle habit
+function toggleHabit(dateStr, habit) {
+    if (!habitData[dateStr]) {
+        habitData[dateStr] = {};
     }
-    habitData[dateKey][habitName] = !habitData[dateKey][habitName];
+    
+    habitData[dateStr][habit] = !habitData[dateStr][habit];
     saveHabitData();
     renderHabitGrid();
     updateStreakDisplay();
 }
 
-// ============================================
-// STREAK CALCULATIONS
-// ============================================
-
-function calculateStreak() {
-    let streak = 0;
-    const today = new Date();
+// Calculate day completion
+function calculateDayCompletion(dateStr) {
+    if (!habitData[dateStr]) return 0;
     
-    for (let i = 0; i < 365; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split('T')[0];
+    const completed = Object.keys(habitData[dateStr]).filter(habit => habitData[dateStr][habit]).length;
+    return Math.round((completed / habitsList.length) * 100);
+}
+
+// Calculate current streak
+function calculateStreak() {
+    const today = new Date();
+    let streak = 0;
+    let checkDate = new Date(today);
+    
+    while (true) {
+        const dateStr = getDateString(checkDate);
+        const completion = calculateDayCompletion(dateStr);
         
-        if (!habitData[dateKey]) break;
-        
-        const completed = Object.values(habitData[dateKey]).filter(h => h).length;
-        const totalHabits = habitsList.length;
-        const percentage = totalHabits > 0 ? (completed / totalHabits) * 100 : 0;
-        
-        if (percentage >= 80) {
+        if (completion >= 80) {
             streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
         } else {
             break;
         }
@@ -223,18 +141,18 @@ function calculateStreak() {
     return streak;
 }
 
+// Calculate best streak
 function calculateBestStreak() {
     let bestStreak = 0;
     let currentStreak = 0;
     
+    // Get all dates sorted
     const dates = Object.keys(habitData).sort();
     
-    dates.forEach(dateKey => {
-        const completed = Object.values(habitData[dateKey]).filter(h => h).length;
-        const totalHabits = habitsList.length;
-        const percentage = totalHabits > 0 ? (completed / totalHabits) * 100 : 0;
+    dates.forEach(dateStr => {
+        const completion = calculateDayCompletion(dateStr);
         
-        if (percentage >= 80) {
+        if (completion >= 80) {
             currentStreak++;
             if (currentStreak > bestStreak) {
                 bestStreak = currentStreak;
@@ -247,77 +165,199 @@ function calculateBestStreak() {
     return bestStreak;
 }
 
+// Update streak display
 function updateStreakDisplay() {
     const currentStreak = calculateStreak();
     const bestStreak = calculateBestStreak();
     
-    // Update current streak display
-    const streakDisplay = document.querySelector('.current-streak');
-    if (streakDisplay) {
-        streakDisplay.textContent = currentStreak;
-    }
+    const streakNumber = document.getElementById('streakNumber');
+    const bestStreakSpan = document.getElementById('bestStreak');
     
-    // Update best streak text
-    const bestStreakText = document.querySelector('.streak-display > div:last-child');
-    if (bestStreakText) {
-        bestStreakText.innerHTML = `🏆 Best Streak: ${bestStreak} days${currentStreak === bestStreak && currentStreak > 0 ? ' (Current!)' : ''}`;
-    }
+    if (streakNumber) streakNumber.textContent = currentStreak;
+    if (bestStreakSpan) bestStreakSpan.textContent = bestStreak;
     
     // Update milestones
-    updateMilestones(currentStreak);
+    renderMilestones(currentStreak);
+    
+    // Update weekly stats
+    updateWeeklyStats();
 }
 
-function updateMilestones(streak) {
-    const milestones = document.querySelectorAll('.milestone-card');
+// Render milestones
+function renderMilestones(streak) {
+    const container = document.getElementById('milestones');
+    if (!container) return;
     
-    if (milestones.length >= 3) {
-        // 7 day milestone
-        if (streak >= 7) {
-            milestones[0].classList.add('achieved');
-            milestones[0].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
-        } else {
-            milestones[0].classList.remove('achieved');
-            milestones[0].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${7 - streak} days away</div>`;
-        }
+    const milestones = [
+        { days: 7, label: '7 Days', icon: '🥉' },
+        { days: 15, label: '15 Days', icon: '🥈' },
+        { days: 30, label: '30 Days', icon: '🥇' },
+        { days: 60, label: '60 Days', icon: '💎' },
+        { days: 90, label: '90 Days', icon: '👑' }
+    ];
+    
+    let html = '';
+    milestones.forEach(milestone => {
+        const unlocked = streak >= milestone.days;
+        html += `
+            <div class="milestone ${unlocked ? 'unlocked' : ''}">
+                <div class="milestone-icon">${milestone.icon}</div>
+                <div class="milestone-label">${milestone.label}</div>
+                ${unlocked ? '<div style="color: #10B981; font-size: 0.8em;">✓ Unlocked</div>' : ''}
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Update weekly stats
+function updateWeeklyStats() {
+    const today = new Date();
+    let daysAt80 = 0;
+    let totalCompletion = 0;
+    
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+        const completion = calculateDayCompletion(dateStr);
         
-        // 15 day milestone
-        if (streak >= 15) {
-            milestones[1].classList.add('achieved');
-            milestones[1].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
-        } else {
-            milestones[1].classList.remove('achieved');
-            milestones[1].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${15 - streak} days away</div>`;
-        }
-        
-        // 30 day milestone
-        if (streak >= 30) {
-            milestones[2].classList.add('achieved');
-            milestones[2].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ UNLOCKED</div>';
-        } else {
-            milestones[2].classList.remove('achieved');
-            milestones[2].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">${30 - streak} days away</div>`;
-        }
+        if (completion >= 80) daysAt80++;
+        totalCompletion += completion;
     }
     
-    // Update reward cards
-    const rewardCards = document.querySelectorAll('.milestone-card');
-    if (rewardCards.length >= 5) {
-        // Cheat meal (7 days)
-        if (streak >= 7) {
-            rewardCards[3].classList.add('achieved');
-            rewardCards[3].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ Unlocked</div>';
-        } else {
-            rewardCards[3].classList.remove('achieved');
-            rewardCards[3].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">🔒 ${7 - streak} days away</div>`;
-        }
-        
-        // New gear (30 days)
-        if (streak >= 30) {
-            rewardCards[4].classList.add('achieved');
-            rewardCards[4].querySelector('div:last-child').innerHTML = '<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">✓ Unlocked</div>';
-        } else {
-            rewardCards[4].classList.remove('achieved');
-            rewardCards[4].querySelector('div:last-child').innerHTML = `<div style="font-size: 10px; margin-top: 5px; color: #ffffff;">🔒 ${30 - streak} days away</div>`;
-        }
+    const avgCompletion = Math.round(totalCompletion / 7);
+    
+    const daysAt80El = document.getElementById('daysAt80');
+    const weeklyCompletionEl = document.getElementById('weeklyCompletion');
+    const currentStreakEl = document.getElementById('currentStreak');
+    
+    if (daysAt80El) daysAt80El.textContent = `${daysAt80}/7`;
+    if (weeklyCompletionEl) weeklyCompletionEl.textContent = `${avgCompletion}%`;
+    if (currentStreakEl) currentStreakEl.textContent = calculateStreak();
+}
+
+// Open manage habits modal
+function openManageHabits() {
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
+    
+    if (!modal || !modalBody) return;
+    
+    let html = '<h2 style="color: white; margin-bottom: 20px;">Manage Habits</h2>';
+    html += '<div style="margin-bottom: 20px;">';
+    
+    habitsList.forEach((habit, index) => {
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1);">
+                <span style="color: white;">${habit}</span>
+                <button onclick="deleteHabit(${index})" style="padding: 5px 15px; background: rgba(255,50,50,0.3); border: 1px solid rgba(255,50,50,0.5); border-radius: 6px; color: #ff9999; cursor: pointer;">Delete</button>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    html += '<button onclick="openAddHabit()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; width: 100%; margin-bottom: 10px;">➕ Add New Habit</button>';
+    html += '<button onclick="closeModal()" style="padding: 10px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #9CA3AF; cursor: pointer; width: 100%;">Close</button>';
+    
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
+}
+
+// Open add habit modal
+function openAddHabit() {
+    const modalBody = document.getElementById('modalBody');
+    
+    let html = '<h2 style="color: white; margin-bottom: 20px;">Add New Habit</h2>';
+    html += '<input type="text" id="newHabitName" placeholder="Enter habit name (e.g., 🏃 Run 5K)" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: white; font-size: 1em; margin-bottom: 20px;">';
+    html += '<div style="display: flex; gap: 10px;">';
+    html += '<button onclick="saveNewHabit()" style="flex: 1; padding: 10px 20px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; color: white; cursor: pointer;">Add Habit</button>';
+    html += '<button onclick="openManageHabits()" style="padding: 10px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #9CA3AF; cursor: pointer;">Cancel</button>';
+    html += '</div>';
+    
+    modalBody.innerHTML = html;
+}
+
+// Save new habit
+function saveNewHabit() {
+    const input = document.getElementById('newHabitName');
+    const habitName = input.value.trim();
+    
+    if (!habitName) {
+        alert('Please enter a habit name');
+        return;
     }
+    
+    habitsList.push(habitName);
+    localStorage.setItem('habitsList', JSON.stringify(habitsList));
+    renderHabitGrid();
+    openManageHabits();
+}
+
+// Delete habit
+function deleteHabit(index) {
+    if (!confirm('Delete this habit? All tracking data for this habit will be removed.')) {
+        return;
+    }
+    
+    const habitName = habitsList[index];
+    habitsList.splice(index, 1);
+    
+    // Remove from all dates in habitData
+    Object.keys(habitData).forEach(dateStr => {
+        if (habitData[dateStr][habitName]) {
+            delete habitData[dateStr][habitName];
+        }
+    });
+    
+    localStorage.setItem('habitsList', JSON.stringify(habitsList));
+    saveHabitData();
+    renderHabitGrid();
+    openManageHabits();
+}
+
+// Show habit chart
+function showHabitChart(habitName) {
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
+    
+    if (!modal || !modalBody) return;
+    
+    // Calculate stats
+    const last30Days = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+        const completed = habitData[dateStr] && habitData[dateStr][habitName] ? 1 : 0;
+        last30Days.push({ date: date.getDate(), completed });
+    }
+    
+    const totalDays = last30Days.length;
+    const completedDays = last30Days.filter(d => d.completed).length;
+    const completionRate = Math.round((completedDays / totalDays) * 100);
+    
+    let html = `<h2 style="color: white; margin-bottom: 20px;">${habitName}</h2>`;
+    html += `<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 20px;">`;
+    html += `<div style="color: #9CA3AF; margin-bottom: 10px;">Last 30 Days</div>`;
+    html += `<div style="font-size: 2em; color: white; font-weight: bold;">${completionRate}%</div>`;
+    html += `<div style="color: #9CA3AF;">${completedDays} of ${totalDays} days completed</div>`;
+    html += `</div>`;
+    
+    // Simple bar chart
+    html += '<div style="display: flex; gap: 2px; height: 100px; align-items: flex-end; margin-bottom: 20px;">';
+    last30Days.forEach(day => {
+        const height = day.completed ? 100 : 20;
+        const color = day.completed ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255, 255, 255, 0.1)';
+        html += `<div style="flex: 1; background: ${color}; height: ${height}%; border-radius: 2px;" title="Day ${day.date}"></div>`;
+    });
+    html += '</div>';
+    
+    html += '<button onclick="closeModal()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; width: 100%;">Close</button>';
+    
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
 }
