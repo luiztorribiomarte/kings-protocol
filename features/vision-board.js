@@ -1,174 +1,155 @@
 // ============================================
-// VISION BOARD MODULE - Visual goal manifestation
+// VISION BOARD MODULE
 // ============================================
 
-let visionBoardData = {
-    images: [null, null, null, null, null, null],
-    quotes: [
-        "I AM a millionaire by 30",
-        "I AM the best version of myself",
-        "I AM living my dream life",
-        "I AM achieving greatness daily",
-        "I AM unstoppable",
-        "I AM manifesting my destiny"
-    ]
-};
+let visionBoardData = [];
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
+// Initialize vision board data
 function initVisionBoardData() {
     const saved = localStorage.getItem('visionBoardData');
     if (saved) {
         visionBoardData = JSON.parse(saved);
+    } else {
+        // Initialize with 6 empty cards
+        visionBoardData = [
+            { id: '1', imageUrl: '', affirmation: 'I AM a millionaire by 30' },
+            { id: '2', imageUrl: '', affirmation: 'I AM the best version of myself' },
+            { id: '3', imageUrl: '', affirmation: 'I AM a successful YouTuber' },
+            { id: '4', imageUrl: '', affirmation: 'I AM healthy and strong' },
+            { id: '5', imageUrl: '', affirmation: 'I AM living my dream life' },
+            { id: '6', imageUrl: '', affirmation: 'I AM abundant and grateful' }
+        ];
+        saveVisionBoardData();
     }
 }
 
+// Save vision board data
 function saveVisionBoardData() {
     localStorage.setItem('visionBoardData', JSON.stringify(visionBoardData));
 }
 
-// ============================================
-// VISION BOARD RENDERING
-// ============================================
-
+// Render vision board
 function renderVisionBoard() {
     const container = document.getElementById('visionBoardContainer');
     if (!container) return;
+
+    let html = '<div class="section-title" style="margin-bottom: 20px;">🖼️ Vision Board</div>';
+    html += '<div style="margin-bottom: 20px; color: #9CA3AF;">Click any card to add/edit image and affirmation</div>';
     
-    container.innerHTML = `
-        <!-- Instructions -->
-        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.2), rgba(107, 107, 107, 0.2)); border: 2px solid rgba(255, 255, 255, 0.2, 0.5); border-radius: 16px; padding: 20px; margin-bottom: 30px;">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Create Your Vision</h3>
-            <p style="font-size: 14px; color: #9CA3AF; line-height: 1.6;">
-                Click any card to add an image URL. Add images that represent your goals, dreams, and the life you're manifesting. Each card has an affirmation you can customize.
-            </p>
-        </div>
-
-        <!-- Vision Board Grid (2 rows × 3 columns) -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
-            ${visionBoardData.images.map((image, index) => renderVisionCard(image, index)).join('')}
-        </div>
-
-        <!-- Actions -->
-        <div style="display: flex; gap: 15px; justify-content: center;">
-            <button onclick="clearAllVisionBoard()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;">🗑️ Clear All</button>
-        </div>
-    `;
-}
-
-function renderVisionCard(image, index) {
-    const quote = visionBoardData.quotes[index] || "Click to add affirmation";
+    html += '<div class="vision-grid">';
     
-    return `
-        <div onclick="openVisionCardModal(${index})" 
-             style="position: relative; aspect-ratio: 4/3; border-radius: 16px; overflow: hidden; cursor: pointer; background: ${image ? `url('${image}')` : 'linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.3), rgba(107, 107, 107, 0.3))'} center/cover; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); transition: transform 0.3s;"
-             onmouseover="this.style.transform='scale(1.05)'"
-             onmouseout="this.style.transform='scale(1)'">
-            
-            ${!image ? `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.8), rgba(107, 107, 107, 0.8)); border: 3px dashed rgba(255, 255, 255, 0.5);">
-                    <div style="font-size: 48px; margin-bottom: 10px;">➕</div>
-                    <div style="font-size: 14px; font-weight: 600; color: white;">Add Vision</div>
-                </div>
-            ` : ''}
-            
-            <!-- Quote Overlay -->
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent); padding: 20px 15px 15px; color: white;">
-                <div style="font-size: 14px; font-weight: 700; text-align: center; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);">${quote}</div>
+    visionBoardData.forEach((card, index) => {
+        html += `
+            <div class="vision-card" onclick="editVisionCard(${index})">
+                ${card.imageUrl ? 
+                    `<img src="${card.imageUrl}" alt="Vision ${index + 1}">` :
+                    `<div style="font-size: 3em; color: rgba(255,255,255,0.3);">+</div>`
+                }
+                ${card.affirmation ? 
+                    `<div class="vision-affirmation">${card.affirmation}</div>` :
+                    ''
+                }
             </div>
-            
-            ${image ? `
-                <button onclick="event.stopPropagation(); deleteVisionCard(${index})" 
-                        style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.9); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);">✕</button>
-            ` : ''}
-        </div>
-    `;
+        `;
+    });
+    
+    html += '</div>';
+    
+    html += '<div style="margin-top: 30px; text-align: center;">';
+    html += '<button onclick="clearAllVisionCards()" style="padding: 10px 20px; background: rgba(255,50,50,0.2); border: 1px solid rgba(255,50,50,0.3); border-radius: 8px; color: #ff9999; cursor: pointer;">Clear All Cards</button>';
+    html += '</div>';
+    
+    container.innerHTML = html;
 }
 
-// ============================================
-// MODAL & ACTIONS
-// ============================================
+// Edit vision card
+function editVisionCard(index) {
+    const card = visionBoardData[index];
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
+    
+    if (!modal || !modalBody) return;
 
-function openVisionCardModal(index) {
-    const image = visionBoardData.images[index];
-    const quote = visionBoardData.quotes[index];
+    let html = `<h2 style="color: white; margin-bottom: 20px;">Edit Vision Card ${index + 1}</h2>`;
     
-    const modalContent = createModal();
-    
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ Vision Card ${index + 1}</h2>
-        
-        <!-- Image Preview -->
-        ${image ? `
+    // Current image preview
+    if (card.imageUrl) {
+        html += `
             <div style="margin-bottom: 20px;">
-                <img src="${image}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4);">
+                <div style="color: #9CA3AF; margin-bottom: 10px;">Current Image:</div>
+                <img src="${card.imageUrl}" style="width: 100%; border-radius: 8px; max-height: 200px; object-fit: cover;">
             </div>
-        ` : ''}
-        
-        <!-- Image URL Input -->
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">🖼️ Image URL</label>
-            <input type="text" 
-                   id="visionImageUrl" 
-                   value="${image || ''}" 
-                   placeholder="Paste image URL (e.g., https://example.com/image.jpg)"
-                   style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
-            <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">💡 Tip: Right-click any image online → Copy Image Address</div>
-        </div>
-        
-        <!-- Quote Input -->
-        <div style="margin-bottom: 25px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">💬 Affirmation / Quote</label>
-            <input type="text" 
-                   id="visionQuote" 
-                   value="${quote}" 
-                   placeholder="I AM..."
-                   style="width: 100%; padding: 15px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.1); color: white;">
-        </div>
-        
-        <!-- Action Buttons -->
-        <div style="display: flex; gap: 15px; justify-content: flex-end;">
-            <button onclick="closeModal()" style="background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid rgba(255, 255, 255, 0.3); padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveVisionCard(${index})" style="background: linear-gradient(135deg, #ffffff, #9CA3AF); color: white; border: none; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2, 0.4);">Save Vision</button>
-        </div>
-    `;
+        `;
+    }
+    
+    html += '<div class="form-group">';
+    html += '<label>Image URL</label>';
+    html += `<input type="text" id="visionImageUrl" class="form-input" placeholder="Paste image URL here" value="${card.imageUrl}">`;
+    html += '<div style="color: #6B7280; font-size: 0.85em; margin-top: 5px;">Right-click any image online → "Copy Image Address"</div>';
+    html += '</div>';
+    
+    html += '<div class="form-group">';
+    html += '<label>Affirmation</label>';
+    html += `<input type="text" id="visionAffirmation" class="form-input" placeholder="I AM..." value="${card.affirmation}">`;
+    html += '</div>';
+    
+    html += '<div class="form-actions">';
+    html += `<button onclick="saveVisionCard(${index})" class="form-submit">Save</button>`;
+    html += `<button onclick="deleteVisionCard(${index})" style="padding: 12px 24px; background: rgba(255,50,50,0.2); border: 1px solid rgba(255,50,50,0.3); border-radius: 8px; color: #ff9999; cursor: pointer;">Delete</button>`;
+    html += '<button onclick="closeModal()" class="form-cancel">Cancel</button>';
+    html += '</div>';
+
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
+// Save vision card
 function saveVisionCard(index) {
-    const imageUrl = document.getElementById('visionImageUrl')?.value.trim();
-    const quote = document.getElementById('visionQuote')?.value.trim();
+    const imageUrl = document.getElementById('visionImageUrl').value.trim();
+    const affirmation = document.getElementById('visionAffirmation').value.trim();
     
-    if (!imageUrl && !quote) {
-        alert('Please add an image URL or quote');
+    if (!imageUrl && !affirmation) {
+        alert('Please add at least an image URL or affirmation');
         return;
     }
     
-    visionBoardData.images[index] = imageUrl || null;
-    visionBoardData.quotes[index] = quote || visionBoardData.quotes[index];
+    visionBoardData[index].imageUrl = imageUrl;
+    visionBoardData[index].affirmation = affirmation;
     
     saveVisionBoardData();
-    renderVisionBoard();
     closeModal();
-}
-
-function deleteVisionCard(index) {
-    if (!confirm('Remove this vision card?')) {
-        return;
-    }
-    
-    visionBoardData.images[index] = null;
-    saveVisionBoardData();
     renderVisionBoard();
 }
 
-function clearAllVisionBoard() {
-    if (!confirm('Clear your entire vision board? This cannot be undone.')) {
+// Delete vision card
+function deleteVisionCard(index) {
+    if (!confirm('Clear this vision card?')) {
         return;
     }
     
-    visionBoardData.images = [null, null, null, null, null, null];
+    visionBoardData[index].imageUrl = '';
+    visionBoardData[index].affirmation = '';
+    
+    saveVisionBoardData();
+    closeModal();
+    renderVisionBoard();
+}
+
+// Clear all vision cards
+function clearAllVisionCards() {
+    if (!confirm('Are you sure you want to clear all vision cards? This cannot be undone.')) {
+        return;
+    }
+    
+    visionBoardData = [
+        { id: '1', imageUrl: '', affirmation: 'I AM a millionaire by 30' },
+        { id: '2', imageUrl: '', affirmation: 'I AM the best version of myself' },
+        { id: '3', imageUrl: '', affirmation: 'I AM a successful YouTuber' },
+        { id: '4', imageUrl: '', affirmation: 'I AM healthy and strong' },
+        { id: '5', imageUrl: '', affirmation: 'I AM living my dream life' },
+        { id: '6', imageUrl: '', affirmation: 'I AM abundant and grateful' }
+    ];
+    
     saveVisionBoardData();
     renderVisionBoard();
 }
