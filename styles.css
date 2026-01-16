@@ -440,3 +440,45 @@ input, textarea, select{
   .stat-value{ font-size: 1.7rem; }
   .timer-time{ font-size: 1.9rem; }
 }
+
+/* ============================================
+   HABIT GRID DIVIDERS (rows + day columns)
+   Paste at the very bottom of styles.css
+============================================ */
+
+/* Make sure the grid can show borders cleanly */
+.habit-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+/* Horizontal line between habit rows */
+.habit-grid .habit-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* Remove the last row bottom border */
+.habit-grid .habit-row:last-child {
+  border-bottom: none;
+}
+
+/* Vertical lines between day columns (applies to header + cells) */
+.habit-grid .day-col,
+.habit-grid .day-header {
+  border-left: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* Don’t add a vertical line before the first day column */
+.habit-grid .day-col:first-of-type,
+.habit-grid .day-header:first-of-type {
+  border-left: none;
+}
+
+/* Optional: subtle separation between Habit name column and days */
+.habit-grid .habit-name {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  padding-right: 14px;
+  margin-right: 6px;
+}
+
