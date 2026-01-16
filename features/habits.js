@@ -1,5 +1,5 @@
 // ============================================
-// HABITS MODULE (Weekly Grid + Streak Support)
+// HABITS MODULE (Weekly Grid + Click Toggle)
 // ============================================
 
 let habitData = {};   // { "YYYY-MM-DD": { "<habitId>": true/false } }
@@ -30,10 +30,6 @@ function getWeekKeys(days = 7) {
 }
 
 function normalizeHabitsList(list) {
-  // Make sure we always have {id, label} for rendering + storage
-  // Supports:
-  //  - ["Wake Up", "Skincare"]
-  //  - [{id:"wake", name:"Wake Up", emoji:"⏰"}]
   if (!Array.isArray(list)) return [];
 
   return list.map((h) => {
@@ -42,8 +38,15 @@ function normalizeHabitsList(list) {
       return { id, label: h };
     }
     if (h && typeof h === "object") {
-      const id = h.id || (h.name || h.label || "habit").toLowerCase().replace(/\s+/g, "_").replace(/[^\w_]/g, "");
-      const label = h.emoji ? `${h.emoji} ${h.name || h.label || ""}`.trim() : (h.name || h.label || id);
+      const id =
+        h.id ||
+        (h.name || h.label || "habit")
+          .toLowerCase()
+          .replace(/\s+/g, "_")
+          .replace(/[^\w_]/g, "");
+      const label = h.emoji
+        ? `${h.emoji} ${h.name || h.label || ""}`.trim()
+        : (h.name || h.label || id);
       return { id, label };
     }
     return { id: "habit", label: "Habit" };
@@ -88,7 +91,6 @@ function initHabitsList() {
     }
   }
 
-  // If empty, seed with your current defaults (you can edit later in Manage Habits)
   if (!Array.isArray(habitsList) || habitsList.length === 0) {
     habitsList = [
       { id: "wake_7am", name: "Wake Up At 7 AM", emoji: "⏰" },
@@ -107,7 +109,7 @@ function initHabitsList() {
   }
 }
 
-// ---------- Core Toggle ----------
+// ---------- Toggle ----------
 function toggleHabit(habitId, dayKey) {
   ensureDay(dayKey);
 
@@ -116,12 +118,11 @@ function toggleHabit(habitId, dayKey) {
 
   saveHabitData();
 
-  // Re-render grid + progress + streak if those functions exist
   if (typeof renderHabitGrid === "function") renderHabitGrid();
   if (typeof updateStreakDisplay === "function") updateStreakDisplay();
 }
 
-// ---------- Stats helpers (used by other modules if needed) ----------
+// ---------- Completion ----------
 function getDayCompletion(dayKey) {
   const normalized = normalizeHabitsList(habitsList);
   const total = normalized.length;
@@ -133,7 +134,7 @@ function getDayCompletion(dayKey) {
   return { done, total, percent };
 }
 
-// ---------- Render Weekly Grid ----------
+// ---------- Render ----------
 function renderHabitGrid() {
   const grid = document.getElementById("habitGrid");
   if (!grid) return;
@@ -144,10 +145,9 @@ function renderHabitGrid() {
 
   const normalizedHabits = normalizeHabitsList(habitsList);
 
-  // Ensure we always have objects for week days so cells are NEVER blank
+  // ensure week data exists so cells never appear "missing"
   weekKeys.forEach(k => ensureDay(k));
 
-  // Build header
   let html = `
     <div class="habit-grid-table" style="width:100%; overflow:auto;">
       <table style="width:100%; border-collapse:collapse;">
@@ -159,17 +159,9 @@ function renderHabitGrid() {
               const dow = d.toLocaleDateString("en-US", { weekday: "short" });
               const dayNum = d.getDate();
               return `
-                <th style="
-                  text-align:center;
-                  padding:10px 8px;
-                  font-weight:800;
-                  color:white;
-                  white-space:nowrap;
-                ">
+                <th style="text-align:center; padding:10px 8px; font-weight:800; color:white; white-space:nowrap;">
                   <div style="opacity:.9; font-size:.9rem;">${dow}</div>
-                  <div style="opacity:${isToday ? "1" : ".85"}; font-size:1rem;">
-                    ${dayNum}
-                  </div>
+                  <div style="opacity:${isToday ? "1" : ".85"}; font-size:1rem;">${dayNum}</div>
                 </th>
               `;
             }).join("")}
@@ -178,54 +170,49 @@ function renderHabitGrid() {
         <tbody>
   `;
 
-  // Rows
   normalizedHabits.forEach(h => {
-    html += `
-      <tr>
-        <td style="padding:12px; color:white; font-weight:650; white-space:nowrap;">
-          ${h.label}
-        </td>
-        ${weekKeys.map(dayKey => {
-          const done = !!habitData[dayKey][h.id];
+    html += `<tr>
+      <td style="padding:12px; color:white; font-weight:650; white-space:nowrap;">
+        ${h.label}
+      </td>
 
-          // ✅ IMPORTANT: always show something:
-          // - done => green check
-          // - not done => hollow dot
-          const symbol = done ? "✅" : "●";
-          const symbolColor = done ? "#22c55e" : "rgba(255,255,255,0.55)";
+      ${weekKeys.map(dayKey => {
+        const done = !!habitData[dayKey][h.id];
 
-          return `
-            <td
-              onclick="toggleHabit('${h.id}','${dayKey}')"
-              style="
-                text-align:center;
-                padding:12px 8px;
-                cursor:pointer;
-                user-select:none;
-              "
-              title="Click to toggle"
-            >
-              <span style="
-                display:inline-block;
-                font-size:${done ? "1.05rem" : "0.85rem"};
-                color:${symbolColor};
-                line-height:1;
-                filter:${done ? "drop-shadow(0 6px 10px rgba(0,0,0,.35))" : "none"};
-              ">${symbol}</span>
-            </td>
-          `;
-        }).join("")}
-      </tr>
-    `;
+        // keep your current look (dot vs check)
+        const symbol = done ? "✅" : "●";
+        const symbolColor = done ? "#22c55e" : "rgba(255,255,255,0.55)";
+
+        // ✅ IMPORTANT: add classes so CSS hover glow works 100%
+        const cls = [
+          "habit-cell",
+          done ? "completed" : "",
+          dayKey === todayKey ? "today" : ""
+        ].filter(Boolean).join(" ");
+
+        return `
+          <td
+            class="${cls}"
+            onclick="toggleHabit('${h.id}','${dayKey}')"
+            style="text-align:center; padding:12px 8px; cursor:pointer; user-select:none;"
+            title="Click to toggle"
+          >
+            <span style="
+              display:inline-block;
+              font-size:${done ? "1.05rem" : "0.85rem"};
+              color:${symbolColor};
+              line-height:1;
+              filter:${done ? "drop-shadow(0 6px 10px rgba(0,0,0,.35))" : "none"};
+            ">${symbol}</span>
+          </td>
+        `;
+      }).join("")}
+
+    </tr>`;
   });
 
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
+  html += `</tbody></table></div>`;
 
-  // Add today's progress line (matches what you're already showing)
   const stats = getDayCompletion(todayKey);
   html += `
     <div style="margin-top:14px; text-align:center; color:#9ca3af;">
@@ -236,11 +223,8 @@ function renderHabitGrid() {
   grid.innerHTML = html;
 }
 
-// ---------- Manage Habits (existing button calls this) ----------
+// ---------- Manage Habits (fallback) ----------
 function openManageHabits() {
-  // Keep your existing modal system if you already have it.
-  // This provides a basic fallback so the button never breaks.
-
   if (typeof openModal !== "function") {
     alert("Modal system not found.");
     return;
@@ -254,7 +238,7 @@ function openManageHabits() {
     </div>
 
     <div style="color:#9ca3af; margin-bottom:12px;">
-      (Optional) You can edit this later. For now, your habit grid is fixed.
+      (Optional) Edit later. Your grid is fixed + styled.
     </div>
 
     <div style="display:flex; flex-direction:column; gap:8px;">
