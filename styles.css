@@ -1,5 +1,5 @@
 /* ============================================
-   GLOBAL RESET & BASE
+   BASE / RESET
 ============================================ */
 
 * {
@@ -9,12 +9,15 @@
 body {
     margin: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: radial-gradient(circle at top, #0f172a, #020617);
+    background:
+        radial-gradient(circle at top, rgba(99,102,241,0.15), transparent 40%),
+        radial-gradient(circle at bottom, rgba(236,72,153,0.12), transparent 45%),
+        linear-gradient(180deg, #020617, #020617);
     color: #f9fafb;
 }
 
 /* ============================================
-   LAYOUT
+   CONTAINER
 ============================================ */
 
 .container {
@@ -23,118 +26,40 @@ body {
     padding: 24px;
 }
 
-.page,
-.page-content {
-    display: none;
-}
-
-.page.active,
-.page-content.active {
-    display: block;
-}
-
 /* ============================================
    NAVIGATION
 ============================================ */
 
 .nav-tabs {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
 }
 
 .nav-tab {
-    padding: 10px 14px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.08),
+        rgba(255,255,255,0.02)
+    );
     color: #e5e7eb;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.15s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .nav-tab:hover {
-    background: rgba(255,255,255,0.12);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
 }
 
 .nav-tab.active {
     background: linear-gradient(135deg, #6366f1, #ec4899);
     color: white;
-    transform: translateY(-1px);
-}
-
-/* ============================================
-   DASHBOARD MOTION (ALIVE FEEL)
-============================================ */
-
-.page-content {
-    animation: fadeIn 0.35s ease-out;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ============================================
-   STAT CARDS
-============================================ */
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-}
-
-.stat-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 14px;
-    padding: 20px;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
-}
-
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    transition: transform 0.15s ease;
-}
-
-.stat-value.updated {
-    transform: scale(1.08);
-}
-
-.stat-label {
-    margin-top: 6px;
-    color: #9ca3af;
-    font-size: 0.9rem;
-}
-
-/* ============================================
-   SMART DAILY STATUS BAR
-============================================ */
-
-#dailyStatus {
-    margin-top: 20px;
-    padding: 16px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.15);
-    font-size: 1rem;
-    transition: border-color 0.25s ease, background 0.25s ease;
+    box-shadow: 0 12px 30px rgba(99,102,241,0.35);
 }
 
 /* ============================================
@@ -145,10 +70,12 @@ body {
     display: flex;
     align-items: center;
     gap: 14px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 16px;
-    padding: 16px;
+    padding: 18px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .widget-icon {
@@ -171,13 +98,88 @@ body {
 }
 
 /* ============================================
+   STATS CARDS
+============================================ */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.stat-card {
+    padding: 22px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 10px 25px rgba(0,0,0,0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.1),
+        0 18px 40px rgba(0,0,0,0.45);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.stat-label {
+    margin-top: 6px;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+/* ============================================
+   DAILY STATUS BAR
+============================================ */
+
+#dailyStatus {
+    margin: 18px 0 28px;
+    padding: 16px 20px;
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 6px 18px rgba(0,0,0,0.35);
+    font-size: 1rem;
+}
+
+/* ============================================
    SECTIONS
 ============================================ */
 
 .section-title {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: 700;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+}
+
+/* ============================================
+   HABIT / MOOD SECTIONS
+============================================ */
+
+.habit-section {
+    margin-bottom: 30px;
+    padding: 22px;
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 10px 28px rgba(0,0,0,0.4);
 }
 
 /* ============================================
@@ -195,15 +197,16 @@ body {
 }
 
 .modal-content {
-    background: #020617;
-    border-radius: 18px;
+    background:
+        linear-gradient(180deg, #020617, #020617);
+    border-radius: 20px;
     padding: 24px;
     max-width: 600px;
     width: 90%;
 }
 
 /* ============================================
-   SCROLLBAR (PREMIUM TOUCH)
+   SCROLLBAR
 ============================================ */
 
 ::-webkit-scrollbar {
@@ -211,7 +214,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.2);
     border-radius: 4px;
 }
 
