@@ -442,43 +442,32 @@ input, textarea, select{
 }
 
 /* ============================================
-   HABIT GRID DIVIDERS (rows + day columns)
-   Paste at the very bottom of styles.css
+   HABIT GRID DIVIDERS (ID-based: #habitGrid)
+   Paste at the VERY bottom of styles.css
 ============================================ */
 
-/* Make sure the grid can show borders cleanly */
-.habit-grid {
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
+/* If your habit grid is built as a TABLE */
+#habitGrid table {
+  border-collapse: collapse !important;
+  width: 100%;
 }
 
-/* Horizontal line between habit rows */
-.habit-grid .habit-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+#habitGrid table th,
+#habitGrid table td {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
 }
 
-/* Remove the last row bottom border */
-.habit-grid .habit-row:last-child {
-  border-bottom: none;
+/* If your habit grid is built with DIV rows/columns */
+#habitGrid > * {
+  position: relative;
 }
 
-/* Vertical lines between day columns (applies to header + cells) */
-.habit-grid .day-col,
-.habit-grid .day-header {
+/* Add horizontal lines between rows (works if rows are direct children) */
+#habitGrid > * + * {
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* Add vertical lines between "cells" inside each row (works if row children are cells) */
+#habitGrid > * > * + * {
   border-left: 1px solid rgba(255, 255, 255, 0.10);
 }
-
-/* Don’t add a vertical line before the first day column */
-.habit-grid .day-col:first-of-type,
-.habit-grid .day-header:first-of-type {
-  border-left: none;
-}
-
-/* Optional: subtle separation between Habit name column and days */
-.habit-grid .habit-name {
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-  padding-right: 14px;
-  margin-right: 6px;
-}
-
