@@ -1,19 +1,16 @@
 // ============================================
-// CONTENT TRACKER MODULE - YouTube content tracking
+// CONTENT TRACKER MODULE
 // ============================================
 
 let contentData = {
-    subscriberCount: 750,
+    subscribers: 0,
     videosThisMonth: 0,
     hoursLogged: 0,
-    ideas: [],
+    videoIdeas: [],
     notes: ''
 };
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
+// Initialize content data
 function initContentData() {
     const saved = localStorage.getItem('contentData');
     if (saved) {
@@ -21,238 +18,183 @@ function initContentData() {
     }
 }
 
+// Save content data
 function saveContentData() {
     localStorage.setItem('contentData', JSON.stringify(contentData));
 }
 
-// ============================================
-// CONTENT TRACKER RENDERING
-// ============================================
-
+// Render content tracker
 function renderContentTracker() {
-    const container = document.getElementById('contentTrackerContainer');
+    const container = document.getElementById('contentContainer');
     if (!container) return;
+
+    let html = '<div class="section-title" style="margin-bottom: 20px;">🎬 Content Tracker</div>';
     
-    container.innerHTML = `
-        <!-- Stats Cards -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
-            <!-- Subscribers -->
-            <div style="background: linear-gradient(135deg, #374151 0%, #4B5563 100%); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 25px; text-align: center;">
-                <div style="font-size: 14px; color: #9CA3AF; margin-bottom: 10px; text-transform: uppercase;">📺 Subscribers</div>
-                <div style="font-size: 48px; font-weight: 900; color: #ffffff; margin-bottom: 15px;">${contentData.subscriberCount.toLocaleString()}</div>
-                <button onclick="updateSubscribers()" style="width: 100%; background: #ffffff; color: #1a1a2e; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;">Update Count</button>
-            </div>
-            
-            <!-- Videos This Month -->
-            <div style="background: linear-gradient(135deg, #374151 0%, #4B5563 100%); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 25px; text-align: center;">
-                <div style="font-size: 14px; color: #9CA3AF; margin-bottom: 10px; text-transform: uppercase;">🎬 Videos This Month</div>
-                <div style="font-size: 48px; font-weight: 900; color: #ffffff; margin-bottom: 15px;">${contentData.videosThisMonth}</div>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="changeVideos(1)" style="flex: 1; background: #ffffff; color: #1a1a2e; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 18px;">+</button>
-                    <button onclick="changeVideos(-1)" style="flex: 1; background: #4B5563; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 18px;">−</button>
-                </div>
-            </div>
-            
-            <!-- Hours Logged -->
-            <div style="background: linear-gradient(135deg, #374151 0%, #4B5563 100%); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 25px; text-align: center;">
-                <div style="font-size: 14px; color: #9CA3AF; margin-bottom: 10px; text-transform: uppercase;">⏱️ Hours Logged</div>
-                <div style="font-size: 48px; font-weight: 900; color: #ffffff; margin-bottom: 15px;">${contentData.hoursLogged}</div>
-                <button onclick="logHours()" style="width: 100%; background: #ffffff; color: #1a1a2e; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;">Log Hours</button>
-            </div>
-        </div>
-
-        <!-- Video Ideas -->
-        <div style="background: #1f2937; border: 1px solid #4B5563; border-radius: 16px; padding: 30px; margin-bottom: 30px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="font-size: 20px; font-weight: 700; color: #ffffff;">💡 Video Ideas</h3>
-                <button onclick="addVideoIdea()" style="background: #ffffff; color: #1a1a2e; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;">+ Add Idea</button>
-            </div>
-            
-            <div id="videoIdeasList">
-                ${renderVideoIdeas()}
-            </div>
-        </div>
-
-        <!-- Notes Section -->
-        <div style="background: #1f2937; border: 1px solid #4B5563; border-radius: 16px; padding: 30px;">
-            <h3 style="font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 20px;">📝 Content Notes</h3>
-            <textarea 
-                id="contentNotes"
-                onchange="saveContentNotes(this.value)"
-                placeholder="Upload schedule, ideas, research notes, scripts in progress..."
-                style="width: 100%; min-height: 200px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 15px; background: #374151; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; resize: vertical;"
-            >${contentData.notes}</textarea>
-            <div style="font-size: 12px; color: #9CA3AF; margin-top: 10px;">Auto-saves as you type</div>
-        </div>
-    `;
-}
-
-function renderVideoIdeas() {
-    if (contentData.ideas.length === 0) {
-        return `
-            <div style="text-align: center; padding: 40px; background: #374151; border: 2px dashed rgba(255, 255, 255, 0.15); border-radius: 12px;">
-                <div style="font-size: 32px; margin-bottom: 10px;">💡</div>
-                <div style="font-size: 14px; color: #9CA3AF;">No video ideas yet. Click "Add Idea" to get started!</div>
-            </div>
-        `;
+    // Stats Cards
+    html += '<div class="content-stats">';
+    
+    // Subscribers
+    html += '<div class="content-stat-card">';
+    html += '<div style="color: #9CA3AF; margin-bottom: 10px;">YouTube Subscribers</div>';
+    html += `<div style="font-size: 2.5em; color: white; font-weight: bold; margin-bottom: 10px;">${contentData.subscribers.toLocaleString()}</div>`;
+    html += '<div style="display: flex; gap: 5px;">';
+    html += '<input type="number" id="subsInput" placeholder="Update count" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: white;">';
+    html += '<button onclick="updateSubscribers()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; cursor: pointer;">Update</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Videos This Month
+    html += '<div class="content-stat-card">';
+    html += '<div style="color: #9CA3AF; margin-bottom: 10px;">Videos This Month</div>';
+    html += `<div style="font-size: 2.5em; color: white; font-weight: bold; margin-bottom: 10px;">${contentData.videosThisMonth}</div>`;
+    html += '<div style="display: flex; gap: 5px;">';
+    html += '<button onclick="changeVideosCount(-1)" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; cursor: pointer; font-size: 1.2em;">-</button>';
+    html += '<button onclick="changeVideosCount(1)" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; cursor: pointer; font-size: 1.2em;">+</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Hours Logged
+    html += '<div class="content-stat-card">';
+    html += '<div style="color: #9CA3AF; margin-bottom: 10px;">Hours Logged</div>';
+    html += `<div style="font-size: 2.5em; color: white; font-weight: bold; margin-bottom: 10px;">${contentData.hoursLogged}</div>`;
+    html += '<div style="display: flex; gap: 5px;">';
+    html += '<button onclick="changeHoursLogged(-1)" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; cursor: pointer; font-size: 1.2em;">-</button>';
+    html += '<button onclick="changeHoursLogged(1)" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white; cursor: pointer; font-size: 1.2em;">+</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    html += '</div>';
+    
+    // Video Ideas
+    html += '<div class="ideas-list" style="margin-top: 30px;">';
+    html += '<div class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
+    html += '<span>💡 Video Ideas</span>';
+    html += '<button onclick="addVideoIdea()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">➕ Add Idea</button>';
+    html += '</div>';
+    
+    if (contentData.videoIdeas.length === 0) {
+        html += '<div style="text-align: center; color: #6B7280; padding: 30px;">No video ideas yet. Click "Add Idea" to start!</div>';
+    } else {
+        contentData.videoIdeas.forEach((idea, index) => {
+            html += '<div class="idea-item">';
+            html += `<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">`;
+            html += `<div style="flex: 1;"><strong style="color: white;">${idea.title}</strong></div>`;
+            html += `<button onclick="deleteVideoIdea(${index})" style="padding: 4px 12px; background: rgba(255,50,50,0.2); border: 1px solid rgba(255,50,50,0.3); border-radius: 6px; color: #ff9999; cursor: pointer; font-size: 0.85em;">Delete</button>`;
+            html += '</div>';
+            if (idea.description) {
+                html += `<div style="color: #9CA3AF; font-size: 0.9em;">${idea.description}</div>`;
+            }
+            html += '</div>';
+        });
     }
     
-    return contentData.ideas.map((idea, index) => `
-        <div style="background: #374151; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <div style="font-size: 16px; font-weight: 600; color: #ffffff; margin-bottom: 5px;">${idea.title}</div>
-                ${idea.description ? `<div style="font-size: 14px; color: #9CA3AF;">${idea.description}</div>` : ''}
-            </div>
-            <button onclick="deleteVideoIdea(${index})" style="background: rgba(255, 255, 255, 0.1); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 13px;">Delete</button>
-        </div>
-    `).join('');
+    html += '</div>';
+    
+    // Notes Section
+    html += '<div class="ideas-list" style="margin-top: 30px;">';
+    html += '<div class="section-title" style="margin-bottom: 15px;">📝 Content Notes</div>';
+    html += '<textarea id="contentNotes" placeholder="Upload schedule, research notes, script ideas, etc." style="width: 100%; min-height: 200px; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: white; font-family: inherit; resize: vertical;" onchange="saveContentNotes()">';
+    html += contentData.notes;
+    html += '</textarea>';
+    html += '</div>';
+    
+    container.innerHTML = html;
 }
 
-// ============================================
-// CONTENT ACTIONS
-// ============================================
-
+// Update subscribers
 function updateSubscribers() {
-    const modalContent = createModal();
+    const input = document.getElementById('subsInput');
+    const value = parseInt(input.value);
     
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; color: #ffffff;">📺 Update Subscriber Count</h2>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Current Subscribers</label>
-            <input type="number" 
-                   id="subscriberInput" 
-                   value="${contentData.subscriberCount}" 
-                   placeholder="750"
-                   style="width: 100%; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 18px; background: #374151; color: white; font-weight: 700;">
-        </div>
-        
-        <div style="display: flex; gap: 15px; justify-content: flex-end;">
-            <button onclick="closeModal()" style="background: #4B5563; color: white; border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveSubscribers()" style="background: #ffffff; color: #1a1a2e; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Save</button>
-        </div>
-    `;
-}
-
-function saveSubscribers() {
-    const input = document.getElementById('subscriberInput');
-    const count = parseInt(input?.value);
-    
-    if (isNaN(count) || count < 0) {
+    if (!value || value < 0) {
         alert('Please enter a valid number');
         return;
     }
     
-    contentData.subscriberCount = count;
+    contentData.subscribers = value;
     saveContentData();
-    renderContentTracker();
-    closeModal();
-}
-
-function changeVideos(amount) {
-    contentData.videosThisMonth = Math.max(0, contentData.videosThisMonth + amount);
-    saveContentData();
+    input.value = '';
     renderContentTracker();
 }
 
-function logHours() {
-    const modalContent = createModal();
-    
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; color: #ffffff;">⏱️ Log Content Hours</h2>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Hours to Add</label>
-            <input type="number" 
-                   id="hoursInput" 
-                   placeholder="0"
-                   step="0.5"
-                   style="width: 100%; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 18px; background: #374151; color: white; font-weight: 700;">
-            <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">Current total: ${contentData.hoursLogged} hours</div>
-        </div>
-        
-        <div style="display: flex; gap: 15px; justify-content: flex-end;">
-            <button onclick="closeModal()" style="background: #4B5563; color: white; border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveHours()" style="background: #ffffff; color: #1a1a2e; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Add Hours</button>
-        </div>
-    `;
-}
-
-function saveHours() {
-    const input = document.getElementById('hoursInput');
-    const hours = parseFloat(input?.value);
-    
-    if (isNaN(hours) || hours <= 0) {
-        alert('Please enter a valid number');
-        return;
-    }
-    
-    contentData.hoursLogged += hours;
+// Change videos count
+function changeVideosCount(delta) {
+    contentData.videosThisMonth = Math.max(0, contentData.videosThisMonth + delta);
     saveContentData();
     renderContentTracker();
-    closeModal();
 }
 
+// Change hours logged
+function changeHoursLogged(delta) {
+    contentData.hoursLogged = Math.max(0, contentData.hoursLogged + delta);
+    saveContentData();
+    renderContentTracker();
+}
+
+// Add video idea
 function addVideoIdea() {
-    const modalContent = createModal();
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
     
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 25px; color: #ffffff;">💡 Add Video Idea</h2>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Video Title</label>
-            <input type="text" 
-                   id="ideaTitle" 
-                   placeholder="e.g., Top 10 Military Strategies"
-                   style="width: 100%; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 15px; background: #374151; color: white;" autofocus>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #9CA3AF;">Description (Optional)</label>
-            <textarea 
-                id="ideaDescription" 
-                placeholder="Brief notes, angle, research needed..."
-                style="width: 100%; min-height: 100px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 15px; background: #374151; color: white; resize: vertical;"></textarea>
-        </div>
-        
-        <div style="display: flex; gap: 15px; justify-content: flex-end;">
-            <button onclick="closeModal()" style="background: #4B5563; color: white; border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Cancel</button>
-            <button onclick="saveVideoIdea()" style="background: #ffffff; color: #1a1a2e; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;">Add Idea</button>
-        </div>
-    `;
+    if (!modal || !modalBody) return;
+
+    let html = '<h2 style="color: white; margin-bottom: 20px;">Add Video Idea</h2>';
+    
+    html += '<div class="form-group">';
+    html += '<label>Video Title *</label>';
+    html += '<input type="text" id="ideaTitle" class="form-input" placeholder="e.g., Top 10 Ancient Civilizations">';
+    html += '</div>';
+    
+    html += '<div class="form-group">';
+    html += '<label>Description (Optional)</label>';
+    html += '<textarea id="ideaDescription" class="form-input" rows="4" placeholder="Brief description, angle, or notes..."></textarea>';
+    html += '</div>';
+    
+    html += '<div class="form-actions">';
+    html += '<button onclick="saveVideoIdea()" class="form-submit">Add Idea</button>';
+    html += '<button onclick="closeModal()" class="form-cancel">Cancel</button>';
+    html += '</div>';
+
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
+// Save video idea
 function saveVideoIdea() {
-    const title = document.getElementById('ideaTitle')?.value.trim();
-    const description = document.getElementById('ideaDescription')?.value.trim();
+    const title = document.getElementById('ideaTitle').value.trim();
+    const description = document.getElementById('ideaDescription').value.trim();
     
     if (!title) {
         alert('Please enter a video title');
         return;
     }
     
-    contentData.ideas.push({
-        title: title,
-        description: description,
-        addedDate: new Date().toISOString()
+    contentData.videoIdeas.push({
+        id: Date.now().toString(),
+        title,
+        description,
+        createdAt: new Date().toISOString()
     });
     
     saveContentData();
-    renderContentTracker();
     closeModal();
+    renderContentTracker();
 }
 
+// Delete video idea
 function deleteVideoIdea(index) {
     if (!confirm('Delete this video idea?')) {
         return;
     }
     
-    contentData.ideas.splice(index, 1);
+    contentData.videoIdeas.splice(index, 1);
     saveContentData();
     renderContentTracker();
 }
 
-function saveContentNotes(value) {
-    contentData.notes = value;
+// Save content notes
+function saveContentNotes() {
+    const notes = document.getElementById('contentNotes').value;
+    contentData.notes = notes;
     saveContentData();
 }
