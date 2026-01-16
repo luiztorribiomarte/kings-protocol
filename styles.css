@@ -14,13 +14,25 @@ body {
 }
 
 /* ============================================
-   CONTAINER
+   APP CONTAINER
 ============================================ */
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 24px;
+}
+
+/* ============================================
+   GLOBAL PAGE BOX (THIS FIXES EVERYTHING)
+============================================ */
+
+.page {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 40px;
 }
 
 /* ============================================
@@ -31,7 +43,7 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
 .nav-tab {
@@ -54,7 +66,7 @@ body {
 }
 
 /* ============================================
-   WIDGETS (CLOCK / WEATHER)
+   TOP WIDGETS (CLOCK / WEATHER)
 ============================================ */
 
 .widget {
@@ -87,19 +99,6 @@ body {
 }
 
 /* ============================================
-   BOXED SECTIONS
-============================================ */
-
-.habit-section,
-.stats-grid,
-#dailyStatus,
-.modal-content {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 16px;
-}
-
-/* ============================================
    STATS GRID
 ============================================ */
 
@@ -107,8 +106,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 16px;
-    padding: 18px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .stat-card {
@@ -116,11 +114,6 @@ body {
     border-radius: 14px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.18);
-    transition: transform 0.15s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
 }
 
 .stat-value {
@@ -139,18 +132,24 @@ body {
 ============================================ */
 
 #dailyStatus {
-    margin-bottom: 24px;
+    margin-bottom: 28px;
     padding: 16px 18px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.18);
     font-size: 0.95rem;
 }
 
 /* ============================================
-   HABIT / MOOD SECTIONS
+   HABIT / MOOD / CONTENT SECTIONS
 ============================================ */
 
 .habit-section {
-    padding: 20px;
+    padding: 22px;
     margin-bottom: 28px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.18);
 }
 
 .section-title {
@@ -177,6 +176,9 @@ body {
     padding: 24px;
     max-width: 600px;
     width: 90%;
+    border-radius: 18px;
+    background: #020617;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 /* ============================================
