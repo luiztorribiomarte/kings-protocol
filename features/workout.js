@@ -1,15 +1,12 @@
 // ============================================
-// WORKOUT MODULE - Workout tracking
+// WORKOUT MODULE
 // ============================================
 
 let workoutData = {};
 let lifetimePushups = 0;
 let lifetimePullups = 0;
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
+// Initialize workout data
 function initWorkoutData() {
     const saved = localStorage.getItem('workoutData');
     if (saved) {
@@ -19,278 +16,230 @@ function initWorkoutData() {
     const savedPushups = localStorage.getItem('lifetimePushups');
     if (savedPushups) {
         lifetimePushups = parseInt(savedPushups);
-        const display = document.getElementById('totalPushups');
-        if (display) display.textContent = lifetimePushups.toLocaleString();
     }
     
     const savedPullups = localStorage.getItem('lifetimePullups');
     if (savedPullups) {
         lifetimePullups = parseInt(savedPullups);
-        const display = document.getElementById('totalPullups');
-        if (display) display.textContent = lifetimePullups.toLocaleString();
     }
+    
+    renderLifetimeCounters();
 }
 
+// Save workout data
 function saveWorkoutData() {
     localStorage.setItem('workoutData', JSON.stringify(workoutData));
 }
 
-// ============================================
-// WORKOUT LOGGING
-// ============================================
-
+// Log workout
 function logWorkout() {
-    const name = document.getElementById('exerciseName')?.value.trim();
-    const weight = parseFloat(document.getElementById('exerciseWeight')?.value);
-    const reps = parseInt(document.getElementById('exerciseReps')?.value);
-    const sets = parseInt(document.getElementById('exerciseSets')?.value);
+    const exerciseName = document.getElementById('exerciseName').value.trim();
+    const weight = parseInt(document.getElementById('exerciseWeight').value);
+    const reps = parseInt(document.getElementById('exerciseReps').value);
+    const sets = parseInt(document.getElementById('exerciseSets').value);
     
-    if (!name) {
-        alert('Please enter an exercise name');
+    if (!exerciseName || !weight || !reps || !sets) {
+        alert('Please fill in all fields');
         return;
     }
     
-    if (isNaN(weight) || isNaN(reps) || isNaN(sets)) {
-        alert('Please enter valid numbers for weight, reps, and sets');
-        return;
+    if (!workoutData[exerciseName]) {
+        workoutData[exerciseName] = [];
     }
     
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (!workoutData[name]) {
-        workoutData[name] = [];
-    }
-    
-    workoutData[name].push({
-        date: today,
-        weight: weight,
-        reps: reps,
-        sets: sets
+    workoutData[exerciseName].push({
+        date: new Date().toISOString(),
+        weight,
+        reps,
+        sets
     });
     
     saveWorkoutData();
-    renderExerciseCards();
     
     // Clear inputs
     document.getElementById('exerciseName').value = '';
     document.getElementById('exerciseWeight').value = '';
     document.getElementById('exerciseReps').value = '';
     document.getElementById('exerciseSets').value = '';
+    
+    renderExerciseCards();
 }
 
+// Render exercise cards
 function renderExerciseCards() {
-    const container = document.getElementById('exerciseCardsContainer');
+    const container = document.getElementById('exerciseCards');
     if (!container) return;
     
     const exercises = Object.keys(workoutData);
     
     if (exercises.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 60px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 2px dashed rgba(255, 255, 255, 0.2, 0.3); margin-bottom: 30px;">
-                <div style="font-size: 48px; margin-bottom: 15px;">💪</div>
-                <div style="font-size: 18px; font-weight: 600; color: #9CA3AF; margin-bottom: 10px;">No exercises tracked yet!</div>
-                <div style="font-size: 14px; color: #9CA3AF;">Log your first workout above to get started</div>
-            </div>
-        `;
+        container.innerHTML = '<div style="text-align: center; color: #6B7280; padding: 40px;">No exercises logged yet. Start tracking your workouts above!</div>';
         return;
     }
     
-    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">';
-    
-    exercises.forEach(exercise => {
-        const workouts = workoutData[exercise];
-        const latest = workouts[workouts.length - 1];
-        const first = workouts[0];
-        const totalGain = latest.weight - first.weight;
-        const percentGain = first.weight > 0 ? Math.round((totalGain / first.weight) * 100) : 0;
+    let html = '';
+    exercises.forEach(exerciseName => {
+        const sessions = workoutData[exerciseName];
+        const latest = sessions[sessions.length - 1];
+        const first = sessions[0];
+        const totalSessions = sessions.length;
+        const weightGain = latest.weight - first.weight;
         
         html += `
-            <div onclick="showExerciseChart('${exercise.replace(/'/g, "\\'")})" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.1), rgba(75, 85, 99, 0.1)); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <button onclick="event.stopPropagation(); deleteExercise('${exercise.replace(/'/g, "\\'")}')" style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-weight: 700;">✕</button>
-                
-                <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 15px;">🏋️ ${exercise}</h3>
-                
-                <div style="background: rgba(255, 255, 255, 0.9); border-radius: 8px; padding: 15px; margin-bottom: 12px; color: #374151;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Latest</span>
-                        <span style="font-weight: 700;">${latest.weight} lbs × ${latest.reps} × ${latest.sets}</span>
+            <div class="exercise-card" onclick="showExerciseChart('${exerciseName}')">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: white; margin: 0;">${exerciseName}</h3>
+                    <span style="color: #9CA3AF; font-size: 0.9em;">${totalSessions} sessions</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div>
+                        <div style="color: #9CA3AF; font-size: 0.85em;">Current</div>
+                        <div style="color: white; font-weight: bold;">${latest.weight} lbs</div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Starting</span>
-                        <span style="font-weight: 700;">${first.weight} lbs</span>
+                    <div>
+                        <div style="color: #9CA3AF; font-size: 0.85em;">Started</div>
+                        <div style="color: white; font-weight: bold;">${first.weight} lbs</div>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-size: 13px; color: #9CA3AF;">Gain</span>
-                        <span style="font-weight: 700; color: ${totalGain >= 0 ? '#ffffff' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs (${percentGain >= 0 ? '+' : ''}${percentGain}%)</span>
+                    <div>
+                        <div style="color: #9CA3AF; font-size: 0.85em;">Gain</div>
+                        <div style="color: ${weightGain >= 0 ? '#10B981' : '#EF4444'}; font-weight: bold;">${weightGain > 0 ? '+' : ''}${weightGain} lbs</div>
                     </div>
                 </div>
-                
-                <div style="background: rgba(31, 41, 55, 0.1); border-radius: 8px; padding: 12px;">
-                    <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 8px;">Total Workouts: ${workouts.length}</div>
-                    <div style="font-size: 11px; color: #9CA3AF;">Click to see progress chart</div>
+                <div style="margin-top: 10px; color: #6B7280; font-size: 0.85em;">
+                    Latest: ${latest.sets} × ${latest.reps} reps
                 </div>
             </div>
         `;
     });
     
-    html += '</div>';
     container.innerHTML = html;
 }
 
+// Show exercise chart
 function showExerciseChart(exerciseName) {
-    const workouts = workoutData[exerciseName];
-    if (!workouts || workouts.length === 0) return;
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
     
-    const modalContent = createModal();
+    if (!modal || !modalBody) return;
     
-    modalContent.innerHTML = `
-        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🏋️ ${exerciseName} Progress</h2>
-        
-        <canvas id="exerciseChart" style="max-height: 400px; margin-bottom: 30px;"></canvas>
-        
-        <div style="background: rgba(31, 41, 55, 0.2); border-radius: 12px; border: 2px solid rgba(31, 41, 55, 0.4); padding: 20px;">
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #9CA3AF;">📊 Stats</h3>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;" id="exerciseStats"></div>
+    const sessions = workoutData[exerciseName];
+    
+    let html = `<h2 style="color: white; margin-bottom: 20px;">${exerciseName}</h2>`;
+    
+    // Stats
+    const latest = sessions[sessions.length - 1];
+    const first = sessions[0];
+    const totalSessions = sessions.length;
+    const weightGain = latest.weight - first.weight;
+    
+    html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">';
+    html += `
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+            <div style="color: #9CA3AF; font-size: 0.9em;">Current Weight</div>
+            <div style="font-size: 2em; color: white; font-weight: bold;">${latest.weight} lbs</div>
         </div>
-        
-        <div style="margin-top: 20px; max-height: 200px; overflow-y: auto; background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px;">
-            <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #9CA3AF;">📝 Recent Workouts</h4>
-            ${workouts.slice(-10).reverse().map(w => `
-                <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; font-size: 13px;">
-                    <strong>${new Date(w.date).toLocaleDateString()}</strong>: ${w.weight} lbs × ${w.reps} reps × ${w.sets} sets
-                </div>
-            `).join('')}
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+            <div style="color: #9CA3AF; font-size: 0.9em;">Total Gain</div>
+            <div style="font-size: 2em; color: ${weightGain >= 0 ? '#10B981' : '#EF4444'}; font-weight: bold;">${weightGain > 0 ? '+' : ''}${weightGain} lbs</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+            <div style="color: #9CA3AF; font-size: 0.9em;">Total Sessions</div>
+            <div style="font-size: 2em; color: white; font-weight: bold;">${totalSessions}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+            <div style="color: #9CA3AF; font-size: 0.9em;">Latest Volume</div>
+            <div style="font-size: 1.5em; color: white; font-weight: bold;">${latest.sets} × ${latest.reps}</div>
         </div>
     `;
+    html += '</div>';
     
-    renderExerciseChart(exerciseName, workouts);
-}
-
-function renderExerciseChart(exerciseName, workouts) {
-    const canvas = document.getElementById('exerciseChart');
-    if (!canvas) return;
+    // Progress chart
+    html += '<div style="margin-bottom: 20px;">';
+    html += '<div style="color: white; font-weight: 600; margin-bottom: 10px;">Weight Progress</div>';
+    html += '<div style="display: flex; gap: 3px; height: 150px; align-items: flex-end;">';
     
-    const labels = workouts.map(w => new Date(w.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-    const weights = workouts.map(w => w.weight);
+    const maxWeight = Math.max(...sessions.map(s => s.weight));
+    sessions.forEach((session, index) => {
+        const height = (session.weight / maxWeight) * 100;
+        html += `<div style="flex: 1; background: rgba(16, 185, 129, 0.6); height: ${height}%; border-radius: 2px;" title="Session ${index + 1}: ${session.weight} lbs"></div>`;
+    });
     
-    const first = workouts[0];
-    const latest = workouts[workouts.length - 1];
-    const totalGain = latest.weight - first.weight;
+    html += '</div>';
+    html += '</div>';
     
-    // Update stats
-    const statsDiv = document.getElementById('exerciseStats');
-    if (statsDiv) {
-        statsDiv.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #ffffff;">${first.weight} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Starting</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: #ffffff;">${latest.weight} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Current</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 28px; font-weight: 900; color: ${totalGain >= 0 ? '#ffffff' : '#EF4444'};">${totalGain >= 0 ? '+' : ''}${totalGain} lbs</div>
-                <div style="font-size: 12px; color: #9CA3AF;">Gain</div>
+    // Recent sessions
+    html += '<div style="margin-bottom: 20px;">';
+    html += '<div style="color: white; font-weight: 600; margin-bottom: 10px;">Recent Sessions</div>';
+    const recentSessions = sessions.slice(-5).reverse();
+    recentSessions.forEach(session => {
+        const date = new Date(session.date);
+        html += `
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between;">
+                <span style="color: #9CA3AF;">${date.toLocaleDateString()}</span>
+                <span style="color: white;">${session.weight} lbs × ${session.sets} sets × ${session.reps} reps</span>
             </div>
         `;
-    }
-    
-    if (window.exerciseChartInstance) {
-        window.exerciseChartInstance.destroy();
-    }
-    
-    window.exerciseChartInstance = new Chart(canvas, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Weight (lbs)',
-                data: weights,
-                borderColor: '#ffffff',
-                backgroundColor: 'rgba(31, 41, 55, 0.2)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { labels: { color: '#ffffff' } },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const workout = workouts[context.dataIndex];
-                            return `${workout.weight} lbs × ${workout.reps} reps × ${workout.sets} sets`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    ticks: { color: '#ffffff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                },
-                x: {
-                    ticks: { color: '#ffffff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                }
-            }
-        }
     });
+    html += '</div>';
+    
+    html += '<div style="display: flex; gap: 10px;">';
+    html += `<button onclick="deleteExercise('${exerciseName}')" style="flex: 1; padding: 10px; background: rgba(255,50,50,0.2); border: 1px solid rgba(255,50,50,0.3); border-radius: 8px; color: #ff9999; cursor: pointer;">Delete Exercise</button>`;
+    html += '<button onclick="closeModal()" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Close</button>';
+    html += '</div>';
+    
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
+// Delete exercise
 function deleteExercise(exerciseName) {
-    if (!confirm(`Delete all data for "${exerciseName}"? This cannot be undone.`)) {
+    if (!confirm(`Delete all data for ${exerciseName}?`)) {
         return;
     }
     
     delete workoutData[exerciseName];
     saveWorkoutData();
     renderExerciseCards();
+    closeModal();
 }
 
-// ============================================
-// LIFETIME COUNTERS
-// ============================================
-
+// Add pushups
 function addPushups() {
-    const input = document.getElementById('pushupInput');
-    const amount = parseInt(input?.value);
+    const input = document.getElementById('pushupsToAdd');
+    const reps = parseInt(input.value);
     
-    if (isNaN(amount) || amount <= 0) {
+    if (!reps || reps <= 0) {
         alert('Please enter a valid number');
         return;
     }
     
-    lifetimePushups += amount;
-    localStorage.setItem('lifetimePushups', lifetimePushups);
-    
-    const display = document.getElementById('totalPushups');
-    if (display) display.textContent = lifetimePushups.toLocaleString();
-    
+    lifetimePushups += reps;
+    localStorage.setItem('lifetimePushups', lifetimePushups.toString());
     input.value = '';
+    renderLifetimeCounters();
 }
 
+// Add pullups
 function addPullups() {
-    const input = document.getElementById('pullupInput');
-    const amount = parseInt(input?.value);
+    const input = document.getElementById('pullupsToAdd');
+    const reps = parseInt(input.value);
     
-    if (isNaN(amount) || amount <= 0) {
+    if (!reps || reps <= 0) {
         alert('Please enter a valid number');
         return;
     }
     
-    lifetimePullups += amount;
-    localStorage.setItem('lifetimePullups', lifetimePullups);
-    
-    const display = document.getElementById('totalPullups');
-    if (display) display.textContent = lifetimePullups.toLocaleString();
-    
+    lifetimePullups += reps;
+    localStorage.setItem('lifetimePullups', lifetimePullups.toString());
     input.value = '';
+    renderLifetimeCounters();
+}
+
+// Render lifetime counters
+function renderLifetimeCounters() {
+    const pushupsEl = document.getElementById('lifetimePushups');
+    const pullupsEl = document.getElementById('lifetimePullups');
+    
+    if (pushupsEl) pushupsEl.textContent = lifetimePushups.toLocaleString();
+    if (pullupsEl) pullupsEl.textContent = lifetimePullups.toLocaleString();
 }
