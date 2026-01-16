@@ -1,4 +1,729 @@
 /* ============================================
+   KINGS PROTOCOL - MIDNIGHT MODE STYLES
+   ============================================ */
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+    color: #ffffff;
+    min-height: 100vh;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+
+.nav-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.nav-tab {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: #9CA3AF;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.95em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.nav-tab:hover {
+    background: linear-gradient(135deg, rgba(75, 85, 99, 0.6) 0%, rgba(55, 65, 81, 0.6) 100%);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.nav-tab.active {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   PAGES
+   ============================================ */
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* ============================================
+   WIDGETS (Clock & Weather)
+   ============================================ */
+
+.widget {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.widget-icon {
+    font-size: 2em;
+}
+
+.widget-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.widget-label {
+    color: #9CA3AF;
+    font-size: 0.9em;
+}
+
+.widget-sublabel {
+    color: #6B7280;
+    font-size: 0.85em;
+}
+
+/* ============================================
+   MODE TOGGLE
+   ============================================ */
+
+.mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mode-toggle:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   STATS CARDS
+   ============================================ */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.stat-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #9CA3AF;
+    font-size: 0.9em;
+}
+
+/* ============================================
+   SECTIONS
+   ============================================ */
+
+.habit-section,
+.streak-section,
+.timer-section {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.4) 0%, rgba(31, 41, 55, 0.4) 100%);
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.section-title {
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ============================================
+   HABIT GRID
+   ============================================ */
+
+.habit-grid {
+    overflow-x: auto;
+}
+
+.habit-grid table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+}
+
+.habit-grid th {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9CA3AF;
+    font-weight: 600;
+}
+
+.habit-grid td {
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.habit-grid td:first-child {
+    text-align: left;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.habit-grid td:first-child:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.habit-grid td:not(:first-child):hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.habit-grid .today {
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
+}
+
+/* ============================================
+   STREAK SYSTEM
+   ============================================ */
+
+.streak-display {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.streak-number {
+    font-size: 5em;
+    font-weight: bold;
+    color: #ffffff;
+    line-height: 1;
+}
+
+.streak-label {
+    font-size: 1.2em;
+    color: #9CA3AF;
+    margin-top: 10px;
+}
+
+.streak-best {
+    color: #6B7280;
+    margin-top: 10px;
+}
+
+.milestones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.milestone {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.milestone.unlocked {
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.milestone-icon {
+    font-size: 2em;
+    margin-bottom: 5px;
+}
+
+.milestone-label {
+    font-size: 0.9em;
+    color: #9CA3AF;
+}
+
+/* ============================================
+   TIMER
+   ============================================ */
+
+.timer-display {
+    text-align: center;
+    padding: 30px;
+}
+
+.timer-time {
+    font-size: 4em;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 20px;
+}
+
+.timer-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.timer-controls button {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.timer-controls button:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.playlist-section {
+    margin-top: 30px;
+}
+
+/* ============================================
+   GOALS
+   ============================================ */
+
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.goal-card {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.goal-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.goal-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 15px;
+}
+
+.goal-progress {
+    width: 100%;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.goal-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.5) 100%);
+    transition: width 0.3s ease;
+}
+
+.goal-stats {
+    display: flex;
+    justify-content: space-between;
+    color: #9CA3AF;
+    font-size: 0.9em;
+}
+
+/* ============================================
+   MOOD TRACKER
+   ============================================ */
+
+.mood-tracker-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+}
+
+.mood-today {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mood-history {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mood-history:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.mood-selector {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.mood-btn {
+    font-size: 2em;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mood-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.mood-btn.selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.energy-slider {
+    width: 100%;
+    margin: 15px 0;
+}
+
+.past-mood-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.past-mood-day {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.past-mood-day.today {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #9CA3AF;
+    cursor: pointer;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+/* ============================================
+   WORKOUT STYLES
+   ============================================ */
+
+.workout-log {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin-bottom: 30px;
+}
+
+.exercise-card {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.exercise-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.lifetime-counter {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.counter-title {
+    font-size: 1.2em;
+    color: #9CA3AF;
+    margin-bottom: 10px;
+}
+
+.counter-value {
+    font-size: 3em;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* ============================================
+   JOURNAL STYLES
+   ============================================ */
+
+.journal-section {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.4) 0%, rgba(31, 41, 55, 0.4) 100%);
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.journal-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: white;
+    font-size: 1em;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.journal-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.journal-textarea {
+    min-height: 150px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* ============================================
+   VISION BOARD
+   ============================================ */
+
+.vision-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.vision-card {
+    aspect-ratio: 1;
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.vision-card:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+.vision-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.vision-affirmation {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+    padding: 15px;
+    color: white;
+    font-size: 0.9em;
+    text-align: center;
+}
+
+/* ============================================
+   CONTENT TRACKER
+   ============================================ */
+
+.content-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.content-stat-card {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    text-align: center;
+}
+
+.ideas-list {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.4) 0%, rgba(31, 41, 55, 0.4) 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.idea-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
    READING LIST STYLES
    ============================================ */
 
@@ -302,8 +1027,33 @@
     border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Responsive Design for Books */
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 1024px) {
+    .vision-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .mood-tracker-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .vision-grid {
+        grid-template-columns: 1fr;
+    }
+    
     .books-grid {
         grid-template-columns: 1fr;
     }
@@ -318,5 +1068,14 @@
     
     .book-action-btn {
         width: 100%;
+    }
+    
+    .nav-tabs {
+        gap: 5px;
+    }
+    
+    .nav-tab {
+        padding: 10px 15px;
+        font-size: 0.85em;
     }
 }
