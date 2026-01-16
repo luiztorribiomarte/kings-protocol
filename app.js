@@ -1,7 +1,6 @@
 // ============================================
 // CORE APP.JS - Main initialization & utilities
 // ============================================
-// All feature modules are loaded separately
 
 let notificationsOn = true;
 let timerInterval = null;
@@ -15,24 +14,27 @@ let timerMode = 'focus';
 function createModal() {
     const overlay = document.createElement('div');
     overlay.id = 'modalOverlay';
-    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
-    
+    overlay.style.cssText =
+        'position: fixed; inset: 0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000;';
+
     const content = document.createElement('div');
-    content.style.cssText = 'background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(236, 72, 153, 0.95)); border: 2px solid rgba(139, 92, 246, 0.8); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;';
-    
+    content.style.cssText =
+        'background: linear-gradient(135deg, rgba(139,92,246,.95), rgba(236,72,153,.95)); border-radius:20px; padding:30px; max-width:600px; width:90%; max-height:90vh; overflow:auto; position:relative;';
+
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '×';
     closeBtn.onclick = closeModal;
-    closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; font-size: 28px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;';
-    
+    closeBtn.style.cssText =
+        'position:absolute; top:15px; right:15px; background:rgba(255,255,255,.2); border:2px solid white; color:white; font-size:28px; width:40px; height:40px; border-radius:50%; cursor:pointer;';
+
     content.appendChild(closeBtn);
     overlay.appendChild(content);
     document.body.appendChild(overlay);
-    
-    overlay.onclick = (e) => {
+
+    overlay.onclick = e => {
         if (e.target === overlay) closeModal();
     };
-    
+
     return content;
 }
 
@@ -42,11 +44,12 @@ function closeModal() {
 }
 
 // ============================================
-// NAVIGATION
+// NAVIGATION (STABLE)
 // ============================================
 
 function showPage(pageName) {
-    document.querySelectorAll('.page, .page-content').forEach(page => {
+    document.querySelectorAll('[id$="Page"]').forEach(page => {
+        page.style.display = 'none';
         page.classList.remove('active');
     });
 
@@ -57,6 +60,7 @@ function showPage(pageName) {
     const pageEl = document.getElementById(pageName + 'Page');
     if (!pageEl) return;
 
+    pageEl.style.display = 'block';
     pageEl.classList.add('active');
 
     const tabs = document.querySelectorAll('.nav-tab');
@@ -76,23 +80,22 @@ function showPage(pageName) {
     }
 
     if (pageName === 'goalsHabits') {
-        renderGoals();
+        if (typeof renderGoals === 'function') renderGoals();
         if (typeof updateHabitAnalytics === 'function') updateHabitAnalytics();
     }
-    if (pageName === 'workout') renderExerciseCards();
-    if (pageName === 'journal') renderJournalPage();
-    if (pageName === 'visionBoard') renderVisionBoard();
-    if (pageName === 'content') renderContentTracker();
-    if (pageName === 'books') renderReadingList();
+    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
+    if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
+    if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
+    if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
+    if (pageName === 'books' && typeof renderReadingList === 'function') renderReadingList();
 }
 
 // ============================================
-// LIVE CLOCK (FIXED IDS — THIS WAS THE BUG)
+// LIVE CLOCK + LOCATION (FIXED IDS)
 // ============================================
 
 function updateClock() {
     const now = new Date();
-
     let hours = now.getHours();
     const minutes = now.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -105,28 +108,26 @@ function updateClock() {
         day: 'numeric'
     });
 
-    // ✅ MATCH HTML IDS
-    const clockElement = document.getElementById('currentTime');
-    const dateElement = document.getElementById('currentDate');
+    const timeEl = document.getElementById('currentTime');
+    const dateEl = document.getElementById('currentDate');
 
-    if (clockElement) clockElement.textContent = timeString;
-    if (dateElement) dateElement.textContent = dateString;
+    if (timeEl) timeEl.textContent = timeString;
+    if (dateEl) dateEl.textContent = dateString;
 }
 
 function updateLocation() {
-    // ✅ MATCH HTML ID
-    const locationElement = document.getElementById('currentLocation');
-    if (!locationElement) return;
+    const locationEl = document.getElementById('currentLocation');
+    if (!locationEl) return;
 
     if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const { latitude, longitude } = position.coords;
+            async pos => {
                 try {
-                    const response = await fetch(
+                    const { latitude, longitude } = pos.coords;
+                    const res = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
                     );
-                    const data = await response.json();
+                    const data = await res.json();
 
                     const city =
                         data.address.city ||
@@ -136,43 +137,81 @@ function updateLocation() {
                         data.address.county ||
                         'Unknown';
 
-                    locationElement.textContent = city;
+                    locationEl.textContent = city;
                     localStorage.setItem('userLocation', city);
                 } catch {
-                    locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
+                    locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
                 }
             },
             () => {
-                locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
+                locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
             }
         );
     } else {
-        locationElement.textContent = localStorage.getItem('userLocation') || 'New York';
+        locationEl.textContent = localStorage.getItem('userLocation') || 'New York';
     }
+}
+
+// ============================================
+// DASHBOARD SMART STATUS (NEW)
+// ============================================
+
+function updateDailyStatus() {
+    const el = document.getElementById('dailyStatus');
+    if (!el) return;
+
+    const streak = parseInt(document.getElementById('currentStreak')?.textContent || 0);
+    const weekly = parseInt(document.getElementById('weeklyCompletion')?.textContent || 0);
+
+    let message = '⚠️ Let’s get started today.';
+    let color = '#FBBF24';
+
+    if (streak >= 5) {
+        message = '🔥 Strong momentum. Protect the streak.';
+        color = '#34D399';
+    } else if (weekly >= 50) {
+        message = '✅ You’re on track this week.';
+        color = '#60A5FA';
+    }
+
+    el.textContent = message;
+    el.style.borderColor = color;
+}
+
+// ============================================
+// STAT PULSE (ALIVE FEEL)
+// ============================================
+
+function pulseStat(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('updated');
+    setTimeout(() => el.classList.remove('updated'), 150);
 }
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    initHabitData();
-    initGoalsData();
-    initMoodData();
-    initHabitsList();
-    initWorkoutData();
-    initJournalData();
-    initVisionBoardData();
-    initContentData();
-    initReadingListData();
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initHabitData === 'function') initHabitData();
+    if (typeof initGoalsData === 'function') initGoalsData();
+    if (typeof initMoodData === 'function') initMoodData();
+    if (typeof initHabitsList === 'function') initHabitsList();
+    if (typeof initWorkoutData === 'function') initWorkoutData();
+    if (typeof initJournalData === 'function') initJournalData();
+    if (typeof initVisionBoardData === 'function') initVisionBoardData();
+    if (typeof initContentData === 'function') initContentData();
+    if (typeof initReadingListData === 'function') initReadingListData();
 
-    renderHabitGrid();
-    renderMoodTracker();
-    updateStreakDisplay();
+    if (typeof renderHabitGrid === 'function') renderHabitGrid();
+    if (typeof renderMoodTracker === 'function') renderMoodTracker();
+    if (typeof updateStreakDisplay === 'function') updateStreakDisplay();
 
     updateClock();
     setInterval(updateClock, 1000);
     updateLocation();
+    updateDailyStatus();
 
     showPage('dashboard');
 });
