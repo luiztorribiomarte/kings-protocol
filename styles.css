@@ -493,3 +493,20 @@ input, textarea, select{
 .habit-cell.today:hover{
   box-shadow: inset 0 0 0 2px rgba(168,85,247,0.45);
 }
+/* ============================
+   HABIT CELLS – CLICK FEEDBACK + ROW GLOW
+   ============================ */
+
+/* click feedback */
+.habit-cell:active{
+  transform: scale(0.96);
+}
+
+/* row completion glow (habit done all 7 days) */
+.habit-row.row-complete td{
+  background: rgba(34,197,94,0.045);
+}
+
+.habit-row.row-complete td:first-child{
+  box-shadow: inset 4px 0 0 rgba(34,197,94,0.55);
+}
