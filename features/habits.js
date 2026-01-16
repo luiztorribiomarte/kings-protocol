@@ -1,5 +1,5 @@
 // ============================================
-// HABITS MODULE (Weekly Grid + Click Toggle)
+// HABITS MODULE (Weekly Grid + Click Toggle + Row Glow)
 // ============================================
 
 let habitData = {};   // { "YYYY-MM-DD": { "<habitId>": true/false } }
@@ -122,7 +122,7 @@ function toggleHabit(habitId, dayKey) {
   if (typeof updateStreakDisplay === "function") updateStreakDisplay();
 }
 
-// ---------- Completion ----------
+// ---------- Completion (used by mood correlation + charts) ----------
 function getDayCompletion(dayKey) {
   const normalized = normalizeHabitsList(habitsList);
   const total = normalized.length;
@@ -171,44 +171,48 @@ function renderHabitGrid() {
   `;
 
   normalizedHabits.forEach(h => {
-    html += `<tr>
-      <td style="padding:12px; color:white; font-weight:650; white-space:nowrap;">
-        ${h.label}
-      </td>
+    // ✅ Row completion glow: habit done for ALL 7 days
+    const rowComplete = weekKeys.every(dayKey => !!habitData[dayKey][h.id]);
 
-      ${weekKeys.map(dayKey => {
-        const done = !!habitData[dayKey][h.id];
+    html += `
+      <tr class="habit-row ${rowComplete ? "row-complete" : ""}">
+        <td style="padding:12px; color:white; font-weight:650; white-space:nowrap;">
+          ${h.label}
+        </td>
 
-        // keep your current look (dot vs check)
-        const symbol = done ? "✅" : "●";
-        const symbolColor = done ? "#22c55e" : "rgba(255,255,255,0.55)";
+        ${weekKeys.map(dayKey => {
+          const done = !!habitData[dayKey][h.id];
 
-        // ✅ IMPORTANT: add classes so CSS hover glow works 100%
-        const cls = [
-          "habit-cell",
-          done ? "completed" : "",
-          dayKey === todayKey ? "today" : ""
-        ].filter(Boolean).join(" ");
+          // keep your current look (dot vs check)
+          const symbol = done ? "✅" : "●";
+          const symbolColor = done ? "#22c55e" : "rgba(255,255,255,0.55)";
 
-        return `
-          <td
-            class="${cls}"
-            onclick="toggleHabit('${h.id}','${dayKey}')"
-            style="text-align:center; padding:12px 8px; cursor:pointer; user-select:none;"
-            title="Click to toggle"
-          >
-            <span style="
-              display:inline-block;
-              font-size:${done ? "1.05rem" : "0.85rem"};
-              color:${symbolColor};
-              line-height:1;
-              filter:${done ? "drop-shadow(0 6px 10px rgba(0,0,0,.35))" : "none"};
-            ">${symbol}</span>
-          </td>
-        `;
-      }).join("")}
+          // classes for hover glow + today highlight
+          const cls = [
+            "habit-cell",
+            done ? "completed" : "",
+            dayKey === todayKey ? "today" : ""
+          ].filter(Boolean).join(" ");
 
-    </tr>`;
+          return `
+            <td
+              class="${cls}"
+              onclick="toggleHabit('${h.id}','${dayKey}')"
+              style="text-align:center; padding:12px 8px; cursor:pointer; user-select:none;"
+              title="Click to toggle"
+            >
+              <span style="
+                display:inline-block;
+                font-size:${done ? "1.05rem" : "0.85rem"};
+                color:${symbolColor};
+                line-height:1;
+                filter:${done ? "drop-shadow(0 6px 10px rgba(0,0,0,.35))" : "none"};
+              ">${symbol}</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
   });
 
   html += `</tbody></table></div>`;
