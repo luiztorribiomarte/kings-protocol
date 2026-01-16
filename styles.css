@@ -440,7 +440,6 @@ input, textarea, select{
   .stat-value{ font-size: 1.7rem; }
   .timer-time{ font-size: 1.9rem; }
 }
-
 /* ============================================
    HABIT GRID DIVIDERS (ID-based: #habitGrid)
    Paste at the VERY bottom of styles.css
@@ -472,37 +471,25 @@ input, textarea, select{
   border-left: 1px solid rgba(255, 255, 255, 0.10);
 }
 
-/* ============================
-   HABIT GRID – HOVER GLOW (SAFE TARGET)
-   ============================ */
-
-/* Target habit tracking dots */
-table td {
-  transition: 
-    box-shadow 0.2s ease,
-    transform 0.15s ease,
-    background 0.2s ease;
+/* Habit cell hover glow (now guaranteed because we added .habit-cell) */
+.habit-cell{
+  transition: box-shadow .2s ease, transform .15s ease, background .2s ease;
 }
 
-/* Hover on empty habit cells */
-table td:hover {
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
-  transform: scale(1.05);
+.habit-cell:hover{
+  box-shadow: inset 0 0 0 2px rgba(99,102,241,0.35);
 }
 
-/* Completed habit (green check) */
-table td:has(svg),
-table td:has(.check),
-table td:has(.completed) {
-  box-shadow: none;
-}
-
-/* Completed hover stronger */
-table td:has(svg):hover,
-table td:has(.check):hover,
-table td:has(.completed):hover {
+.habit-cell.completed:hover{
   box-shadow:
-    0 0 0 2px rgba(34, 197, 94, 0.6),
-    0 0 10px rgba(34, 197, 94, 0.35);
-  transform: scale(1.08);
+    inset 0 0 0 2px rgba(34,197,94,0.60),
+    0 0 10px rgba(34,197,94,0.25);
+}
+
+.habit-cell.today{
+  background: rgba(255,255,255,0.04);
+}
+
+.habit-cell.today:hover{
+  box-shadow: inset 0 0 0 2px rgba(168,85,247,0.45);
 }
