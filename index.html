@@ -1,199 +1,235 @@
-/* ============================================
-   BASE / RESET
-============================================ */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kings Protocol</title>
 
-* {
-    box-sizing: border-box;
-}
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:,">
 
-body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(180deg, #020617, #020617);
-    color: #f9fafb;
-}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 
-/* ============================================
-   APP CONTAINER
-============================================ */
+<body class="fire-mode">
+    <div class="container">
+        <!-- Header with Title and Widgets -->
+        <div style="margin-bottom: 30px;">
+            <!-- Top Row: Clock, Weather, Mode Toggle -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <!-- Clock Widget -->
+                <div class="widget" id="clockWidget" style="flex: 1; margin-right: 10px;">
+                    <div class="widget-icon">🕐</div>
+                    <div>
+                        <!-- IDs that app.js expects -->
+                        <div class="widget-value" id="currentTime">--:--</div>
+                        <div class="widget-label" id="currentLocation">New York</div>
+                        <div class="widget-sublabel" id="currentDate">---</div>
+                    </div>
+                </div>
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px;
-}
+                <!-- Weather Widget -->
+                <div class="widget" id="weatherWidget" style="flex: 1; margin-left: 10px; margin-right: 10px;">
+                    <div class="widget-icon">🌤️</div>
+                    <div>
+                        <div class="widget-value">72°F</div>
+                        <div class="widget-label">Yonkers</div>
+                    </div>
+                </div>
 
-/* ============================================
-   GLOBAL PAGE BOX (THIS FIXES EVERYTHING)
-============================================ */
+                <!-- Mode Toggle -->
+                <div style="flex: 0;">
+                    <button class="mode-toggle" onclick="toggleMode()">
+                        <span id="modeIcon">🔥</span>
+                        <span id="modeText">Fire Mode</span>
+                    </button>
+                </div>
+            </div>
 
-.page {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 20px;
-    padding: 28px;
-    margin-bottom: 40px;
-}
+            <!-- Title -->
+            <h1 style="text-align: center; font-size: 2.5em; margin: 20px 0; background: linear-gradient(135deg, #ffffff 0%, #9CA3AF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Kings Protocol
+            </h1>
+        </div>
 
-/* ============================================
-   NAVIGATION
-============================================ */
+        <!-- Navigation -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
+            <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
+            <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
+            <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
+            <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
+            <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
+            <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
+        </div>
 
-.nav-tabs {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-}
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="page active">
+            <!-- Weekly Stats -->
+            <div class="stats-grid">
+                <div class="stat-card" onclick="showStatsChart('weeklyCompletion')">
+                    <div class="stat-value" id="daysAt80">0/7</div>
+                    <div class="stat-label">Days at 80%+</div>
+                </div>
+                <div class="stat-card" onclick="showStatsChart('habitCompletion')">
+                    <div class="stat-value" id="weeklyCompletion">0%</div>
+                    <div class="stat-label">Weekly Completion</div>
+                </div>
+                <div class="stat-card" onclick="showStatsChart('streakHistory')">
+                    <div class="stat-value" id="currentStreak">0</div>
+                    <div class="stat-label">Current Streak</div>
+                </div>
+            </div>
 
-.nav-tab {
-    padding: 10px 16px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.06);
-    color: #e5e7eb;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.15s ease;
-}
+            <!-- Smart daily status -->
+            <div id="dailyStatus" style="
+                margin-top: 18px;
+                margin-bottom: 22px;
+                padding: 16px 18px;
+                border-radius: 14px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.18);
+                color: #E5E7EB;
+                font-size: 1rem;
+            ">Checking today’s status…</div>
 
-.nav-tab:hover {
-    background: rgba(255,255,255,0.12);
-}
+            <!-- Energy & Mood Tracker -->
+            <div class="habit-section">
+                <div class="section-title">😊 Energy & Mood</div>
+                <div id="moodTracker"></div>
+            </div>
 
-.nav-tab.active {
-    background: linear-gradient(135deg, #6366f1, #ec4899);
-    color: white;
-}
+            <!-- Habit Tracker -->
+            <div class="habit-section">
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>📋 Daily Habits - This Week</span>
+                    <button onclick="openManageHabits()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; font-size: 0.9em;">
+                        ⚙️ Manage Habits
+                    </button>
+                </div>
+                <div id="habitGrid" class="habit-grid"></div>
+            </div>
 
-/* ============================================
-   TOP WIDGETS (CLOCK / WEATHER)
-============================================ */
+            <!-- Streak System -->
+            <div class="streak-section">
+                <div class="streak-display">
+                    <div class="streak-number" id="streakNumber">0</div>
+                    <div class="streak-label">DAY STREAK</div>
+                    <div class="streak-best">Best: <span id="bestStreak">0</span> days</div>
+                </div>
+                <div class="milestones" id="milestones"></div>
+            </div>
 
-.widget {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.18);
-}
+            <!-- Focus Timer -->
+            <div class="timer-section">
+                <div class="section-title">⏱️ Focus Timer</div>
+                <div class="timer-display">
+                    <div class="timer-time" id="timerDisplay">25:00</div>
+                    <div class="timer-controls">
+                        <button onclick="startTimer(25)">Focus (25m)</button>
+                        <button onclick="startTimer(5)">Short Break (5m)</button>
+                        <button onclick="startTimer(15)">Long Break (15m)</button>
+                        <button onclick="resetTimer()">Reset</button>
+                    </div>
+                </div>
 
-.widget-icon {
-    font-size: 1.6rem;
-}
+                <div class="playlist-section">
+                    <div class="section-title">🎵 Playlist</div>
+                    <input type="text" id="playlistUrl" placeholder="Paste Spotify or YouTube playlist URL" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-bottom: 10px;">
+                    <button onclick="loadPlaylist()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Load Playlist</button>
+                    <div id="playlistPlayer" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+        </div>
 
-.widget-value {
-    font-size: 1.3rem;
-    font-weight: 700;
-}
+        <!-- Goals & Habits Page -->
+        <div id="goalsHabitsPage" class="page">
+            <div class="section-title">🎯 Goals</div>
+            <button onclick="openAddGoal()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; margin-bottom: 20px;">➕ Add New Goal</button>
+            <div id="goalsGrid" class="goals-grid"></div>
 
-.widget-label {
-    font-size: 0.95rem;
-    color: #d1d5db;
-}
+            <div class="section-title" style="margin-top: 40px;">📊 Habit Analytics</div>
+            <div style="margin-bottom: 20px;">
+                <label style="color: #9CA3AF; margin-right: 10px;">Time Range:</label>
+                <select id="habitAnalyticsRange" onchange="renderHabitAnalytics()" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+            <div id="habitAnalytics"></div>
+        </div>
 
-.widget-sublabel {
-    font-size: 0.8rem;
-    color: #9ca3af;
-}
+        <!-- Workout Page -->
+        <div id="workoutPage" class="page">
+            <div class="section-title">💪 Log Today's Workout</div>
+            <div class="workout-log">
+                <input type="text" id="exerciseName" placeholder="Exercise name (e.g., Bench Press)" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-bottom: 10px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="number" id="exerciseWeight" placeholder="Weight (lbs)" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                    <input type="number" id="exerciseReps" placeholder="Reps" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                    <input type="number" id="exerciseSets" placeholder="Sets" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                </div>
+                <button onclick="logWorkout()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; width: 100%;">Log Exercise</button>
+            </div>
 
-/* ============================================
-   STATS GRID
-============================================ */
+            <div id="exerciseCards" style="margin-top: 30px;"></div>
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
+            <div class="section-title" style="margin-top: 40px;">🏆 Lifetime Counters</div>
+            <div style="display: flex; gap: 20px;">
+                <div class="lifetime-counter">
+                    <div class="counter-title">Pushups</div>
+                    <div class="counter-value" id="lifetimePushups">0</div>
+                    <div style="margin-top: 10px;">
+                        <input type="number" id="pushupsToAdd" placeholder="Add reps" style="width: 100px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-right: 10px;">
+                        <button onclick="addPushups()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Add</button>
+                    </div>
+                </div>
+                <div class="lifetime-counter">
+                    <div class="counter-title">Pull-ups</div>
+                    <div class="counter-value" id="lifetimePullups">0</div>
+                    <div style="margin-top: 10px;">
+                        <input type="number" id="pullupsToAdd" placeholder="Add reps" style="width: 100px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; margin-right: 10px;">
+                        <button onclick="addPullups()" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer;">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-.stat-card {
-    padding: 18px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.18);
-}
+        <!-- Journal Page -->
+        <div id="journalPage" class="page"><div id="journalContainer"></div></div>
 
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: 800;
-}
+        <!-- Vision Board Page -->
+        <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
 
-.stat-label {
-    margin-top: 6px;
-    font-size: 0.9rem;
-    color: #9ca3af;
-}
+        <!-- Content Tracker Page -->
+        <div id="contentPage" class="page"><div id="contentContainer"></div></div>
 
-/* ============================================
-   DAILY STATUS
-============================================ */
+        <!-- Books Page -->
+        <div id="booksPage" class="page"><div id="booksContainer"></div></div>
 
-#dailyStatus {
-    margin-bottom: 28px;
-    padding: 16px 18px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.18);
-    font-size: 0.95rem;
-}
+        <!-- Settings Page -->
+        <div id="settingsPage" class="page">
+            <div class="section-title">⚙️ Settings</div>
+            <p style="color: #9CA3AF; text-align: center; padding: 40px;">Coming Soon...</p>
+        </div>
+    </div>
 
-/* ============================================
-   HABIT / MOOD / CONTENT SECTIONS
-============================================ */
+    <!-- Modal for charts and forms -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
 
-.habit-section {
-    padding: 22px;
-    margin-bottom: 28px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.18);
-}
-
-.section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 12px;
-}
-
-/* ============================================
-   MODAL
-============================================ */
-
-.modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    padding: 24px;
-    max-width: 600px;
-    width: 90%;
-    border-radius: 18px;
-    background: #020617;
-    border: 1px solid rgba(255,255,255,0.2);
-}
-
-/* ============================================
-   SCROLLBAR
-============================================ */
-
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.25);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
+    <!-- Load Scripts -->
+    <script src="app.js?v=7"></script>
+    <script src="features/habits.js"></script>
+    <script src="features/goals.js"></script>
+    <script src="features/mood.js"></script>
+    <script src="features/workout.js"></script>
+    <script src="features/journal.js"></script>
+    <script src="features/vision-board.js"></script>
+    <scri
