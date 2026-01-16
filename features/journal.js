@@ -1,13 +1,10 @@
 // ============================================
-// JOURNAL MODULE - Daily journaling & reflections
+// JOURNAL MODULE
 // ============================================
 
 let journalData = {};
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
+// Initialize journal data
 function initJournalData() {
     const saved = localStorage.getItem('journalData');
     if (saved) {
@@ -15,128 +12,109 @@ function initJournalData() {
     }
 }
 
+// Save journal data
 function saveJournalData() {
     localStorage.setItem('journalData', JSON.stringify(journalData));
 }
 
-// ============================================
-// JOURNAL RENDERING
-// ============================================
+// Get date string
+function getJournalDateString(date) {
+    const d = date || new Date();
+    return d.toISOString().split('T')[0];
+}
 
+// Render journal page
 function renderJournalPage() {
     const container = document.getElementById('journalContainer');
     if (!container) return;
-    
-    const today = new Date().toISOString().split('T')[0];
+
+    const today = getJournalDateString(new Date());
     const todayData = journalData[today] || {
         wins: ['', '', ''],
         gratitude: ['', '', ''],
         affirmations: ['', '', '', '', ''],
         entry: ''
     };
-    
-    container.innerHTML = `
-        <!-- Date Selector -->
-        <div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h2 style="font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Today's Journal</h2>
-                <div style="font-size: 14px; color: #9CA3AF; margin-top: 5px;">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
-            </div>
-            <select id="journalDateSelector" onchange="loadJournalDate(this.value)" style="padding: 12px 20px; border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; font-weight: 600; cursor: pointer;">
+
+    let html = `
+        <div style="margin-bottom: 20px;">
+            <label style="color: #9CA3AF; display: block; margin-bottom: 10px;">View Entry:</label>
+            <select id="journalDateSelector" onchange="loadJournalDate()" style="padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; width: 100%;">
                 <option value="${today}">Today</option>
-                ${getPastDates().map(date => `<option value="${date}">${formatDate(date)}</option>`).join('')}
             </select>
         </div>
+    `;
 
-        <!-- Daily Wins -->
-        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(156, 163, 175, 0.1)); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🏆 Daily Wins</h3>
-            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What did you accomplish today?</p>
-            ${todayData.wins.map((win, i) => `
-                <input type="text" 
-                       id="win${i}" 
-                       value="${win}" 
-                       onchange="saveJournalField('wins', ${i}, this.value)"
-                       placeholder="Win #${i + 1}"
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
-            `).join('')}
+    // Daily Wins
+    html += '<div class="journal-section">';
+    html += '<div class="section-title">🏆 Daily Wins</div>';
+    for (let i = 0; i < 3; i++) {
+        html += `<input type="text" class="journal-input" placeholder="Win #${i + 1}" value="${todayData.wins[i]}" onchange="saveJournalField('wins', ${i}, this.value)">`;
+    }
+    html += '</div>';
+
+    // Gratitude
+    html += '<div class="journal-section">';
+    html += '<div class="section-title">🙏 Gratitude</div>';
+    for (let i = 0; i < 3; i++) {
+        html += `<input type="text" class="journal-input" placeholder="Grateful for #${i + 1}" value="${todayData.gratitude[i]}" onchange="saveJournalField('gratitude', ${i}, this.value)">`;
+    }
+    html += '</div>';
+
+    // Affirmations
+    html += '<div class="journal-section">';
+    html += '<div class="section-title">✨ I AM Affirmations</div>';
+    for (let i = 0; i < 5; i++) {
+        html += `<input type="text" class="journal-input" placeholder="I AM..." value="${todayData.affirmations[i]}" onchange="saveJournalField('affirmations', ${i}, this.value)">`;
+    }
+    html += '</div>';
+
+    // Free Journal Entry
+    html += '<div class="journal-section">';
+    html += '<div class="section-title">📝 Journal Entry</div>';
+    html += `<textarea class="journal-input journal-textarea" placeholder="Write your thoughts for today..." onchange="saveJournalField('entry', null, this.value)">${todayData.entry}</textarea>`;
+    html += `<div style="text-align: right; color: #6B7280; font-size: 0.85em; margin-top: 5px;">Word count: <span id="wordCount">${countWords(todayData.entry)}</span></div>`;
+    html += '</div>';
+
+    // Journal Stats
+    const stats = calculateJournalStats();
+    html += '<div class="journal-section">';
+    html += '<div class="section-title">📊 Journal Stats</div>';
+    html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">';
+    html += `
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2em; color: white; font-weight: bold;">${stats.totalEntries}</div>
+            <div style="color: #9CA3AF; font-size: 0.85em;">Total Entries</div>
         </div>
-
-        <!-- Gratitude -->
-        <div style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.1), rgba(75, 85, 99, 0.1)); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #ffffff;">🙏 Gratitude</h3>
-            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">What are you thankful for today?</p>
-            ${todayData.gratitude.map((item, i) => `
-                <input type="text" 
-                       id="gratitude${i}" 
-                       value="${item}" 
-                       onchange="saveJournalField('gratitude', ${i}, this.value)"
-                       placeholder="I'm grateful for..."
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(31, 41, 55, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
-            `).join('')}
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2em; color: white; font-weight: bold;">${stats.currentStreak}</div>
+            <div style="color: #9CA3AF; font-size: 0.85em;">Day Streak</div>
         </div>
-
-        <!-- Affirmations -->
-        <div style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.2, 0.1), rgba(107, 107, 107, 0.1)); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; background: linear-gradient(135deg, #ffffff, #9CA3AF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎 I AM Affirmations</h3>
-            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">Declare who you are becoming</p>
-            ${todayData.affirmations.map((affirmation, i) => `
-                <input type="text" 
-                       id="affirmation${i}" 
-                       value="${affirmation}" 
-                       onchange="saveJournalField('affirmations', ${i}, this.value)"
-                       placeholder="I AM ${['successful', 'confident', 'disciplined', 'focused', 'unstoppable'][i]}"
-                       style="width: 100%; padding: 15px; margin-bottom: 12px; border: 2px solid rgba(255, 255, 255, 0.2, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151;">
-            `).join('')}
-        </div>
-
-        <!-- Daily Entry -->
-        <div style="background: linear-gradient(135deg, rgba(75, 85, 99, 0.1), rgba(147, 197, 253, 0.1)); border: 2px solid rgba(75, 85, 99, 0.4); border-radius: 16px; padding: 25px;">
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; color: #8B8B8B;">📖 Daily Journal Entry</h3>
-            <p style="font-size: 14px; color: #9CA3AF; margin-bottom: 20px;">How was your day? Thoughts, reflections, feelings...</p>
-            <textarea 
-                id="journalEntry" 
-                onchange="saveJournalField('entry', null, this.value)"
-                placeholder="Dear Journal,
-
-Today was..."
-                style="width: 100%; min-height: 250px; padding: 20px; border: 2px solid rgba(75, 85, 99, 0.3); border-radius: 12px; font-size: 15px; background: rgba(255, 255, 255, 0.95); color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; resize: vertical;"
-            >${todayData.entry}</textarea>
-            
-            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 12px; color: #9CA3AF;">
-                    <span id="wordCount">0 words</span> • Auto-saves as you type
-                </div>
-                <button onclick="clearTodayJournal()" style="background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 2px solid #EF4444; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">Clear Today</button>
-            </div>
-        </div>
-
-        <!-- Journal Stats -->
-        <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-            <div style="background: rgba(255, 255, 255, 0.2, 0.2); border: 2px solid rgba(255, 255, 255, 0.2, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
-                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${Object.keys(journalData).length}</div>
-                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Entries</div>
-            </div>
-            <div style="background: rgba(31, 41, 55, 0.2); border: 2px solid rgba(31, 41, 55, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
-                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${calculateStreak()}</div>
-                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Day Streak</div>
-            </div>
-            <div style="background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
-                <div style="font-size: 32px; font-weight: 900; color: #ffffff;">${getTotalWords()}</div>
-                <div style="font-size: 12px; color: #9CA3AF; margin-top: 5px;">Total Words</div>
-            </div>
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2em; color: white; font-weight: bold;">${stats.totalWords}</div>
+            <div style="color: #9CA3AF; font-size: 0.85em;">Total Words</div>
         </div>
     `;
-    
-    updateWordCount();
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Populate date selector with past entries
+    populateDateSelector();
+
+    // Add word count listener
+    const textarea = container.querySelector('.journal-textarea');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            document.getElementById('wordCount').textContent = countWords(this.value);
+        });
+    }
 }
 
-// ============================================
-// JOURNAL ACTIONS
-// ============================================
-
+// Save journal field
 function saveJournalField(field, index, value) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getJournalDateString(new Date());
     
     if (!journalData[today]) {
         journalData[today] = {
@@ -146,117 +124,140 @@ function saveJournalField(field, index, value) {
             entry: ''
         };
     }
-    
-    if (field === 'entry') {
-        journalData[today].entry = value;
-    } else {
+
+    if (index !== null) {
         journalData[today][field][index] = value;
+    } else {
+        journalData[today][field] = value;
     }
-    
+
     saveJournalData();
-    updateWordCount();
-    
-    // Update stats
-    renderJournalPage();
 }
 
-function loadJournalDate(dateString) {
-    const data = journalData[dateString] || {
+// Count words
+function countWords(text) {
+    if (!text || text.trim() === '') return 0;
+    return text.trim().split(/\s+/).length;
+}
+
+// Calculate journal stats
+function calculateJournalStats() {
+    const entries = Object.keys(journalData);
+    let totalWords = 0;
+    let currentStreak = 0;
+    
+    entries.forEach(dateStr => {
+        const entry = journalData[dateStr];
+        if (entry.entry) {
+            totalWords += countWords(entry.entry);
+        }
+    });
+
+    // Calculate streak
+    const today = new Date();
+    let checkDate = new Date(today);
+    
+    while (true) {
+        const dateStr = getJournalDateString(checkDate);
+        const entry = journalData[dateStr];
+        
+        if (entry && (entry.entry || entry.wins.some(w => w) || entry.gratitude.some(g => g) || entry.affirmations.some(a => a))) {
+            currentStreak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+
+    return {
+        totalEntries: entries.length,
+        currentStreak,
+        totalWords
+    };
+}
+
+// Populate date selector
+function populateDateSelector() {
+    const selector = document.getElementById('journalDateSelector');
+    if (!selector) return;
+
+    const dates = Object.keys(journalData).sort().reverse();
+    const today = getJournalDateString(new Date());
+    
+    // Clear existing options except today
+    selector.innerHTML = `<option value="${today}">Today</option>`;
+    
+    // Add past 30 days
+    for (let i = 1; i < 30; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = getJournalDateString(date);
+        
+        if (dates.includes(dateStr)) {
+            const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            selector.innerHTML += `<option value="${dateStr}">${dateLabel}</option>`;
+        }
+    }
+}
+
+// Load journal date
+function loadJournalDate() {
+    const selector = document.getElementById('journalDateSelector');
+    const selectedDate = selector.value;
+    const today = getJournalDateString(new Date());
+    
+    const dateData = journalData[selectedDate] || {
         wins: ['', '', ''],
         gratitude: ['', '', ''],
         affirmations: ['', '', '', '', ''],
         entry: ''
     };
-    
-    // Update all fields
-    data.wins.forEach((win, i) => {
-        const el = document.getElementById(`win${i}`);
-        if (el) el.value = win;
+
+    const isToday = selectedDate === today;
+
+    // Update wins
+    const winInputs = document.querySelectorAll('.journal-section:nth-of-type(2) .journal-input');
+    winInputs.forEach((input, i) => {
+        input.value = dateData.wins[i] || '';
+        input.disabled = !isToday;
     });
-    
-    data.gratitude.forEach((item, i) => {
-        const el = document.getElementById(`gratitude${i}`);
-        if (el) el.value = item;
+
+    // Update gratitude
+    const gratitudeInputs = document.querySelectorAll('.journal-section:nth-of-type(3) .journal-input');
+    gratitudeInputs.forEach((input, i) => {
+        input.value = dateData.gratitude[i] || '';
+        input.disabled = !isToday;
     });
-    
-    data.affirmations.forEach((affirmation, i) => {
-        const el = document.getElementById(`affirmation${i}`);
-        if (el) el.value = affirmation;
+
+    // Update affirmations
+    const affirmationInputs = document.querySelectorAll('.journal-section:nth-of-type(4) .journal-input');
+    affirmationInputs.forEach((input, i) => {
+        input.value = dateData.affirmations[i] || '';
+        input.disabled = !isToday;
     });
-    
-    const entryEl = document.getElementById('journalEntry');
-    if (entryEl) entryEl.value = data.entry;
-    
-    updateWordCount();
-}
 
-function clearTodayJournal() {
-    if (!confirm('Clear all entries for today? This cannot be undone.')) {
-        return;
+    // Update entry
+    const entryTextarea = document.querySelector('.journal-textarea');
+    if (entryTextarea) {
+        entryTextarea.value = dateData.entry || '';
+        entryTextarea.disabled = !isToday;
+        document.getElementById('wordCount').textContent = countWords(dateData.entry);
     }
-    
-    const today = new Date().toISOString().split('T')[0];
-    delete journalData[today];
-    saveJournalData();
-    renderJournalPage();
-}
 
-function updateWordCount() {
-    const entry = document.getElementById('journalEntry')?.value || '';
-    const words = entry.trim() ? entry.trim().split(/\s+/).length : 0;
-    const wordCountEl = document.getElementById('wordCount');
-    if (wordCountEl) {
-        wordCountEl.textContent = `${words} word${words !== 1 ? 's' : ''}`;
-    }
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function getPastDates() {
-    const dates = [];
-    for (let i = 1; i <= 30; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split('T')[0];
-        dates.push(dateKey);
-    }
-    return dates;
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function calculateStreak() {
-    let streak = 0;
-    const dates = Object.keys(journalData).sort().reverse();
-    const today = new Date().toISOString().split('T')[0];
-    
-    for (let i = 0; i < 365; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split('T')[0];
-        
-        if (journalData[dateKey] && journalData[dateKey].entry) {
-            streak++;
-        } else {
-            break;
+    if (!isToday) {
+        // Show message that this is a past entry
+        const container = document.getElementById('journalContainer');
+        const existingNote = container.querySelector('.past-entry-note');
+        if (!existingNote) {
+            const note = document.createElement('div');
+            note.className = 'past-entry-note';
+            note.style.cssText = 'background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.4); padding: 12px; border-radius: 8px; margin-top: 15px; color: #FCD34D; text-align: center;';
+            note.textContent = '📖 Viewing past entry (read-only)';
+            container.insertBefore(note, container.firstChild.nextSibling);
         }
+    } else {
+        // Remove past entry note if exists
+        const note = document.querySelector('.past-entry-note');
+        if (note) note.remove();
     }
-    
-    return streak;
-}
-
-function getTotalWords() {
-    let total = 0;
-    Object.values(journalData).forEach(day => {
-        if (day.entry) {
-            const words = day.entry.trim().split(/\s+/).length;
-            total += words;
-        }
-    });
-    return total;
 }
