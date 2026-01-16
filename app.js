@@ -80,7 +80,7 @@ function showPage(pageName) {
     }
     
     if (pageName === 'books') {
-        renderBooksPage();
+        renderReadingList();
     }
 }
 
@@ -351,7 +351,7 @@ initWorkoutData();
 initJournalData();
 initVisionBoardData();
 initContentData();
-initBooksData();
+initReadingListData();
 
 // Render initial views
 renderHabitGrid();
