@@ -1,225 +1,193 @@
 // ============================================
-// MOOD MODULE
+// MOOD MODULE (Energy + Mood + Past 7 Days)
 // ============================================
+
+// Stored shape:
+// moodData = {
+//   "YYYY-MM-DD": { energy: 5, mood: "😊" }
+// }
 
 let moodData = {};
 
-// Initialize mood data
-function initMoodData() {
-    const saved = localStorage.getItem('moodData');
-    if (saved) {
-        moodData = JSON.parse(saved);
-    }
+// ---------- Utilities ----------
+function getDayKey(date = new Date()) {
+  // Local date key (not UTC) to avoid day-shift bugs
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-// Save mood data
+function getPastDays(n = 7) {
+  const out = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    out.push(d);
+  }
+  return out;
+}
+
 function saveMoodData() {
-    localStorage.setItem('moodData', JSON.stringify(moodData));
+  localStorage.setItem("moodData", JSON.stringify(moodData));
 }
 
-// Get date string
-function getMoodDateString(date) {
-    const d = date || new Date();
-    return d.toISOString().split('T')[0];
+// ---------- Init ----------
+function initMoodData() {
+  const saved = localStorage.getItem("moodData");
+  if (saved) {
+    try {
+      moodData = JSON.parse(saved) || {};
+    } catch (e) {
+      moodData = {};
+    }
+  } else {
+    moodData = {};
+  }
 }
 
-// Render mood tracker
+// ---------- Actions ----------
+function setTodayEnergy(val) {
+  const v = Number(val);
+  const key = getDayKey();
+  if (!moodData[key]) moodData[key] = { energy: 5, mood: "🙂" };
+
+  moodData[key].energy = Math.min(10, Math.max(1, v));
+  saveMoodData();
+  renderMoodTracker();
+}
+
+function setTodayMood(emoji) {
+  const key = getDayKey();
+  if (!moodData[key]) moodData[key] = { energy: 5, mood: "🙂" };
+
+  moodData[key].mood = emoji;
+  saveMoodData();
+  renderMoodTracker();
+}
+
+// ---------- Render ----------
 function renderMoodTracker() {
-    const container = document.getElementById('moodTracker');
-    if (!container) return;
+  const container = document.getElementById("moodTracker");
+  if (!container) return;
 
-    const today = getMoodDateString(new Date());
-    const todayData = moodData[today] || { energy: 5, mood: null };
+  const key = getDayKey();
+  const today = moodData[key] || { energy: 5, mood: "🙂" };
+  const energy = today.energy ?? 5;
+  const mood = today.mood ?? "🙂";
 
-    let html = '<div class="mood-tracker-container">';
-    
-    // Today's input section
-    html += '<div class="mood-today">';
-    html += '<h3 style="color: white; margin-bottom: 15px;">Today</h3>';
-    
-    // Energy slider
-    html += '<div style="margin-bottom: 20px;">';
-    html += '<label style="color: #9CA3AF; display: block; margin-bottom: 10px;">⚡ Energy Level: <span id="energyValue">' + (todayData.energy || 5) + '</span>/10</label>';
-    html += '<input type="range" min="1" max="10" value="' + (todayData.energy || 5) + '" oninput="document.getElementById(\'energyValue\').textContent = this.value" onchange="setEnergy(this.value)" class="energy-slider" style="width: 100%;">';
-    html += '</div>';
-    
-    // Mood selector
-    html += '<div>';
-    html += '<label style="color: #9CA3AF; display: block; margin-bottom: 10px;">😊 Mood</label>';
-    html += '<div class="mood-selector">';
-    const moods = ['😃', '💪', '😴', '😤', '🧘'];
-    const moodLabels = ['Happy', 'Energized', 'Tired', 'Stressed', 'Calm'];
-    moods.forEach((emoji, index) => {
-        const selected = todayData.mood === emoji ? 'selected' : '';
-        html += `<button class="mood-btn ${selected}" onclick="setMood('${emoji}')" title="${moodLabels[index]}">${emoji}</button>`;
-    });
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
-    
-    // Past 7 days section
-    html += '<div class="mood-history" onclick="showMoodChart()">';
-    html += '<h3 style="color: white; margin-bottom: 15px;">Past 7 Days</h3>';
-    html += '<div class="past-mood-grid">';
-    
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = getMoodDateString(date);
-        const dayData = moodData[dateStr] || {};
-        const isToday = i === 0;
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        
-        html += `<div class="past-mood-day ${isToday ? 'today' : ''}">`;
-        html += `<div style="font-size: 0.8em; color: #6B7280; margin-bottom: 5px;">${dayName}</div>`;
-        html += `<div style="font-size: 1.5em; margin-bottom: 5px;">${dayData.mood || '—'}</div>`;
-        html += `<div style="color: ${getEnergyColor(dayData.energy)}; font-weight: bold;">${dayData.energy || '—'}</div>`;
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    html += '<div style="text-align: center; color: #6B7280; font-size: 0.85em; margin-top: 10px;">Click to view chart</div>';
-    html += '</div>';
-    
-    html += '</div>';
-    
-    container.innerHTML = html;
-}
+  const moods = ["🙂", "💪", "😴", "😤", "🧘"];
 
-// Get energy color
-function getEnergyColor(energy) {
-    if (!energy) return '#6B7280';
-    if (energy >= 8) return '#10B981';
-    if (energy >= 5) return '#F59E0B';
-    return '#EF4444';
-}
+  // Parent: two boxes side-by-side
+  let html = `
+    <div style="
+      display:flex;
+      gap:16px;
+      align-items:stretch;
+      flex-wrap:wrap;
+    ">
+      <!-- LEFT: Today -->
+      <div style="
+        flex:1;
+        min-width:280px;
+        padding:18px;
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,0.16);
+        background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      ">
+        <div style="font-weight:800; font-size:1.05rem; margin-bottom:10px;">Today</div>
 
-// Set energy
-function setEnergy(value) {
-    const today = getMoodDateString(new Date());
-    if (!moodData[today]) {
-        moodData[today] = {};
-    }
-    
-    moodData[today].energy = parseInt(value);
-    saveMoodData();
-}
+        <div style="color:#9ca3af; margin-bottom:6px;">⚡ Energy Level: <span style="color:#fff; font-weight:800;">${energy}/10</span></div>
+        <input
+          type="range"
+          min="1"
+          max="10"
+          value="${energy}"
+          oninput="setTodayEnergy(this.value)"
+          style="width:100%; margin:8px 0 14px;"
+        />
 
-// Set mood
-function setMood(emoji) {
-    const today = getMoodDateString(new Date());
-    if (!moodData[today]) {
-        moodData[today] = {};
-    }
-    
-    moodData[today].mood = emoji;
-    saveMoodData();
-    renderMoodTracker();
-}
+        <div style="color:#9ca3af; margin-bottom:8px;">😊 Mood</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          ${moods
+            .map((em) => {
+              const active = em === mood;
+              return `
+                <button
+                  onclick="setTodayMood('${em}')"
+                  style="
+                    padding:10px 12px;
+                    border-radius:12px;
+                    border:1px solid ${active ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.16)"};
+                    background:${active ? "linear-gradient(135deg, rgba(99,102,241,0.9), rgba(236,72,153,0.9))" : "rgba(255,255,255,0.06)"};
+                    color:white;
+                    cursor:pointer;
+                    font-size:1.05rem;
+                    line-height:1;
+                    box-shadow:${active ? "0 10px 30px rgba(0,0,0,0.35)" : "none"};
+                  "
+                  aria-label="Mood ${em}"
+                >${em}</button>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
 
-// Show mood chart
-function showMoodChart() {
-    const modal = document.getElementById('modal');
-    const modalBody = document.getElementById('modalBody');
-    
-    if (!modal || !modalBody) return;
+      <!-- RIGHT: Past 7 Days -->
+      <div style="
+        flex:1;
+        min-width:340px;
+        padding:18px;
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,0.16);
+        background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      ">
+        <div style="font-weight:800; font-size:1.05rem; margin-bottom:10px;">Past 7 Days</div>
 
-    let html = '<h2 style="color: white; margin-bottom: 20px;">Energy & Mood Trends</h2>';
-    
-    // Time range selector
-    html += '<div style="margin-bottom: 20px;">';
-    html += '<select id="moodTimeRange" onchange="updateMoodChart()" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; width: 100%;">';
-    html += '<option value="7">Last 7 Days</option>';
-    html += '<option value="30">Last 30 Days</option>';
-    html += '<option value="90">All Time</option>';
-    html += '</select>';
-    html += '</div>';
-    
-    // Stats
-    const stats = calculateMoodStats(7);
-    html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">';
-    html += `<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">`;
-    html += `<div style="color: #9CA3AF; font-size: 0.9em;">Avg Energy</div>`;
-    html += `<div style="font-size: 2em; color: white; font-weight: bold;">${stats.avgEnergy}</div>`;
-    html += `</div>`;
-    html += `<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">`;
-    html += `<div style="color: #9CA3AF; font-size: 0.9em;">High Energy Days</div>`;
-    html += `<div style="font-size: 2em; color: white; font-weight: bold;">${stats.highEnergyDays}</div>`;
-    html += `</div>`;
-    html += '</div>';
-    
-    // Simple line chart
-    html += '<div id="moodChartContainer">';
-    html += renderMoodChartBars(7);
-    html += '</div>';
-    
-    html += '<button onclick="closeModal()" style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; cursor: pointer; width: 100%; margin-top: 20px;">Close</button>';
+        <div style="
+          display:grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap:10px;
+          align-items:start;
+        ">
+          ${getPastDays(7)
+            .map((d) => {
+              const k = getDayKey(d);
+              const entry = moodData[k] || null;
+              const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+              const isToday = k === key;
 
-    modalBody.innerHTML = html;
-    modal.style.display = 'flex';
-}
+              return `
+                <div style="
+                  text-align:center;
+                  padding:10px 8px;
+                  border-radius:14px;
+                  border:1px solid rgba(255,255,255,0.12);
+                  background:${isToday ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.05)"};
+                ">
+                  <div style="font-size:0.78rem; color:#9ca3af; font-weight:800;">${dayLabel}</div>
+                  <div style="font-size:1.25rem; margin-top:6px;">
+                    ${entry?.mood ? entry.mood : "—"}
+                  </div>
+                  <div style="margin-top:6px; font-size:0.85rem; color:#e5e7eb;">
+                    ${entry?.energy ? `${entry.energy}` : "—"}
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
 
-// Calculate mood stats
-function calculateMoodStats(days) {
-    const today = new Date();
-    let totalEnergy = 0;
-    let energyCount = 0;
-    let highEnergyDays = 0;
-    
-    const daysToCheck = days === 90 ? 90 : days;
-    
-    for (let i = 0; i < daysToCheck; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = getMoodDateString(date);
-        const dayData = moodData[dateStr];
-        
-        if (dayData && dayData.energy) {
-            totalEnergy += dayData.energy;
-            energyCount++;
-            if (dayData.energy >= 7) {
-                highEnergyDays++;
-            }
-        }
-    }
-    
-    return {
-        avgEnergy: energyCount > 0 ? (totalEnergy / energyCount).toFixed(1) : '0.0',
-        highEnergyDays
-    };
-}
+        <div style="margin-top:10px; color:#6b7280; font-size:0.82rem;">
+          Tip: Today is highlighted. Past days are read-only.
+        </div>
+      </div>
+    </div>
+  `;
 
-// Render mood chart bars
-function renderMoodChartBars(days) {
-    const today = new Date();
-    let html = '<div style="margin-bottom: 10px; color: #9CA3AF;">Energy Levels</div>';
-    html += '<div style="display: flex; gap: 4px; height: 150px; align-items: flex-end; margin-bottom: 20px;">';
-    
-    for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = getMoodDateString(date);
-        const dayData = moodData[dateStr] || {};
-        const energy = dayData.energy || 0;
-        const height = (energy / 10) * 100;
-        const color = getEnergyColor(energy);
-        
-        html += `<div style="flex: 1; background: ${color}; height: ${height}%; border-radius: 3px; opacity: 0.7; position: relative;" title="${dateStr}: ${energy}/10">`;
-        html += `<div style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 1.2em;">${dayData.mood || ''}</div>`;
-        html += `</div>`;
-    }
-    
-    html += '</div>';
-    return html;
-}
-
-// Update mood chart
-function updateMoodChart() {
-    const range = document.getElementById('moodTimeRange').value;
-    const days = parseInt(range);
-    
-    const stats = calculateMoodStats(days);
-    const chartHtml = renderMoodChartBars(days);
-    
-    document.getElementById('moodChartContainer').innerHTML = chartHtml;
+  container.innerHTML = html;
 }
