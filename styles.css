@@ -1,199 +1,442 @@
 /* ============================================
-   BASE / RESET
+   Kings Protocol - styles.css (FULL)
+   Boxed layout + module styles + clean gradients
 ============================================ */
 
-* {
-    box-sizing: border-box;
-}
+/* ---------- Reset ---------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 
 body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(180deg, #020617, #020617);
-    color: #f9fafb;
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #f9fafb;
+
+  /* Background stays calm; gradients are used inside boxes */
+  background:
+    radial-gradient(circle at 20% 10%, rgba(99,102,241,0.12), transparent 45%),
+    radial-gradient(circle at 80% 20%, rgba(236,72,153,0.10), transparent 55%),
+    linear-gradient(180deg, #020617, #020617);
 }
 
-/* ============================================
-   APP CONTAINER
-============================================ */
-
+/* ---------- Container ---------- */
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
-/* ============================================
-   GLOBAL PAGE BOX (THIS FIXES EVERYTHING)
-============================================ */
-
+/* ---------- Page visibility (CRITICAL) ---------- */
 .page {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 20px;
-    padding: 28px;
-    margin-bottom: 40px;
+  display: none; /* hides other pages */
+}
+.page.active {
+  display: block; /* only the selected page shows */
 }
 
-/* ============================================
-   NAVIGATION
-============================================ */
-
-.nav-tabs {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
+/* ---------- Global boxed “panel” look ---------- */
+:root{
+  --panel-bg-1: rgba(255,255,255,0.08);
+  --panel-bg-2: rgba(255,255,255,0.03);
+  --panel-border: rgba(255,255,255,0.18);
+  --panel-shadow: 0 18px 50px rgba(0,0,0,0.45);
+  --muted: #9ca3af;
+  --soft: #d1d5db;
 }
 
-.nav-tab {
-    padding: 10px 16px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.06);
-    color: #e5e7eb;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.15s ease;
+/* Each page gets a clean frame */
+.page.active{
+  padding: 26px;
+  border-radius: 22px;
+  border: 1px solid var(--panel-border);
+  background: linear-gradient(180deg, var(--panel-bg-1), var(--panel-bg-2));
+  box-shadow: var(--panel-shadow);
 }
 
-.nav-tab:hover {
-    background: rgba(255,255,255,0.12);
-}
-
-.nav-tab.active {
-    background: linear-gradient(135deg, #6366f1, #ec4899);
-    color: white;
-}
-
-/* ============================================
-   TOP WIDGETS (CLOCK / WEATHER)
-============================================ */
-
+/* ---------- Widgets (Clock/Weather) ---------- */
 .widget {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.18);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
 
-.widget-icon {
-    font-size: 1.6rem;
-}
+.widget-icon { font-size: 1.7rem; opacity: 0.95; }
 
 .widget-value {
-    font-size: 1.3rem;
-    font-weight: 700;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
 }
 
-.widget-label {
-    font-size: 0.95rem;
-    color: #d1d5db;
+.widget-label { color: var(--soft); font-size: 0.95rem; }
+.widget-sublabel { color: var(--muted); font-size: 0.82rem; }
+
+/* ---------- Mode Toggle Button ---------- */
+.mode-toggle {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.mode-toggle:hover { transform: translateY(-1px); background: rgba(255,255,255,0.12); }
+
+/* ---------- Nav Tabs ---------- */
+.nav-tabs{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
 
-.widget-sublabel {
-    font-size: 0.8rem;
-    color: #9ca3af;
+.nav-tab{
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: #e5e7eb;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* ============================================
-   STATS GRID
-============================================ */
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+.nav-tab:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.12);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.35);
 }
 
-.stat-card {
-    padding: 18px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.18);
+.nav-tab.active{
+  background: linear-gradient(135deg, rgba(99,102,241,0.95), rgba(236,72,153,0.95));
+  border-color: rgba(255,255,255,0.22);
+  color: white;
 }
 
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: 800;
+/* ---------- Section Titles ---------- */
+.section-title{
+  font-size: 1.12rem;
+  font-weight: 800;
+  margin-bottom: 14px;
 }
 
-.stat-label {
-    margin-top: 6px;
-    font-size: 0.9rem;
-    color: #9ca3af;
-}
-
-/* ============================================
-   DAILY STATUS
-============================================ */
-
+/* ---------- “Box” sections used everywhere ---------- */
+.habit-section,
+.timer-section,
+.streak-section,
+.workout-log,
+.lifetime-counter,
+.content-stat-card,
+.idea-item,
+.goals-grid > div,
+#habitAnalytics,
+#exerciseCards > div,
 #dailyStatus {
-    margin-bottom: 28px;
-    padding: 16px 18px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.18);
-    font-size: 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-/* ============================================
-   HABIT / MOOD / CONTENT SECTIONS
-============================================ */
-
-.habit-section {
-    padding: 22px;
-    margin-bottom: 28px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.18);
+/* Dashboard “smart status” if present */
+#dailyStatus{
+  padding: 16px 18px;
+  margin: 18px 0 22px;
 }
 
-.section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 12px;
+/* ---------- Stats Grid ---------- */
+.stats-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
-/* ============================================
-   MODAL
-============================================ */
+.stat-card{
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.stat-card:hover{ transform: translateY(-2px); }
 
-.modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+.stat-value{ font-size: 2rem; font-weight: 900; }
+.stat-label{ margin-top: 6px; color: var(--muted); font-size: 0.92rem; }
+
+/* ---------- Habit Section ---------- */
+.habit-section{
+  padding: 20px;
+  margin-bottom: 22px;
 }
 
-.modal-content {
-    padding: 24px;
-    max-width: 600px;
-    width: 90%;
-    border-radius: 18px;
-    background: #020617;
-    border: 1px solid rgba(255,255,255,0.2);
+/* Habit Grid (generated by habits.js) */
+.habit-grid{
+  width: 100%;
+  overflow-x: auto;
+  padding: 12px 0 6px;
 }
 
-/* ============================================
-   SCROLLBAR
-============================================ */
-
-::-webkit-scrollbar {
-    width: 8px;
+/* Common table look (if module builds tables) */
+table{
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td{
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  color: #e5e7eb;
+}
+th{
+  color: #ffffff;
+  font-weight: 800;
+  text-align: left;
 }
 
-::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.25);
-    border-radius: 4px;
+/* Small clickable “dots” often used for completion */
+.habit-dot,
+.dot,
+.check-dot{
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.10);
+}
+.habit-dot.done,
+.dot.done,
+.check-dot.done{
+  background: linear-gradient(135deg, rgba(99,102,241,0.95), rgba(236,72,153,0.95));
+  border-color: rgba(255,255,255,0.35);
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+/* ---------- Mood Tracker ---------- */
+#moodTracker{
+  padding: 10px 0;
+}
+input[type="range"]{
+  width: 100%;
+  accent-color: #6366f1;
+}
+.mood-btn,
+.mood-option button{
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  cursor: pointer;
+}
+
+/* ---------- Streak Section ---------- */
+.streak-section{
+  padding: 20px;
+  margin-bottom: 22px;
+}
+
+.streak-display{
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.15);
+  margin-bottom: 14px;
+}
+
+.streak-number{ font-size: 2.4rem; font-weight: 900; }
+.streak-label{ color: var(--muted); font-weight: 700; letter-spacing: 2px; }
+.streak-best{ margin-top: 6px; color: var(--soft); }
+
+.milestones{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+/* ---------- Timer Section ---------- */
+.timer-section{
+  padding: 20px;
+  margin-bottom: 22px;
+}
+
+.timer-display{
+  display: grid;
+  gap: 12px;
+}
+
+.timer-time{
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.timer-controls{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.timer-controls button,
+.playlist-section button,
+.workout-log button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.timer-controls button:hover,
+.playlist-section button:hover,
+.workout-log button:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.14);
+}
+
+.playlist-section{
+  margin-top: 18px;
+}
+
+/* ---------- Goals Grid ---------- */
+.goals-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.goal-card{
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+}
+
+/* ---------- Workout ---------- */
+.workout-log{
+  padding: 16px;
+}
+
+#exerciseCards > div{
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.lifetime-counter{
+  padding: 16px;
+  flex: 1;
+}
+
+.counter-title{ color: var(--muted); font-weight: 700; }
+.counter-value{ font-size: 2rem; font-weight: 900; }
+
+/* ---------- Content Tracker (module uses .content-stats & cards) ---------- */
+.content-stats{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.content-stat-card{
+  padding: 16px;
+}
+.ideas-list{
+  margin-top: 18px;
+}
+.idea-item{
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+/* ---------- Forms (modal forms etc.) ---------- */
+.form-group{ margin-bottom: 14px; }
+.form-group label{ display:block; color: var(--soft); margin-bottom: 6px; font-weight: 700; }
+
+.form-input{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  outline: none;
+}
+
+.form-actions{
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.form-submit, .form-cancel{
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  cursor: pointer;
+  color: white;
+}
+
+.form-submit{
+  background: linear-gradient(135deg, rgba(99,102,241,0.95), rgba(236,72,153,0.95));
+}
+.form-cancel{
+  background: rgba(255,255,255,0.08);
+}
+
+/* ---------- Modal ---------- */
+.modal{
+  display: none; /* JS shows it */
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content{
+  max-width: 700px;
+  width: 92%;
+  max-height: 88vh;
+  overflow: auto;
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: linear-gradient(180deg, rgba(2,6,23,0.98), rgba(2,6,23,0.92));
+  box-shadow: 0 26px 70px rgba(0,0,0,0.6);
+}
+
+.close{
+  color: #fff;
+  font-size: 26px;
+  cursor: pointer;
+  float: right;
+}
+
+/* ---------- Inputs ---------- */
+input, textarea, select{
+  font-family: inherit;
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 720px){
+  .page.active{ padding: 18px; border-radius: 18px; }
+  .widget{ padding: 14px; border-radius: 14px; }
+  .stat-value{ font-size: 1.7rem; }
+  .timer-time{ font-size: 1.9rem; }
 }
