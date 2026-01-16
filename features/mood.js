@@ -1,5 +1,5 @@
 // ============================================
-// MOOD MODULE (Energy + Mood + Past 7 Days + Graph Modal)
+// MOOD MODULE (Energy + Mood + History Graph + Habit Correlation)
 // ============================================
 
 // Stored shape:
@@ -41,8 +41,7 @@ function saveMoodData() {
 }
 
 function getMoodScore(emoji) {
-  // For graph + “smarter” scoring (you can tweak these anytime)
-  // Higher = better mood
+  // Optional “smart” mapping (hidden dataset)
   const map = {
     "🙂": 7,
     "💪": 8,
@@ -58,11 +57,45 @@ function getRangeKeys(range) {
   if (range === "all") {
     const keys = Object.keys(moodData || {}).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
     keys.sort((a, b) => parseDayKey(a) - parseDayKey(b));
-    return keys;
+    return keys.length ? keys : getRangeKeys("7");
   }
 
   const days = range === "30" ? 30 : 7;
   return getPastDays(days).map(getDayKey);
+}
+
+// ---------- Habit correlation helper ----------
+function getHabitCompletionForDay(dayKey) {
+  // Uses habits.js helper if present; otherwise best-effort compute from habitData/habitsList
+  try {
+    if (typeof getDayCompletion === "function") {
+      return getDayCompletion(dayKey); // {done,total,percent}
+    }
+  } catch {}
+
+  // Best effort fallback:
+  try {
+    const hd = window.habitData;
+    const hl = window.habitsList;
+
+    // total habits
+    let total = 0;
+    if (Array.isArray(hl)) total = hl.length;
+
+    // day object
+    const dayObj = (hd && typeof hd === "object") ? hd[dayKey] : null;
+    if (!dayObj || typeof dayObj !== "object") {
+      return { done: 0, total: total || 0, percent: 0 };
+    }
+
+    const done = Object.values(dayObj).filter(Boolean).length;
+    const denom = total || Object.keys(dayObj).length || 0;
+    const percent = denom ? Math.round((done / denom) * 100) : 0;
+
+    return { done, total: denom, percent };
+  } catch {
+    return { done: 0, total: 0, percent: 0 };
+  }
 }
 
 // ---------- Init ----------
@@ -101,7 +134,6 @@ function setTodayMood(emoji) {
 
 // ---------- Graph Modal ----------
 function openMoodGraph(range = "7") {
-  // Build modal HTML
   const title = range === "30" ? "Last 30 Days" : range === "all" ? "All Time" : "Last 7 Days";
 
   const html = `
@@ -120,7 +152,7 @@ function openMoodGraph(range = "7") {
     </div>
 
     <div style="color:#9ca3af; font-size:0.9rem; margin-bottom:12px;">
-      Energy is plotted (1–10). Mood emoji shows in the tooltip and below each day.
+      Energy is plotted (1–10). Tooltip shows mood + habit completion for that day.
     </div>
 
     <div style="width:100%; height:320px;">
@@ -138,21 +170,17 @@ function openMoodGraph(range = "7") {
     "></div>
   `;
 
-  // Use your app.js modal system if available
   if (typeof openModal === "function") openModal(html);
   else {
-    // fallback: simple alert
     alert("Modal system not found. Make sure app.js openModal() exists.");
     return;
   }
 
-  // Hook range change
   const select = document.getElementById("moodRangeSelect");
   if (select) {
     select.onchange = () => openMoodGraph(select.value);
   }
 
-  // Render chart after modal exists
   setTimeout(() => renderMoodChart(range), 0);
 }
 
@@ -160,10 +188,14 @@ function renderMoodChart(range) {
   const canvas = document.getElementById("moodChartCanvas");
   if (!canvas) return;
 
-  // Destroy previous chart if any
   if (moodChartInstance) {
     try { moodChartInstance.destroy(); } catch (e) {}
     moodChartInstance = null;
+  }
+
+  if (typeof Chart === "undefined") {
+    console.error("Chart.js not found. Make sure your HTML loads it.");
+    return;
   }
 
   const keys = getRangeKeys(range);
@@ -180,27 +212,29 @@ function renderMoodChart(range) {
     return s ?? null;
   });
 
+  // Habit completion for correlation
+  const habitStats = keys.map(k => getHabitCompletionForDay(k));
+
   // Emoji row under chart
   const emojiRow = document.getElementById("moodEmojiRow");
   if (emojiRow) {
-    emojiRow.innerHTML = keys.map((k, i) => `
-      <div style="
-        padding:10px 8px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.12);
-        background:rgba(255,255,255,0.05);
-      ">
-        <div style="font-size:0.72rem; color:#9ca3af; font-weight:800;">${labels[i]}</div>
-        <div style="font-size:1.2rem; margin-top:6px;">${moodEmojis[i]}</div>
-        <div style="font-size:0.85rem; margin-top:6px; color:#e5e7eb;">${energyValues[i] ?? "—"}</div>
-      </div>
-    `).join("");
-  }
-
-  // Chart.js required
-  if (typeof Chart === "undefined") {
-    console.error("Chart.js not found. Make sure your HTML loads it.");
-    return;
+    emojiRow.innerHTML = keys.map((k, i) => {
+      const hs = habitStats[i];
+      const habitsLine = (hs && hs.total) ? `${hs.done}/${hs.total}` : "—";
+      return `
+        <div style="
+          padding:10px 8px;
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,0.12);
+          background:rgba(255,255,255,0.05);
+        ">
+          <div style="font-size:0.72rem; color:#9ca3af; font-weight:800;">${labels[i]}</div>
+          <div style="font-size:1.2rem; margin-top:6px;">${moodEmojis[i]}</div>
+          <div style="font-size:0.85rem; margin-top:6px; color:#e5e7eb;">Energy: ${energyValues[i] ?? "—"}</div>
+          <div style="font-size:0.8rem; margin-top:6px; color:#9ca3af;">Habits: ${habitsLine}</div>
+        </div>
+      `;
+    }).join("");
   }
 
   const ctx = canvas.getContext("2d");
@@ -220,7 +254,6 @@ function renderMoodChart(range) {
           borderWidth: 3
         },
         {
-          // Optional 2nd line: mood score (hidden by default but available)
           label: "Mood Score (optional)",
           data: moodScores,
           tension: 0.35,
@@ -242,11 +275,21 @@ function renderMoodChart(range) {
         tooltip: {
           callbacks: {
             afterBody: (items) => {
-              // Show emoji + day key in tooltip
               const idx = items?.[0]?.dataIndex ?? 0;
               const k = keys[idx];
               const em = moodEmojis[idx];
-              return [`Mood: ${em}`, `Date: ${k}`];
+              const hs = habitStats[idx];
+
+              const habitsLine =
+                (hs && hs.total)
+                  ? `Habits: ${hs.done}/${hs.total} (${hs.percent}%)`
+                  : "Habits: —";
+
+              return [
+                `Mood: ${em}`,
+                habitsLine,
+                `Date: ${k}`
+              ];
             }
           }
         }
@@ -279,7 +322,6 @@ function renderMoodTracker() {
 
   const moods = ["🙂", "💪", "😴", "😤", "🧘"];
 
-  // Parent: two boxes side-by-side
   let html = `
     <div style="display:flex; gap:16px; align-items:stretch; flex-wrap:wrap;">
       <!-- LEFT: Today -->
@@ -294,7 +336,9 @@ function renderMoodTracker() {
       ">
         <div style="font-weight:800; font-size:1.05rem; margin-bottom:10px;">Today</div>
 
-        <div style="color:#9ca3af; margin-bottom:6px;">⚡ Energy Level: <span style="color:#fff; font-weight:800;">${energy}/10</span></div>
+        <div style="color:#9ca3af; margin-bottom:6px;">
+          ⚡ Energy Level: <span style="color:#fff; font-weight:800;">${energy}/10</span>
+        </div>
         <input
           type="range"
           min="1"
