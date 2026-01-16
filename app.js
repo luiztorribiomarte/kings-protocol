@@ -342,30 +342,34 @@ function switchToFireMode() {
 // INITIALIZATION
 // ============================================
 
-// Initialize all modules
-initHabitData();
-initGoalsData();
-initMoodData();
-initHabitsList();
-initWorkoutData();
-initJournalData();
-initVisionBoardData();
-initContentData();
-initReadingListData();
+// Wait for DOM and all scripts to load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize all modules
+    initHabitData();
+    initGoalsData();
+    initMoodData();
+    initHabitsList();
+    initWorkoutData();
+    initJournalData();
+    initVisionBoardData();
+    initContentData();
+    initReadingListData();
 
-// Render initial views
-renderHabitGrid();
-updateStreakDisplay();
-fetchYouTubeStats();
-fetchWeather();
+    // Render initial views
+    renderHabitGrid();
+    renderMoodTracker();
+    updateStreakDisplay();
+    fetchYouTubeStats();
+    fetchWeather();
 
-// Initialize and update clock
-updateClock();
-setInterval(updateClock, 1000); // Update every second
+    // Initialize and update clock
+    updateClock();
+    setInterval(updateClock, 1000); // Update every second
 
-// Get user location
-updateLocation();
+    // Get user location
+    updateLocation();
 
-// Set up intervals
-setInterval(fetchYouTubeStats, 300000);
-setInterval(fetchWeather, 1800000);
+    // Set up intervals
+    setInterval(fetchYouTubeStats, 300000);
+    setInterval(fetchWeather, 1800000);
+});
