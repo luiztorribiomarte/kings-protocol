@@ -380,3 +380,10 @@ function openManageHabits() {
 
   openModal(html);
 }
+function attachHabitClickHandlers() {
+    document.querySelectorAll('.habit-name').forEach(el => {
+        el.style.cursor = 'pointer';
+        el.onclick = () => openHabitHistory(el.dataset.habitId, el.innerText);
+    });
+}
+
