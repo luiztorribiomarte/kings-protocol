@@ -8,127 +8,113 @@ let contentData = {
     hoursLogged: 0,
     videoIdeas: [],
     notes: '',
+    monthlyGoal: 12,
     streak: {
         current: 0,
         lastActiveDate: null
     }
 };
 
-// Initialize content data
 function initContentData() {
     const saved = localStorage.getItem('contentData');
-    if (saved) {
-        contentData = JSON.parse(saved);
-    }
+    if (saved) contentData = JSON.parse(saved);
     updateContentStreak(false);
 }
 
-// Save content data
 function saveContentData() {
     localStorage.setItem('contentData', JSON.stringify(contentData));
 }
 
-// Helpers
-function getTodayDateString() {
+function getToday() {
     return new Date().toISOString().split('T')[0];
 }
 
-function isYesterday(dateStr) {
-    const d = new Date(dateStr);
+function isYesterday(d) {
+    const x = new Date(d);
     const y = new Date();
     y.setDate(y.getDate() - 1);
-    return d.toDateString() === y.toDateString();
+    return x.toDateString() === y.toDateString();
 }
 
-// Streak logic
-function updateContentStreak(actedToday = true) {
-    const today = getTodayDateString();
-
-    if (!contentData.streak) {
-        contentData.streak = { current: 0, lastActiveDate: null };
-    }
-
+function updateContentStreak(acted) {
+    const today = getToday();
     const last = contentData.streak.lastActiveDate;
 
-    if (!last) {
-        if (actedToday) {
-            contentData.streak.current = 1;
-            contentData.streak.lastActiveDate = today;
-        }
+    if (!last && acted) {
+        contentData.streak.current = 1;
+        contentData.streak.lastActiveDate = today;
     } else if (last === today) {
-        // already counted today
-    } else if (isYesterday(last)) {
-        if (actedToday) {
-            contentData.streak.current += 1;
-            contentData.streak.lastActiveDate = today;
-        }
-    } else {
-        if (actedToday) {
-            contentData.streak.current = 1;
-            contentData.streak.lastActiveDate = today;
-        } else {
-            contentData.streak.current = 0;
-        }
+        return;
+    } else if (last && isYesterday(last) && acted) {
+        contentData.streak.current++;
+        contentData.streak.lastActiveDate = today;
+    } else if (acted) {
+        contentData.streak.current = 1;
+        contentData.streak.lastActiveDate = today;
     }
 
     saveContentData();
 }
 
-// Render content tracker
 function renderContentTracker() {
-    const container = document.getElementById('contentContainer');
-    if (!container) return;
+    const c = document.getElementById('contentContainer');
+    if (!c) return;
 
-    const streak = contentData.streak?.current || 0;
+    const streak = contentData.streak.current || 0;
+    const goalPct = Math.min(
+        100,
+        Math.round((contentData.videosThisMonth / contentData.monthlyGoal) * 100)
+    );
 
-    let html = `
+    c.innerHTML = `
         <div class="content-streak-card">
             ${streak > 0
                 ? `🔥 Content Streak: <strong>${streak} day${streak > 1 ? 's' : ''}</strong>`
                 : `Log content today to start your streak`}
         </div>
 
-        <div class="section-title" style="margin: 20px 0;">🎬 Content Tracker</div>
-    `;
-
-    // Stats Cards
-    html += '<div class="content-stats">';
-
-    html += `
-        <div class="content-stat-card">
-            <div>YouTube Subscribers</div>
-            <div class="stat-big">${contentData.subscribers}</div>
-            <input id="subsInput" type="number" placeholder="Update count">
-            <button onclick="updateSubscribers()">Update</button>
+        <div class="monthly-goal-card">
+            <div style="margin-bottom:6px;">
+                🎯 Monthly Video Goal — ${contentData.videosThisMonth} / ${contentData.monthlyGoal}
+            </div>
+            <div class="goal-bar">
+                <div class="goal-fill" style="width:${goalPct}%;"></div>
+            </div>
         </div>
 
-        <div class="content-stat-card">
-            <div>Videos This Month</div>
-            <div class="stat-big">${contentData.videosThisMonth}</div>
-            <button onclick="changeVideosCount(-1)">−</button>
-            <button onclick="changeVideosCount(1)">+</button>
+        <div class="section-title" style="margin-top:20px;">🎬 Content Tracker</div>
+
+        <div class="content-stats">
+            <div class="content-stat-card">
+                <div>Subscribers</div>
+                <div class="stat-big">${contentData.subscribers}</div>
+                <input id="subsInput" type="number">
+                <button onclick="updateSubscribers()">Update</button>
+            </div>
+
+            <div class="content-stat-card">
+                <div>Videos This Month</div>
+                <div class="stat-big">${contentData.videosThisMonth}</div>
+                <button onclick="changeVideosCount(-1)">−</button>
+                <button onclick="changeVideosCount(1)">+</button>
+            </div>
+
+            <div class="content-stat-card">
+                <div>Hours Logged</div>
+                <div class="stat-big">${contentData.hoursLogged}</div>
+                <button onclick="changeHoursLogged(-1)">−</button>
+                <button onclick="changeHoursLogged(1)">+</button>
+            </div>
         </div>
 
-        <div class="content-stat-card">
-            <div>Hours Logged</div>
-            <div class="stat-big">${contentData.hoursLogged}</div>
-            <button onclick="changeHoursLogged(-1)">−</button>
-            <button onclick="changeHoursLogged(1)">+</button>
-        </div>
-    `;
-
-    html += '</div>';
-
-    // Video Ideas
-    html += `
         <div class="ideas-list">
             <div class="section-title">💡 Video Ideas</div>
             <button onclick="addVideoIdea()">➕ Add Idea</button>
             ${contentData.videoIdeas.length === 0
                 ? `<p class="muted">No ideas yet.</p>`
-                : contentData.videoIdeas.map((idea, i) => `
+                : contentData.videoIdeas.map((v,i)=>`
                     <div class="idea-item">
-                        <strong>${idea.title}</strong>
+                        <strong>${v.title}</strong>
                         <button onclick="deleteVideoIdea(${i})">Delete</button>
                     </div>
                 `).join('')}
@@ -136,14 +122,11 @@ function renderContentTracker() {
 
         <div class="ideas-list">
             <div class="section-title">📝 Content Notes</div>
-            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes || ''}</textarea>
+            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes||''}</textarea>
         </div>
     `;
-
-    container.innerHTML = html;
 }
 
-// Mutations (all trigger streak)
 function updateSubscribers() {
     const v = parseInt(document.getElementById('subsInput').value);
     if (isNaN(v)) return;
@@ -165,9 +148,9 @@ function changeHoursLogged(d) {
 }
 
 function addVideoIdea() {
-    const title = prompt('Video idea title');
-    if (!title) return;
-    contentData.videoIdeas.push({ title });
+    const t = prompt('Video idea title');
+    if (!t) return;
+    contentData.videoIdeas.push({ title: t });
     updateContentStreak(true);
     renderContentTracker();
 }
