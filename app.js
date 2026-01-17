@@ -1,67 +1,26 @@
 // ============================================
-// CORE APP.JS - Main initialization & utilities
+// CORE APP.JS
+// Dashboard initialization + utilities
+// Adds: Real weather + city + feels-like + nudges + DAILY BRIEF (varied)
 // ============================================
-// All feature modules are loaded separately
 
 let notificationsOn = true;
 
-// Timer state
-let timerInterval = null;
-let timerSeconds = 1500;
-let timerMode = 'focus';
+// ============================================
+// MODAL SYSTEM
+// ============================================
 
-// ============================================
-// MODAL SYSTEM (supports BOTH modal types)
-// - Your HTML uses #modal / #modalBody
-// - Some older code may use modalOverlay. We support both.
-// ============================================
+function openModal(html) {
+    const overlay = document.getElementById('modal');
+    const body = document.getElementById('modalBody');
+    if (!overlay || !body) return;
+    body.innerHTML = html;
+    overlay.style.display = 'flex';
+}
 
 function closeModal() {
-  // Close HTML modal if present
-  const modal = document.getElementById('modal');
-  if (modal) modal.style.display = 'none';
-
-  // Close overlay modal if present
-  const overlay = document.getElementById('modalOverlay');
-  if (overlay) overlay.remove();
-}
-
-function createModal() {
-  // Legacy overlay-style modal (kept so existing modules won’t break)
-  const overlay = document.createElement('div');
-  overlay.id = 'modalOverlay';
-  overlay.style.cssText =
-    'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
-
-  const content = document.createElement('div');
-  content.style.cssText =
-    'background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(236, 72, 153, 0.95)); border: 2px solid rgba(139, 92, 246, 0.8); border-radius: 20px; padding: 30px; max-width: 700px; width: 92%; max-height: 90vh; overflow-y: auto; position: relative;';
-
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '×';
-  closeBtn.onclick = closeModal;
-  closeBtn.style.cssText =
-    'position: absolute; top: 15px; right: 15px; background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; font-size: 28px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;';
-
-  content.appendChild(closeBtn);
-  overlay.appendChild(content);
-  document.body.appendChild(overlay);
-
-  overlay.onclick = (e) => {
-    if (e.target === overlay) closeModal();
-  };
-
-  return content;
-}
-
-// Helper: open the HTML modal (#modal) cleanly
-function openHtmlModal(html) {
-  const modal = document.getElementById('modal');
-  const body = document.getElementById('modalBody');
-  if (!modal || !body) return;
-
-  body.innerHTML = html;
-  modal.style.display = 'flex';
+    const overlay = document.getElementById('modal');
+    if (overlay) overlay.style.display = 'none';
 }
 
 // ============================================
@@ -69,599 +28,613 @@ function openHtmlModal(html) {
 // ============================================
 
 function showPage(pageName) {
-  // Your HTML uses .page (not .page-content)
-  document.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach((tab) => tab.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
-  const pageEl = document.getElementById(pageName + 'Page');
-  if (pageEl) pageEl.classList.add('active');
+    const page = document.getElementById(pageName + 'Page');
+    if (page) page.classList.add('active');
 
-  // Tabs are in this order in your HTML
-  const tabs = document.querySelectorAll('.nav-tab');
-  const pageIndex = {
-    dashboard: 0,
-    goalsHabits: 1,
-    workout: 2,
-    journal: 3,
-    visionBoard: 4,
-    content: 5,
-    books: 6,
-    settings: 7
-  };
+    const tabs = document.querySelectorAll('.nav-tab');
+    const indexMap = {
+        dashboard: 0,
+        goalsHabits: 1,
+        workout: 2,
+        journal: 3,
+        visionBoard: 4,
+        content: 5,
+        books: 6,
+        settings: 7
+    };
 
-  if (tabs[pageIndex[pageName]]) tabs[pageIndex[pageName]].classList.add('active');
-
-  // Load page-specific data
-  if (pageName === 'goalsHabits') {
-    if (typeof renderGoals === 'function') renderGoals();
-    if (typeof updateHabitAnalytics === 'function') updateHabitAnalytics();
-  }
-
-  if (pageName === 'workout') {
-    if (typeof renderExerciseCards === 'function') renderExerciseCards();
-  }
-
-  if (pageName === 'journal') {
-    if (typeof renderJournalPage === 'function') renderJournalPage();
-  }
-
-  if (pageName === 'visionBoard') {
-    if (typeof renderVisionBoard === 'function') renderVisionBoard();
-  }
-
-  if (pageName === 'content') {
-    if (typeof renderContentTracker === 'function') renderContentTracker();
-  }
-
-  if (pageName === 'books') {
-    if (typeof renderReadingList === 'function') renderReadingList();
-  }
-}
-
-// ============================================
-// MODE SWITCHING (Fire / Zen)
-// ============================================
-
-function toggleMode() {
-  if (document.body.classList.contains('fire-mode')) {
-    document.body.classList.remove('fire-mode');
-    document.body.classList.add('zen-mode');
-    const icon = document.getElementById('modeIcon');
-    const text = document.getElementById('modeText');
-    if (icon) icon.textContent = '🧘';
-    if (text) text.textContent = 'Zen Mode';
-  } else {
-    document.body.classList.remove('zen-mode');
-    document.body.classList.add('fire-mode');
-    const icon = document.getElementById('modeIcon');
-    const text = document.getElementById('modeText');
-    if (icon) icon.textContent = '🔥';
-    if (text) text.textContent = 'Fire Mode';
-  }
-}
-
-// ============================================
-// FOCUS TIMER (matches your HTML buttons)
-// startTimer(25) / startTimer(5) / startTimer(15)
-// ============================================
-
-function startTimer(minutes) {
-  if (typeof minutes === 'number' && minutes > 0) {
-    timerSeconds = minutes * 60;
-  }
-
-  if (timerInterval) return;
-
-  timerInterval = setInterval(() => {
-    timerSeconds--;
-    updateTimerDisplay();
-
-    if (timerSeconds <= 0) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-
-      if (notificationsOn && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('Timer Complete!', {
-          body: 'Time block complete. Reset and go again.',
-          icon: '🔥'
-        });
-      }
+    if (tabs[indexMap[pageName]]) {
+        tabs[indexMap[pageName]].classList.add('active');
     }
-  }, 1000);
-}
 
-function resetTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
+    // Render page modules when needed
+    if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
+    if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
+    if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
+    if (pageName === 'books' && typeof renderReadingList === 'function') renderReadingList();
+    if (pageName === 'goalsHabits' && typeof renderGoals === 'function') renderGoals();
+    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
 
-  // Default back to 25m if nothing else is set
-  if (!timerSeconds || timerSeconds <= 0) timerSeconds = 1500;
-  updateTimerDisplay();
-}
-
-function updateTimerDisplay() {
-  const mins = Math.floor(timerSeconds / 60);
-  const secs = timerSeconds % 60;
-  const display = document.getElementById('timerDisplay');
-  if (display) display.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    // Update daily brief whenever switching pages (safe + cheap)
+    if (pageName === 'dashboard') {
+        ensureDailyBriefUI();
+        updateDailyBrief();
+    }
 }
 
 // ============================================
-// PLAYLIST (matches your HTML #playlistPlayer)
-// ============================================
-
-function loadPlaylist() {
-  const url = document.getElementById('playlistUrl')?.value;
-  if (!url) {
-    alert('Please paste a playlist URL');
-    return;
-  }
-
-  const player = document.getElementById('playlistPlayer');
-  if (!player) return;
-
-  let embedUrl = '';
-  if (url.includes('spotify')) {
-    const playlistId = url.split('/playlist/')[1]?.split('?')[0];
-    if (playlistId) embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
-  } else if (url.includes('youtube')) {
-    const playlistId = url.split('list=')[1]?.split('&')[0];
-    if (playlistId) embedUrl = `https://www.youtube.com/embed/videoseries?list=${playlistId}`;
-  }
-
-  if (!embedUrl) {
-    alert('That link does not look like a Spotify or YouTube playlist URL.');
-    return;
-  }
-
-  player.innerHTML = `<iframe src="${embedUrl}" width="100%" height="380" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
-}
-
-// ============================================
-// LIVE CLOCK (matches your HTML IDs)
-// currentTime / currentDate / currentLocation
+// CLOCK (REAL TIME)
 // ============================================
 
 function updateClock() {
-  const now = new Date();
+    const now = new Date();
 
-  let hours = now.getHours();
-  const minutes = now.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12;
+    let hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
 
-  const timeString = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-  const dateString = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = `${hours}:${minutes} ${ampm}`;
+    const date = now.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
 
-  const clockEl = document.getElementById('currentTime');
-  const dateEl = document.getElementById('currentDate');
+    const timeEl = document.getElementById('currentTime');
+    const dateEl = document.getElementById('currentDate');
 
-  if (clockEl) clockEl.textContent = timeString;
-  if (dateEl) dateEl.textContent = dateString;
+    if (timeEl) timeEl.textContent = time;
+    if (dateEl) dateEl.textContent = date;
 }
 
-async function updateLocation() {
-  const locationEl = document.getElementById('currentLocation');
-  const savedCity = localStorage.getItem('userCity');
+// ============================================
+// LOCATION (CITY NAME)
+// ============================================
 
-  if (!('geolocation' in navigator)) {
-    if (locationEl) locationEl.textContent = savedCity || 'New York';
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
+async function reverseGeocodeCity(lat, lon) {
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`
+        );
         const data = await res.json();
+
         const a = data.address || {};
-        const city = a.city || a.town || a.village || a.suburb || a.neighbourhood || a.county || 'Your Area';
+        const city =
+            a.city ||
+            a.town ||
+            a.village ||
+            a.suburb ||
+            a.neighbourhood ||
+            a.county ||
+            'Your Area';
 
         localStorage.setItem('userCity', city);
-        if (locationEl) locationEl.textContent = city;
 
-        // If you have weather enabled, refresh it too:
-        if (typeof fetchWeather === 'function') {
-          fetchWeather(lat, lon, city);
-        }
-      } catch (err) {
-        console.error('Location reverse lookup failed:', err);
-        if (locationEl) locationEl.textContent = savedCity || 'New York';
-      }
-    },
-    () => {
-      if (locationEl) locationEl.textContent = savedCity || 'New York';
+        const clockLoc = document.getElementById('currentLocation');
+        if (clockLoc) clockLoc.textContent = city;
+
+        return city;
+    } catch (e) {
+        console.warn('Reverse geocode failed:', e);
+        const saved = localStorage.getItem('userCity') || 'Your Area';
+        const clockLoc = document.getElementById('currentLocation');
+        if (clockLoc) clockLoc.textContent = saved;
+        return saved;
     }
-  );
 }
 
 // ============================================
-// DAILY BRIEF (Talk-back) — short, varied, B + C tone
-// - Uses weather + mood + streak if available
-// - Changes daily but stays consistent for that day
+// WEATHER (REAL-TIME + FEELS LIKE + ICON + NUDGE)
 // ============================================
 
-function getTodayKey() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function cToF(c) {
+    return Math.round((c * 9) / 5 + 32);
 }
 
-function seededPick(arr, seedNum) {
-  if (!arr.length) return '';
-  const idx = Math.abs(seedNum) % arr.length;
-  return arr[idx];
+function getWeatherIcon(code) {
+    if (code === 0) return '☀️';
+    if (code === 1 || code === 2) return '🌤️';
+    if (code === 3) return '☁️';
+    if (code === 45 || code === 48) return '🌫️';
+    if ([51, 53, 55, 56, 57].includes(code)) return '🌦️';
+    if ([61, 63, 65, 66, 67].includes(code)) return '🌧️';
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return '❄️';
+    if ([95, 96, 99].includes(code)) return '⛈️';
+    return '🌡️';
 }
 
-// Simple daily seed so the same day = same line, next day = different
-function dailySeedNumber() {
-  const key = getTodayKey();
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
-  return hash;
+function getWeatherType(code) {
+    if (code === 0) return 'clear';
+    if (code === 1 || code === 2) return 'partly';
+    if (code === 3) return 'cloudy';
+    if (code === 45 || code === 48) return 'fog';
+    if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
+    if ([61, 63, 65, 66, 67].includes(code)) return 'rain';
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
+    if ([95, 96, 99].includes(code)) return 'storm';
+    return 'other';
 }
 
-// Reads whatever you already have for streak (if present)
-function getCurrentStreakSafe() {
-  const el = document.getElementById('currentStreak');
-  const n = el ? parseInt(el.textContent, 10) : NaN;
-  return Number.isFinite(n) ? n : 0;
+function getWeatherWidgetNudge({ code, tempF, feelsF }) {
+    const cold = tempF <= 35;
+    const hot = tempF >= 85;
+    const rainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67].includes(code);
+    const snow = [71, 73, 75, 77, 85, 86].includes(code);
+    const storm = [95, 96, 99].includes(code);
+    const fog = (code === 45 || code === 48);
+
+    const delta = (feelsF != null && tempF != null) ? (feelsF - tempF) : 0;
+
+    if (storm) return 'Stormy: keep it “indoor strong” (habits + mobility).';
+    if (snow) return 'Snowy: warm up extra + keep steps safe.';
+    if (rainy) return 'Rainy: perfect focus day—lock habits early.';
+    if (fog) return 'Low visibility: slow morning, sharp plan.';
+    if (hot) return 'Hot: hydrate + train earlier if possible.';
+    if (cold) return 'Cold: bundle up—momentum beats motivation.';
+
+    if (Math.abs(delta) >= 8) {
+        return delta < 0 ? 'Feels colder than it looks—warm up longer.' : 'Feels warmer—pace yourself today.';
+    }
+
+    return 'Good day to stack small wins—start with the easiest habit.';
 }
 
-// Reads mood/energy if your mood module stores it
-function getMoodEnergySafe() {
-  try {
-    const moodSaved = localStorage.getItem('moodData');
-    if (!moodSaved) return { energy: null, mood: null };
-    const moodData = JSON.parse(moodSaved);
+async function fetchWeather(lat, lon, cityLabel) {
+    try {
+        const url =
+            `https://api.open-meteo.com/v1/forecast` +
+            `?latitude=${lat}&longitude=${lon}` +
+            `&current=temperature_2m,apparent_temperature,weather_code` +
+            `&temperature_unit=celsius` +
+            `&timezone=auto`;
 
-    // Try common shapes
-    // moodData[todayKey] = { energy, moodEmoji }
-    const tk = getTodayKey();
-    const today = moodData[tk] || moodData.today || null;
+        const res = await fetch(url);
+        const data = await res.json();
 
-    const energy = today?.energy ?? today?.energyLevel ?? null;
-    const mood = today?.mood ?? today?.emoji ?? today?.moodEmoji ?? null;
+        const cur = data.current;
+        if (!cur) return;
 
-    return { energy, mood };
-  } catch {
-    return { energy: null, mood: null };
-  }
+        const tempF = cToF(cur.temperature_2m);
+        const feelsF = cToF(cur.apparent_temperature);
+        const code = cur.weather_code;
+
+        const icon = getWeatherIcon(code);
+        const nudge = getWeatherWidgetNudge({ code, tempF, feelsF });
+
+        const city = cityLabel || localStorage.getItem('userCity') || 'Your Area';
+
+        const widget = document.getElementById('weatherWidget');
+        if (widget) {
+            widget.innerHTML = `
+                <div class="widget-icon">${icon}</div>
+                <div>
+                    <div class="widget-value">${tempF}°F <span style="font-size:0.55em; opacity:0.75;">(feels ${feelsF}°)</span></div>
+                    <div class="widget-label">${city}</div>
+                    <div class="widget-sublabel" style="opacity:0.75;">${nudge}</div>
+                </div>
+            `;
+        }
+
+        localStorage.setItem('lastWeather', JSON.stringify({
+            city,
+            tempF,
+            feelsF,
+            code,
+            type: getWeatherType(code),
+            at: new Date().toISOString()
+        }));
+
+        // Update daily brief right after we get fresh weather
+        updateDailyBrief();
+    } catch (err) {
+        console.error('Weather fetch failed', err);
+        // fall back silently (daily brief can still use lastWeather if saved)
+        updateDailyBrief();
+    }
 }
 
-// Reads weather if stored (your weather module may store lastWeather)
-function getWeatherSafe() {
-  try {
-    const w = localStorage.getItem('lastWeather');
-    if (!w) return { tempF: null, feelsF: null, code: null, city: localStorage.getItem('userCity') || null };
-    const data = JSON.parse(w);
-    return {
-      tempF: data.tempF ?? null,
-      feelsF: data.feelsF ?? null,
-      code: data.code ?? null,
-      city: data.city ?? localStorage.getItem('userCity') || null
-    };
-  } catch {
-    return { tempF: null, feelsF: null, code: null, city: localStorage.getItem('userCity') || null };
-  }
+function initWeatherAndCity() {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const { latitude, longitude } = pos.coords;
+
+            const city = await reverseGeocodeCity(latitude, longitude);
+            await fetchWeather(latitude, longitude, city);
+
+            // refresh every 10 minutes
+            setInterval(() => fetchWeather(latitude, longitude, city), 10 * 60 * 1000);
+        },
+        () => {
+            console.warn('Location denied. Weather/city unavailable.');
+            const savedCity = localStorage.getItem('userCity') || 'Your Area';
+            const clockLoc = document.getElementById('currentLocation');
+            if (clockLoc) clockLoc.textContent = savedCity;
+
+            // Still update daily brief with whatever data exists
+            updateDailyBrief();
+        }
+    );
 }
 
-function buildDailyBrief() {
-  const seed = dailySeedNumber();
-  const streak = getCurrentStreakSafe();
-  const { energy, mood } = getMoodEnergySafe();
-  const { tempF, feelsF } = getWeatherSafe();
+// ============================================
+// DAILY BRIEF (ALWAYS DIFFERENT EACH DAY)
+// Uses: weather + mood + habits + streak
+// Tone: disciplined + encouraging
+// Short: one line
+// ============================================
 
-  // Context tags
-  const cold = typeof tempF === 'number' && tempF <= 35;
-  const hot = typeof tempF === 'number' && tempF >= 85;
-  const lowEnergy = typeof energy === 'number' && energy <= 4;
-  const highEnergy = typeof energy === 'number' && energy >= 8;
-
-  // Pools (short, B + C)
-  const openersDirect = [
-    'No excuses—just execution.',
-    'Move first. Think later.',
-    'Keep it simple. Do the work.',
-    'Lock in early. Win the day.'
-  ];
-
-  const openersEncourage = [
-    'One win starts momentum.',
-    'Start small, finish strong.',
-    'Consistency beats intensity.',
-    'Stack easy wins, then push.'
-  ];
-
-  const weatherLines = [
-    cold ? 'Cold outside—warm up and stay sharp.' : '',
-    hot ? 'Heat day—hydrate and pace your output.' : '',
-    (typeof feelsF === 'number' && typeof tempF === 'number' && feelsF < tempF - 8) ? 'Feels colder—protect your energy.' : '',
-    (typeof feelsF === 'number' && typeof tempF === 'number' && feelsF > tempF + 8) ? 'Feels warmer—don’t gas out early.' : ''
-  ].filter(Boolean);
-
-  const streakLines = [
-    streak === 0 ? 'Streak is 0. Start stacking days.' : '',
-    streak > 0 && streak < 3 ? `Streak is ${streak}. Keep it alive.` : '',
-    streak >= 3 ? `Streak is ${streak}. Protect it.` : ''
-  ].filter(Boolean);
-
-  const moodLines = [
-    lowEnergy ? 'Low energy—minimums count today.' : '',
-    highEnergy ? 'High energy—use it with control.' : '',
-    mood ? `Mood check: ${mood}. Keep it moving.` : ''
-  ].filter(Boolean);
-
-  // Build 1–2 short lines total (you chose SHORT)
-  const opener = seededPick([...openersDirect, ...openersEncourage], seed);
-  const line2Pool = [...weatherLines, ...streakLines, ...moodLines];
-
-  // Ensure variety: pick based on a different seed offset
-  const line2 = line2Pool.length ? seededPick(line2Pool, seed * 7 + 13) : '';
-
-  // Return as 1 or 2 lines (short)
-  return line2 ? `${opener} ${line2}` : opener;
+function todayKeyLocal() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 
-function renderDailyBriefCard() {
-  // If a Daily Brief card already exists, update it.
-  const existingText =
-    document.getElementById('dailyBriefText') ||
-    document.querySelector('[data-daily-brief-text]');
+// deterministic “random” based on date (stable all day)
+function seededRand(seedStr) {
+    // simple hash -> 0..1
+    let h = 2166136261;
+    for (let i = 0; i < seedStr.length; i++) {
+        h ^= seedStr.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    // xorshift
+    h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+    const n = (h >>> 0) / 4294967295;
+    return n;
+}
 
-  const msg = buildDailyBrief();
+function pickVaried(list, seedStr, memoryKey) {
+    const memRaw = localStorage.getItem(memoryKey);
+    let mem = [];
+    try { mem = memRaw ? JSON.parse(memRaw) : []; } catch { mem = []; }
 
-  if (existingText) {
-    existingText.textContent = msg;
-    return;
-  }
+    const day = todayKeyLocal();
+    // reset memory weekly-ish to keep things fresh forever
+    // keep last 7 picks
+    mem = Array.isArray(mem) ? mem.slice(-7) : [];
 
-  // Otherwise, inject a Daily Brief card under the stat cards (dashboard)
-  const dashboard = document.getElementById('dashboardPage');
-  if (!dashboard) return;
+    // choose index; try avoid repeating recent
+    const r = seededRand(seedStr);
+    let idx = Math.floor(r * list.length);
+    let tries = 0;
+    while (mem.includes(idx) && tries < 10) {
+        idx = (idx + 1) % list.length;
+        tries++;
+    }
 
-  // Find the stats grid to insert after (best effort)
-  const statsGrid = dashboard.querySelector('.stats-grid');
-  if (!statsGrid) return;
+    // store (only once per day)
+    const dayMemKey = `${memoryKey}:${day}`;
+    if (!localStorage.getItem(dayMemKey)) {
+        mem.push(idx);
+        localStorage.setItem(memoryKey, JSON.stringify(mem));
+        localStorage.setItem(dayMemKey, '1');
+    }
 
-  const wrapper = document.createElement('div');
-  wrapper.style.marginTop = '16px';
+    return list[idx];
+}
 
-  wrapper.innerHTML = `
-    <div class="habit-section" style="padding:16px; border-radius:14px; background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-        <div>
-          <div style="font-weight:700; color:white; margin-bottom:4px;">Daily Brief</div>
-          <div id="dailyBriefText" data-daily-brief-text style="color:#d1d5db;">${msg}</div>
+function getMoodToday() {
+    try {
+        const md = JSON.parse(localStorage.getItem('moodData') || '{}');
+        const k = todayKeyLocal();
+        return md && md[k] ? md[k] : null;
+    } catch {
+        return null;
+    }
+}
+
+function getHabitToday() {
+    // Prefer habits.js helper if it exists
+    try {
+        if (typeof getDayCompletion === 'function') {
+            return getDayCompletion(todayKeyLocal()); // {done,total,percent}
+        }
+    } catch {}
+
+    // fallback: attempt to compute
+    try {
+        const hd = window.habitData;
+        const hl = window.habitsList;
+        const k = todayKeyLocal();
+        const dayObj = hd && hd[k] ? hd[k] : null;
+
+        const total = Array.isArray(hl) ? hl.length : (dayObj ? Object.keys(dayObj).length : 0);
+        const done = dayObj ? Object.values(dayObj).filter(Boolean).length : 0;
+        const percent = total ? Math.round((done / total) * 100) : 0;
+
+        return { done, total, percent };
+    } catch {
+        return { done: 0, total: 0, percent: 0 };
+    }
+}
+
+function getStreakSnapshot() {
+    // Try multiple likely storage keys (safe)
+    const candidates = ['currentStreak', 'streak', 'streakNumber'];
+    for (const k of candidates) {
+        const v = localStorage.getItem(k);
+        if (v && !isNaN(Number(v))) return Number(v);
+    }
+    // Try DOM if available
+    const el = document.getElementById('streakNumber');
+    if (el && !isNaN(Number(el.textContent))) return Number(el.textContent);
+    return null;
+}
+
+function ensureDailyBriefUI() {
+    const dash = document.getElementById('dashboardPage');
+    if (!dash) return;
+
+    // If already exists, done
+    if (document.getElementById('dailyBriefCard')) return;
+
+    // Insert near top of dashboard, right below stats grid if possible
+    const statsGrid = dash.querySelector('.stats-grid');
+    const card = document.createElement('div');
+    card.id = 'dailyBriefCard';
+    card.style.cssText = `
+        margin-top: 14px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.10));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+    `;
+
+    card.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            <div style="font-size:1.15rem;">🗣️</div>
+            <div style="min-width:0;">
+                <div style="font-weight:900; color:white; line-height:1;">Daily Brief</div>
+                <div id="dailyBriefText" style="margin-top:6px; color:rgba(255,255,255,0.88); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    Loading...
+                </div>
+            </div>
         </div>
         <button
-          title="Refresh"
-          onclick="renderDailyBriefCard()"
-          style="border-radius:10px; padding:8px 10px; background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:white; cursor:pointer;"
+            onclick="updateDailyBrief(true)"
+            style="
+                padding:8px 12px;
+                border-radius:12px;
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.18);
+                color: rgba(255,255,255,0.9);
+                cursor: pointer;
+                font-weight: 800;
+                flex:0 0 auto;
+            "
+            title="Refresh today's brief (still stays different day-to-day)"
         >↻</button>
-      </div>
-    </div>
-  `;
+    `;
 
-  // Insert after stats grid
-  statsGrid.parentNode.insertBefore(wrapper, statsGrid.nextSibling);
-}
-
-// ============================================
-// ✅ HABIT STATS (recompute + update top cards)
-// NOTE: If your habits.js hard-codes red in the HTML string,
-// we will fix that in habits.js next.
-// ============================================
-
-function getWeekStartSaturday(date = new Date()) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const daysSinceSat = (day - 6 + 7) % 7;
-  d.setDate(d.getDate() - daysSinceSat);
-  return d;
-}
-
-function fmtKey(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function safeJSON(str, fallback) {
-  try { return JSON.parse(str); } catch { return fallback; }
-}
-
-function getHabitStore() {
-  // Prefer global habitData if exists (habits.js)
-  if (typeof habitData !== 'undefined' && habitData) return habitData;
-  const saved = localStorage.getItem('habitData');
-  return saved ? safeJSON(saved, {}) : {};
-}
-
-function getHabitsListSafe() {
-  if (typeof habitsList !== 'undefined' && Array.isArray(habitsList)) return habitsList;
-  const saved = localStorage.getItem('habitsList');
-  const arr = saved ? safeJSON(saved, []) : [];
-  return Array.isArray(arr) ? arr : [];
-}
-
-function isHabitCompleted(store, dateKey, habitName) {
-  // Support multiple shapes
-  if (store && store[dateKey] && typeof store[dateKey] === 'object') {
-    if (store[dateKey][habitName] === true) return true;
-  }
-  if (store && store[habitName] && typeof store[habitName] === 'object') {
-    if (store[habitName][dateKey] === true) return true;
-  }
-  if (store && store[dateKey] && Array.isArray(store[dateKey].completedHabits)) {
-    return store[dateKey].completedHabits.includes(habitName);
-  }
-  return false;
-}
-
-function computeDayPercent(store, dateKey, habits) {
-  const total = habits.length || 0;
-  if (!total) return 0;
-
-  let done = 0;
-  for (const h of habits) {
-    const name = typeof h === 'string' ? h : (h?.name || h?.title || String(h));
-    if (isHabitCompleted(store, dateKey, name)) done++;
-  }
-  return Math.round((done / total) * 100);
-}
-
-function computeWeeklyCompletion(store, keys, habits) {
-  const totalHabits = habits.length || 0;
-  if (!totalHabits) return 0;
-
-  let done = 0;
-  let possible = keys.length * totalHabits;
-
-  for (const k of keys) {
-    for (const h of habits) {
-      const name = typeof h === 'string' ? h : (h?.name || h?.title || String(h));
-      if (isHabitCompleted(store, k, name)) done++;
+    if (statsGrid && statsGrid.parentNode) {
+        statsGrid.parentNode.insertBefore(card, statsGrid.nextSibling);
+    } else {
+        dash.insertBefore(card, dash.firstChild);
     }
-  }
-  return Math.round((done / possible) * 100);
 }
 
-function computeCurrentStreakFromWeek(dayPercents) {
-  let streak = 0;
-  for (let i = dayPercents.length - 1; i >= 0; i--) {
-    if (dayPercents[i] >= 80) streak++;
-    else break;
-  }
-  return streak;
+function buildDailyBriefMessage(forceRefresh = false) {
+    const day = todayKeyLocal();
+
+    // Cache so it stays stable all day (unless you press refresh)
+    const cacheKey = 'dailyBriefCache';
+    if (!forceRefresh) {
+        try {
+            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && cached.day === day && cached.text) return cached.text;
+        } catch {}
+    }
+
+    // Data inputs
+    let weather = null;
+    try { weather = JSON.parse(localStorage.getItem('lastWeather') || 'null'); } catch { weather = null; }
+
+    const mood = getMoodToday();              // {energy,mood}
+    const habits = getHabitToday();           // {done,total,percent}
+    const streak = getStreakSnapshot();       // number or null
+
+    const city = (weather && weather.city) ? weather.city : (localStorage.getItem('userCity') || 'your area');
+    const wType = weather ? weather.type : 'unknown';
+    const tempF = weather ? weather.tempF : null;
+    const feelsF = weather ? weather.feelsF : null;
+
+    // Build a “context tag” so messages vary by conditions too
+    const ctxParts = [
+        day,
+        wType,
+        String(tempF ?? ''),
+        String(feelsF ?? ''),
+        String(mood?.energy ?? ''),
+        String(mood?.mood ?? ''),
+        String(habits?.percent ?? ''),
+        String(streak ?? '')
+    ];
+    const seedBase = ctxParts.join('|');
+
+    // Parts library (disciplined + encouraging)
+    const openers = [
+        "No excuses—just execution.",
+        "Discipline first. Feelings second.",
+        "Win the morning, win the day.",
+        "Start clean. Stay sharp.",
+        "You’re in control today."
+    ];
+
+    const weatherLines = {
+        clear: [
+            `Clear skies in ${city}. Move early and build momentum.`,
+            `It’s clear out—use it. One hard win before noon.`,
+            `Sun’s up. Lock the first habit fast.`
+        ],
+        partly: [
+            `Mixed skies in ${city}. Keep the plan simple and ruthless.`,
+            `Not perfect weather—perfect discipline test.`,
+            `Stay steady today. Momentum > mood.`
+        ],
+        cloudy: [
+            `Overcast in ${city}. Quiet day—strong work.`,
+            `Cloudy outside. Inside is where the wins happen.`,
+            `Low drama weather. High output day.`
+        ],
+        fog: [
+            `Foggy in ${city}. Slow start, sharp finish.`,
+            `Low visibility—high clarity. Stick to the checklist.`,
+            `Fog day: do the basics brutally well.`
+        ],
+        drizzle: [
+            `Wet outside. Perfect focus conditions inside.`,
+            `Drizzle day: lock habits early, then coast.`,
+            `Rain-lite means distractions are low—capitalize.`
+        ],
+        rain: [
+            `Rain in ${city}. This is an indoor advantage day.`,
+            `Rainy day: protect energy, hit the essentials.`,
+            `Let the weather slow others down—not you.`
+        ],
+        snow: [
+            `Snow in ${city}. Warm up longer, then dominate the basics.`,
+            `Snow day: safe steps, strong habits.`,
+            `Cold outside—discipline keeps you warm.`
+        ],
+        storm: [
+            `Storm conditions. Keep it tight: habits + mobility + focus.`,
+            `Storm day: control what you can. Execute the plan.`,
+            `Bad weather, good discipline. Stay locked in.`
+        ],
+        other: [
+            `Weather’s doing its thing. You do yours.`,
+            `No matter the conditions—stack wins.`,
+            `Stay consistent. That’s the flex.`
+        ],
+        unknown: [
+            `Quick check-in: stack one win immediately.`,
+            `Today is built from small wins—start now.`,
+            `Lock one habit right away.`
+        ]
+    };
+
+    const moodLines = [
+        () => {
+            if (!mood) return "Log energy + mood—data makes you dangerous.";
+            const e = Number(mood.energy);
+            if (e >= 8) return `Energy is high (${e}/10). Don’t waste it—hit the hardest habit first.`;
+            if (e >= 6) return `Energy is decent (${e}/10). Stay disciplined and stack clean reps.`;
+            if (e >= 4) return `Energy is low-ish (${e}/10). Shrink the task, don’t skip it.`;
+            return `Energy is low (${e}/10). Minimum standard day—keep the streak alive.`;
+        },
+        () => {
+            if (!mood) return "No mood logged yet—one tap and your patterns get clearer.";
+            const em = mood.mood ? mood.mood : "—";
+            return `Mood check: ${em}. Don’t negotiate—execute one clean win.`;
+        }
+    ];
+
+    const habitLines = [
+        () => {
+            if (!habits || !habits.total) return "Habits decide the day. Start with the easiest one.";
+            if (habits.percent >= 80) return `You’re already at ${habits.done}/${habits.total}. Finish strong—close the loop.`;
+            if (habits.percent >= 50) return `You’re at ${habits.done}/${habits.total}. Keep pressure—one more habit now.`;
+            if (habits.done > 0) return `You’ve started (${habits.done}/${habits.total}). Don’t break momentum.`;
+            return `Zero logged yet. Do one habit immediately—then the day opens up.`;
+        },
+        () => {
+            if (!habits || !habits.total) return "Make today measurable. Touch the habit grid once.";
+            return `Target: +1 habit in the next 10 minutes.`;
+        }
+    ];
+
+    const streakLines = [
+        () => {
+            if (streak == null) return "Protect consistency. That’s the whole game.";
+            if (streak >= 14) return `${streak}-day streak. Stay cold—no sloppy misses.`;
+            if (streak >= 7) return `${streak}-day streak. Keep it alive—minimum standard counts.`;
+            if (streak >= 3) return `${streak}-day streak. Momentum is building—don’t blink.`;
+            return `Streak is ${streak}. Start stacking days.`;
+        }
+    ];
+
+    // Choose which “angle” today gets so it doesn’t repeat
+    const angle = pickVaried(
+        ["weatherFirst", "moodFirst", "habitFirst", "streakFirst", "hybrid"],
+        seedBase + "|angle",
+        "dailyBriefAngleMem"
+    );
+
+    const opener = pickVaried(openers, seedBase + "|opener", "dailyBriefOpenerMem");
+    const wLine = pickVaried((weatherLines[wType] || weatherLines.unknown), seedBase + "|weather", "dailyBriefWeatherMem");
+    const mLine = pickVaried(moodLines.map(fn => fn()), seedBase + "|mood", "dailyBriefMoodMem");
+    const hLine = pickVaried(habitLines.map(fn => fn()), seedBase + "|habits", "dailyBriefHabitsMem");
+    const sLine = pickVaried(streakLines.map(fn => fn()), seedBase + "|streak", "dailyBriefStreakMem");
+
+    // Build a SHORT, single-line sentence (disciplined + encouraging)
+    // We rotate structure so it doesn’t feel templated.
+    let text = "";
+    if (angle === "weatherFirst") text = `${opener} ${wLine}`;
+    else if (angle === "moodFirst") text = `${opener} ${mLine}`;
+    else if (angle === "habitFirst") text = `${opener} ${hLine}`;
+    else if (angle === "streakFirst") text = `${opener} ${sLine}`;
+    else text = `${opener} ${wLine} ${pickVaried([hLine, mLine, sLine], seedBase + "|hybridTail", "dailyBriefTailMem")}`;
+
+    // Cache it for the day
+    localStorage.setItem('dailyBriefCache', JSON.stringify({ day, text }));
+
+    return text;
 }
 
-function updateTopStatCards({ daysAt80, weeklyCompletion, currentStreak }) {
-  const daysEl = document.getElementById('daysAt80');
-  const weeklyEl = document.getElementById('weeklyCompletion');
-  const streakEl = document.getElementById('currentStreak');
+function updateDailyBrief(forceRefresh = false) {
+    ensureDailyBriefUI();
 
-  if (daysEl) daysEl.textContent = `${daysAt80}/7`;
-  if (weeklyEl) weeklyEl.textContent = `${weeklyCompletion}%`;
-  if (streakEl) streakEl.textContent = `${currentStreak}`;
+    const el = document.getElementById('dailyBriefText');
+    if (!el) return;
 
-  const streakNumber = document.getElementById('streakNumber');
-  if (streakNumber) streakNumber.textContent = `${currentStreak}`;
-}
+    const msg = buildDailyBriefMessage(forceRefresh);
 
-// Best-effort: color Today’s Progress if it’s NOT hard-coded red.
-// If habits.js hardcodes a red span, we’ll fix habits.js next.
-function updateTodayProgressColor(todayPercent) {
-  const all = Array.from(document.querySelectorAll('div, p, span'));
-  const line = all.find((el) => el.textContent && el.textContent.includes("Today's Progress:"));
-  if (!line) return;
-
-  // Try to color only the percent portion if there is a span
-  const span = line.querySelector('span');
-  const target = span || line;
-
-  target.style.color = todayPercent >= 80 ? '#22c55e' : '#ef4444';
-  target.style.fontWeight = '700';
-}
-
-function recomputeAndUpdateHabitStats() {
-  const store = getHabitStore();
-  const habits = getHabitsListSafe();
-
-  const weekStart = getWeekStartSaturday(new Date());
-  const keys = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    keys.push(fmtKey(d));
-  }
-
-  const dayPercents = keys.map((k) => computeDayPercent(store, k, habits));
-  const daysAt80 = dayPercents.filter((p) => p >= 80).length;
-  const weeklyCompletion = computeWeeklyCompletion(store, keys, habits);
-
-  const todayKey = fmtKey(new Date());
-  const todayIndex = keys.indexOf(todayKey);
-  const todayPercent = todayIndex >= 0 ? dayPercents[todayIndex] : computeDayPercent(store, todayKey, habits);
-
-  const currentStreak = computeCurrentStreakFromWeek(dayPercents);
-
-  updateTopStatCards({ daysAt80, weeklyCompletion, currentStreak });
-  updateTodayProgressColor(todayPercent);
-
-  // Re-render brief since it can reference streak/mood/weather
-  renderDailyBriefCard();
-}
-
-function attachHabitGridListener() {
-  // Your grid container is #habitGrid
-  const grid = document.getElementById('habitGrid');
-  if (!grid) return;
-
-  grid.addEventListener('click', () => {
-    // let habits.js toggle/save first
-    setTimeout(() => recomputeAndUpdateHabitStats(), 80);
-  });
-}
-
-// ============================================
-// PLACEHOLDERS (safe)
-// ============================================
-
-function fetchYouTubeStats() {
-  console.log('YouTube stats would be fetched here');
-}
-
-function fetchWeather() {
-  console.log('Weather would be fetched here');
+    el.textContent = msg;
+    el.title = msg; // so you can see full message on hover if it truncates
 }
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
-document.addEventListener('DOMContentLoaded', function () {
-  // Initialize all modules (only if present)
-  if (typeof initHabitData === 'function') initHabitData();
-  if (typeof initGoalsData === 'function') initGoalsData();
-  if (typeof initMoodData === 'function') initMoodData();
-  if (typeof initHabitsList === 'function') initHabitsList();
-  if (typeof initWorkoutData === 'function') initWorkoutData();
-  if (typeof initJournalData === 'function') initJournalData();
-  if (typeof initVisionBoardData === 'function') initVisionBoardData();
-  if (typeof initContentData === 'function') initContentData();
-  if (typeof initReadingListData === 'function') initReadingListData();
+document.addEventListener('DOMContentLoaded', () => {
+    // Init modules
+    if (typeof initHabitData === 'function') initHabitData();
+    if (typeof initHabitsList === 'function') initHabitsList();
+    if (typeof initMoodData === 'function') initMoodData();
+    if (typeof initGoalsData === 'function') initGoalsData();
+    if (typeof initWorkoutData === 'function') initWorkoutData();
+    if (typeof initJournalData === 'function') initJournalData();
+    if (typeof initVisionBoardData === 'function') initVisionBoardData();
+    if (typeof initContentData === 'function') initContentData();
+    if (typeof initReadingListData === 'function') initReadingListData();
 
-  // Render initial views
-  if (typeof renderHabitGrid === 'function') renderHabitGrid();
-  if (typeof renderMoodTracker === 'function') renderMoodTracker();
+    // Render dashboard modules
+    if (typeof renderHabitGrid === 'function') renderHabitGrid();
+    if (typeof renderMoodTracker === 'function') renderMoodTracker();
+    if (typeof updateStreakDisplay === 'function') updateStreakDisplay();
 
-  // Clock
-  updateClock();
-  setInterval(updateClock, 1000);
+    // Clock
+    updateClock();
+    setInterval(updateClock, 1000);
 
-  // Location
-  updateLocation();
+    // Weather + city
+    initWeatherAndCity();
 
-  // Daily brief (talk-back)
-  setTimeout(() => renderDailyBriefCard(), 150);
-
-  // Habit stats hook
-  attachHabitGridListener();
-  setTimeout(() => recomputeAndUpdateHabitStats(), 300);
-
-  // Background fetch placeholders
-  fetchYouTubeStats();
-  fetchWeather();
-  setInterval(fetchYouTubeStats, 300000);
-  setInterval(fetchWeather, 1800000);
+    // Daily Brief (shows immediately, then gets smarter when weather loads)
+    ensureDailyBriefUI();
+    updateDailyBrief();
 });
