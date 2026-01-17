@@ -213,3 +213,28 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDailyBrief();
     updateStreakWithContent();
 });
+// ===============================
+// MODAL SYSTEM (RESTORED)
+// ===============================
+function openModal(contentHTML) {
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modalBody');
+
+    if (!modal || !modalBody) {
+        alert('Modal system not found. Make sure modal HTML exists.');
+        return;
+    }
+
+    modalBody.innerHTML = contentHTML;
+    modal.style.display = 'flex';
+}
+
+function closeModal(e) {
+    const modal = document.getElementById('modal');
+    if (!modal) return;
+
+    if (!e || e.target === modal) {
+        modal.style.display = 'none';
+        document.getElementById('modalBody').innerHTML = '';
+    }
+}
