@@ -1,12 +1,12 @@
 // ============================================
-// CONTENT TRACKER MODULE
+// CONTENT TRACKER MODULE (SAFE FIXED VERSION)
 // ============================================
 
 let contentData = {
     subscribers: 0,
     videosThisMonth: 0,
     hoursLogged: 0,
-    activity: {}, // YYYY-MM-DD → { videos: number, hours: number }
+    activity: {}, // YYYY-MM-DD → { videos, hours }
     videoIdeas: [],
     notes: ''
 };
@@ -21,9 +21,14 @@ function initContentData() {
     const saved = localStorage.getItem('contentData');
     if (saved) {
         try {
-            contentData = JSON.parse(saved);
+            const parsed = JSON.parse(saved);
+            contentData = {
+                ...contentData,
+                ...parsed,
+                activity: parsed.activity || {}
+            };
         } catch {
-            contentData = contentData;
+            // keep defaults
         }
     }
 }
@@ -36,9 +41,11 @@ function saveContentData() {
 // ---------- Activity Logging ----------
 function logContentActivity(type, amount = 1) {
     const today = getContentDayKey();
+
     if (!contentData.activity[today]) {
         contentData.activity[today] = { videos: 0, hours: 0 };
     }
+
     contentData.activity[today][type] += amount;
 }
 
@@ -47,7 +54,7 @@ function renderContentTracker() {
     const container = document.getElementById('contentContainer');
     if (!container) return;
 
-    let html = `
+    container.innerHTML = `
         <div class="section-title">🎬 Content Tracker</div>
 
         <div class="content-stats">
@@ -73,7 +80,6 @@ function renderContentTracker() {
             </div>
         </div>
 
-        <!-- Content Activity History -->
         <div style="margin-top:30px;">
             <div class="section-title">📆 Content Activity (Last 14 Days)</div>
             <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-top:12px;">
@@ -81,32 +87,29 @@ function renderContentTracker() {
             </div>
         </div>
 
-        <!-- Video Ideas -->
         <div style="margin-top:40px;">
             <div class="section-title">💡 Video Ideas</div>
             <button onclick="addVideoIdea()">➕ Add Idea</button>
             ${renderVideoIdeas()}
         </div>
 
-        <!-- Notes -->
         <div style="margin-top:40px;">
             <div class="section-title">📝 Content Notes</div>
-            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes}</textarea>
+            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes || ''}</textarea>
         </div>
     `;
-
-    container.innerHTML = html;
 }
 
-// ---------- History Grid ----------
+// ---------- History Grid (SAFE) ----------
 function renderContentHistory() {
     let out = '';
+
     for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = getContentDayKey(d);
-        const activity = contentData.activity[key];
-        const active = activity && (activity.videos > 0 || activity.hours > 0);
+        const activity = contentData.activity[key] || { videos: 0, hours: 0 };
+        const active = activity.videos > 0 || activity.hours > 0;
 
         out += `
             <div style="
@@ -123,6 +126,7 @@ function renderContentHistory() {
             </div>
         `;
     }
+
     return out;
 }
 
@@ -164,7 +168,7 @@ function renderVideoIdeas() {
         return `<p style="opacity:.6;">No ideas yet</p>`;
     }
     return contentData.videoIdeas
-        .map((i, idx) => `<div>• ${i.title}</div>`)
+        .map(i => `<div>• ${i.title}</div>`)
         .join('');
 }
 
