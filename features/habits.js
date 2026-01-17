@@ -1,5 +1,14 @@
 // ============================================
 // HABITS MODULE (Weekly Grid + Click Toggle + Row Glow)
+// Fixes added:
+// 1) Today's Progress turns GREEN when >= 80%
+// 2) Updates stat cards automatically:
+//    - Days at 80%+ (this week)
+//    - Weekly Completion (avg this week)
+//    - Current Streak (consecutive 80%+ days)
+//    - Best Streak (saved)
+// 3) Remembers previous days via localStorage (already)
+// 4) Updates on every click toggle + on render
 // ============================================
 
 let habitData = {};   // { "YYYY-MM-DD": { "<habitId>": true/false } }
@@ -19,6 +28,7 @@ function parseDayKey(key) {
 }
 
 function getWeekKeys(days = 7) {
+  // NOTE: This matches your grid: last 7 days ending today
   const out = [];
   const now = new Date();
   for (let i = days - 1; i >= 0; i--) {
@@ -109,20 +119,7 @@ function initHabitsList() {
   }
 }
 
-// ---------- Toggle ----------
-function toggleHabit(habitId, dayKey) {
-  ensureDay(dayKey);
-
-  const current = !!habitData[dayKey][habitId];
-  habitData[dayKey][habitId] = !current;
-
-  saveHabitData();
-
-  if (typeof renderHabitGrid === "function") renderHabitGrid();
-  if (typeof updateStreakDisplay === "function") updateStreakDisplay();
-}
-
-// ---------- Completion (used by mood correlation + charts) ----------
+// ---------- Completion ----------
 function getDayCompletion(dayKey) {
   const normalized = normalizeHabitsList(habitsList);
   const total = normalized.length;
@@ -132,6 +129,126 @@ function getDayCompletion(dayKey) {
 
   const percent = total ? Math.round((done / total) * 100) : 0;
   return { done, total, percent };
+}
+
+// ---------- Streak helpers (80%+ days) ----------
+function getCurrentStreakFromToday() {
+  const threshold = 80;
+  let streak = 0;
+
+  // Walk backwards day by day until we find a day < threshold or no data
+  const d = new Date();
+  for (let i = 0; i < 3650; i++) { // safety cap ~10 years
+    const key = getLocalDayKey(d);
+    const stats = getDayCompletion(key);
+
+    // If there are no habits configured, streak is 0
+    if (!stats.total) break;
+
+    if (stats.percent >= threshold) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
+
+    // stop streak as soon as one day breaks it
+    break;
+  }
+
+  return streak;
+}
+
+function getBestStreak() {
+  const v = parseInt(localStorage.getItem("bestStreak") || "0", 10);
+  return Number.isFinite(v) ? v : 0;
+}
+
+function setBestStreak(n) {
+  localStorage.setItem("bestStreak", String(n));
+}
+
+// ---------- Weekly stats (based on the SAME 7-day window shown) ----------
+function getWeekStats() {
+  const threshold = 80;
+  const weekKeys = getWeekKeys(7);
+
+  // Ensure days exist so grid always has values
+  weekKeys.forEach(k => ensureDay(k));
+
+  const daily = weekKeys.map(k => ({ key: k, ...getDayCompletion(k) }));
+  const daysAt80 = daily.filter(d => d.percent >= threshold).length;
+
+  // Weekly completion: average of the 7 day percents
+  const avg = daily.length
+    ? Math.round(daily.reduce((sum, d) => sum + d.percent, 0) / daily.length)
+    : 0;
+
+  return { weekKeys, daily, daysAt80, weeklyCompletion: avg };
+}
+
+// ---------- Update header cards + streak UI ----------
+function updateHabitHeaderStats() {
+  const todayKey = getLocalDayKey(new Date());
+  const today = getDayCompletion(todayKey);
+
+  // Update today's progress color (in grid) is handled in renderHabitGrid
+  // Here we update the stat cards on top
+
+  const { daysAt80, weeklyCompletion } = getWeekStats();
+
+  const daysAt80El = document.getElementById("daysAt80");
+  const weeklyCompletionEl = document.getElementById("weeklyCompletion");
+  const currentStreakEl = document.getElementById("currentStreak");
+
+  if (daysAt80El) daysAt80El.textContent = `${daysAt80}/7`;
+  if (weeklyCompletionEl) weeklyCompletionEl.textContent = `${weeklyCompletion}%`;
+
+  // Streak
+  const streak = getCurrentStreakFromToday();
+  if (currentStreakEl) currentStreakEl.textContent = String(streak);
+
+  // If you also use the big streak box:
+  const streakNumberEl = document.getElementById("streakNumber");
+  if (streakNumberEl) streakNumberEl.textContent = String(streak);
+
+  // Best streak
+  const bestEl = document.getElementById("bestStreak");
+  const best = getBestStreak();
+  const newBest = Math.max(best, streak);
+  if (newBest !== best) setBestStreak(newBest);
+  if (bestEl) bestEl.textContent = String(newBest);
+
+  // Optional: if you have “milestones” UI
+  if (typeof renderMilestones === "function") {
+    try { renderMilestones(streak); } catch {}
+  }
+
+  // Keep today completion available to other modules if needed
+  return today;
+}
+
+// ---------- Toggle ----------
+function toggleHabit(habitId, dayKey) {
+  ensureDay(dayKey);
+
+  const current = !!habitData[dayKey][habitId];
+  habitData[dayKey][habitId] = !current;
+
+  saveHabitData();
+
+  // Re-render + update stats every click
+  if (typeof renderHabitGrid === "function") renderHabitGrid();
+  updateHabitHeaderStats();
+
+  // If something else depends on streak display, keep it
+  if (typeof updateStreakDisplay === "function") {
+    try { updateStreakDisplay(); } catch {}
+  }
+
+  // If Daily Brief exists, refresh it (optional, safe)
+  if (typeof updateDailyBrief === "function") {
+    try { updateDailyBrief(); } catch {}
+  }
 }
 
 // ---------- Render ----------
@@ -217,14 +334,21 @@ function renderHabitGrid() {
 
   html += `</tbody></table></div>`;
 
+  // Today's Progress under grid (NOW color changes)
   const stats = getDayCompletion(todayKey);
+  const good = stats.percent >= 80;
+  const pctColor = good ? "#22c55e" : "#ff4d4d";
+
   html += `
     <div style="margin-top:14px; text-align:center; color:#9ca3af;">
-      Today's Progress: <span style="color:#ff4d4d; font-weight:900;">${stats.percent}%</span> (Need 80% for streak)
+      Today's Progress: <span style="color:${pctColor}; font-weight:900;">${stats.percent}%</span> (Need 80% for streak)
     </div>
   `;
 
   grid.innerHTML = html;
+
+  // Update the top stat cards after rendering
+  updateHabitHeaderStats();
 }
 
 // ---------- Manage Habits (fallback) ----------
