@@ -1,5 +1,5 @@
 // ============================================
-// CONTENT TRACKER MODULE (ALIVE + FEEDBACK)
+// CONTENT TRACKER MODULE (SMART + ALIVE)
 // ============================================
 
 let contentData = {
@@ -17,13 +17,31 @@ function initContentData() {
         try {
             contentData = JSON.parse(saved);
         } catch {
-            contentData = { subscribers: 0, videosThisMonth: 0, hoursLogged: 0, videoIdeas: [], notes: '' };
+            resetContentData();
         }
     }
 }
 
+function resetContentData() {
+    contentData = {
+        subscribers: 0,
+        videosThisMonth: 0,
+        hoursLogged: 0,
+        videoIdeas: [],
+        notes: ''
+    };
+}
+
 function saveContentData() {
     localStorage.setItem('contentData', JSON.stringify(contentData));
+}
+
+// ---------- DATE HELPERS ----------
+function getMonthProgress() {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return { day, daysInMonth };
 }
 
 // ---------- FEEDBACK ----------
@@ -39,9 +57,33 @@ function showContentFeedback(msg, type = 'neutral') {
         '#9CA3AF';
 
     clearTimeout(el._t);
-    el._t = setTimeout(() => {
-        el.style.opacity = '0';
-    }, 2000);
+    el._t = setTimeout(() => el.style.opacity = '0', 2200);
+}
+
+// ---------- SMART PACING ----------
+function getPacingMessage() {
+    const { day, daysInMonth } = getMonthProgress();
+
+    if (day <= 2) {
+        return 'New month — early actions set the tone.';
+    }
+
+    const pace = contentData.videosThisMonth / day;
+    const projected = Math.round(pace * daysInMonth);
+
+    if (contentData.videosThisMonth === 0) {
+        return 'No content logged yet. One session starts momentum.';
+    }
+
+    if (projected >= 12) {
+        return `Strong pace — on track for ~${projected} videos this month.`;
+    }
+
+    if (projected >= 8) {
+        return `Decent pace — ~${projected} videos projected. Stay consistent.`;
+    }
+
+    return `Below pace — ~${projected} projected. A short session today fixes this.`;
 }
 
 // ---------- RENDER ----------
@@ -49,92 +91,81 @@ function renderContentTracker() {
     const container = document.getElementById('contentContainer');
     if (!container) return;
 
-    let html = `
+    container.innerHTML = `
         <div class="section-title" style="margin-bottom:20px;">🎬 Content Tracker</div>
 
-        <div id="contentFeedback" style="
-            margin-bottom:14px;
+        <div class="content-stats">
+
+            <div class="content-stat-card">
+                <div style="color:#9CA3AF;">YouTube Subscribers</div>
+                <div style="font-size:2.5em;font-weight:900;color:white;">
+                    ${contentData.subscribers.toLocaleString()}
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <input id="subsInput" type="number" placeholder="New count"
+                        style="flex:1;padding:8px;background:rgba(255,255,255,0.05);
+                        border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                    <button onclick="updateSubscribers()">Update</button>
+                </div>
+            </div>
+
+            <div class="content-stat-card">
+                <div style="color:#9CA3AF;">Videos This Month</div>
+                <div style="font-size:2.5em;font-weight:900;color:white;">
+                    ${contentData.videosThisMonth}
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="changeVideosCount(-1)">−</button>
+                    <button onclick="changeVideosCount(1)">+</button>
+                </div>
+            </div>
+
+            <div class="content-stat-card">
+                <div style="color:#9CA3AF;">Hours Logged</div>
+                <div style="font-size:2.5em;font-weight:900;color:white;">
+                    ${contentData.hoursLogged}
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="changeHoursLogged(-1)">−</button>
+                    <button onclick="changeHoursLogged(1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SMART PACING -->
+        <div style="
+            margin-top:12px;
             font-weight:700;
+            color:#9CA3AF;
+        ">
+            ${getPacingMessage()}
+        </div>
+
+        <div id="contentFeedback" style="
+            margin-top:8px;
+            font-weight:800;
             opacity:0;
             transition:opacity .3s ease;
         "></div>
 
-        <div class="content-stats">
-    `;
-
-    // Subscribers
-    html += `
-        <div class="content-stat-card">
-            <div style="color:#9CA3AF;">YouTube Subscribers</div>
-            <div id="subsDisplay" style="font-size:2.5em;font-weight:900;color:white;">
-                ${contentData.subscribers.toLocaleString()}
-            </div>
-            <div style="display:flex;gap:6px;margin-top:8px;">
-                <input id="subsInput" type="number" placeholder="New count"
-                    style="flex:1;padding:8px;background:rgba(255,255,255,0.05);
-                    border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
-                <button onclick="updateSubscribers()">Update</button>
-            </div>
-        </div>
-    `;
-
-    // Videos
-    html += `
-        <div class="content-stat-card">
-            <div style="color:#9CA3AF;">Videos This Month</div>
-            <div style="font-size:2.5em;font-weight:900;color:white;">
-                ${contentData.videosThisMonth}
-            </div>
-            <div style="display:flex;gap:8px;">
-                <button onclick="changeVideosCount(-1)">−</button>
-                <button onclick="changeVideosCount(1)">+</button>
-            </div>
-        </div>
-    `;
-
-    // Hours
-    html += `
-        <div class="content-stat-card">
-            <div style="color:#9CA3AF;">Hours Logged</div>
-            <div style="font-size:2.5em;font-weight:900;color:white;">
-                ${contentData.hoursLogged}
-            </div>
-            <div style="display:flex;gap:8px;">
-                <button onclick="changeHoursLogged(-1)">−</button>
-                <button onclick="changeHoursLogged(1)">+</button>
-            </div>
-        </div>
-    </div>
-    `;
-
-    // Ideas
-    html += `
         <div class="ideas-list" style="margin-top:30px;">
             <div class="section-title" style="display:flex;justify-content:space-between;">
                 <span>💡 Video Ideas</span>
                 <button onclick="addVideoIdea()">➕ Add Idea</button>
             </div>
-    `;
 
-    if (contentData.videoIdeas.length === 0) {
-        html += `<div style="color:#6B7280;padding:20px;text-align:center;">
-            No ideas yet — capture momentum.
-        </div>`;
-    } else {
-        contentData.videoIdeas.forEach((idea, i) => {
-            html += `
-                <div class="idea-item" id="idea-${idea.id}">
-                    <div style="display:flex;justify-content:space-between;">
-                        <strong>${idea.title}</strong>
-                        <button onclick="deleteVideoIdea(${i})">Delete</button>
+            ${contentData.videoIdeas.length === 0
+                ? `<div style="color:#6B7280;padding:20px;text-align:center;">No ideas yet.</div>`
+                : contentData.videoIdeas.map((idea, i) => `
+                    <div class="idea-item">
+                        <div style="display:flex;justify-content:space-between;">
+                            <strong>${idea.title}</strong>
+                            <button onclick="deleteVideoIdea(${i})">Delete</button>
+                        </div>
+                        ${idea.description ? `<div style="color:#9CA3AF;">${idea.description}</div>` : ''}
                     </div>
-                    ${idea.description ? `<div style="color:#9CA3AF;">${idea.description}</div>` : ''}
-                </div>
-            `;
-        });
-    }
-
-    html += `
+                `).join('')
+            }
         </div>
 
         <div class="ideas-list" style="margin-top:30px;">
@@ -148,46 +179,32 @@ function renderContentTracker() {
             >${contentData.notes}</textarea>
         </div>
     `;
-
-    container.innerHTML = html;
 }
 
 // ---------- ACTIONS ----------
 function updateSubscribers() {
     const input = document.getElementById('subsInput');
     const val = parseInt(input.value);
-
     if (!val || val < 0) return;
 
-    const prev = contentData.subscribers;
     contentData.subscribers = val;
     saveContentData();
     renderContentTracker();
-
-    showContentFeedback(
-        val > prev ? 'Subscriber count increased.' : 'Subscriber count updated.',
-        'success'
-    );
+    showContentFeedback('Subscriber count updated.', 'success');
 }
 
 function changeVideosCount(delta) {
     contentData.videosThisMonth = Math.max(0, contentData.videosThisMonth + delta);
     saveContentData();
     renderContentTracker();
-    showContentFeedback(
-        delta > 0 ? '+1 video logged. Momentum maintained.' : 'Video removed.',
-        delta > 0 ? 'success' : 'warn'
-    );
+    showContentFeedback(delta > 0 ? '+1 video logged.' : 'Video removed.', delta > 0 ? 'success' : 'warn');
 }
 
 function changeHoursLogged(delta) {
     contentData.hoursLogged = Math.max(0, contentData.hoursLogged + delta);
     saveContentData();
     renderContentTracker();
-    showContentFeedback(
-        delta > 0 ? '+1 hour logged. Stay consistent.' : 'Hour removed.',
-        delta > 0 ? 'success' : 'warn'
-    );
+    showContentFeedback(delta > 0 ? '+1 hour logged.' : 'Hour removed.', delta > 0 ? 'success' : 'warn');
 }
 
 function addVideoIdea() {
@@ -209,17 +226,10 @@ function saveVideoIdea() {
     const description = document.getElementById('ideaDesc').value.trim();
     if (!title) return;
 
-    const idea = {
-        id: Date.now(),
-        title,
-        description
-    };
-
-    contentData.videoIdeas.unshift(idea);
+    contentData.videoIdeas.unshift({ id: Date.now(), title, description });
     saveContentData();
     closeModal();
     renderContentTracker();
-
     showContentFeedback('Idea captured.', 'success');
 }
 
