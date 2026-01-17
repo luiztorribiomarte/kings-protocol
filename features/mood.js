@@ -1,18 +1,12 @@
 // ============================================
-// MOOD MODULE (Energy + Mood + History Graph + Habit Correlation + Insights)
+// MOOD MODULE (Energy + Mood + History Graph + Habit Correlation + Insights + Pattern Highlights)
 // ============================================
-
-// Stored shape:
-// moodData = {
-//   "YYYY-MM-DD": { energy: 5, mood: "😊" }
-// }
 
 let moodData = {};
 let moodChartInstance = null;
 
 // ---------- Utilities ----------
 function getDayKey(date = new Date()) {
-  // Local date key (not UTC) to avoid day-shift bugs
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -20,7 +14,6 @@ function getDayKey(date = new Date()) {
 }
 
 function parseDayKey(key) {
-  // key: YYYY-MM-DD
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y, (m - 1), d);
 }
@@ -41,7 +34,6 @@ function saveMoodData() {
 }
 
 function getMoodScore(emoji) {
-  // Optional “smart” mapping (hidden dataset)
   const map = {
     "🙂": 7,
     "💪": 8,
@@ -53,36 +45,30 @@ function getMoodScore(emoji) {
 }
 
 function getRangeKeys(range) {
-  // Returns array of day keys to chart, ordered oldest -> newest
   if (range === "all") {
     const keys = Object.keys(moodData || {}).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
     keys.sort((a, b) => parseDayKey(a) - parseDayKey(b));
     return keys.length ? keys : getRangeKeys("7");
   }
-
   const days = range === "30" ? 30 : 7;
   return getPastDays(days).map(getDayKey);
 }
 
 // ---------- Habit correlation helper ----------
 function getHabitCompletionForDay(dayKey) {
-  // Uses habits.js helper if present; otherwise best-effort compute from habitData/habitsList
   try {
     if (typeof getDayCompletion === "function") {
-      return getDayCompletion(dayKey); // {done,total,percent}
+      return getDayCompletion(dayKey);
     }
   } catch {}
 
-  // Best effort fallback:
   try {
     const hd = window.habitData;
     const hl = window.habitsList;
 
-    // total habits
     let total = 0;
     if (Array.isArray(hl)) total = hl.length;
 
-    // day object
     const dayObj = (hd && typeof hd === "object") ? hd[dayKey] : null;
     if (!dayObj || typeof dayObj !== "object") {
       return { done: 0, total: total || 0, percent: 0 };
@@ -100,10 +86,6 @@ function getHabitCompletionForDay(dayKey) {
 
 // ---------- Insight helper ----------
 function computeMoodHabitInsights(keys, energyValues, habitStats) {
-  // We’ll compute:
-  // - Avg habit % on high-energy days (>=7)
-  // - Avg habit % on low-energy days (<=4)
-  // And compare them.
   const hi = [];
   const lo = [];
 
@@ -121,7 +103,6 @@ function computeMoodHabitInsights(keys, energyValues, habitStats) {
   const avgHi = avg(hi);
   const avgLo = avg(lo);
 
-  // Build 1–2 simple sentences
   let line1 = "";
   let line2 = "";
 
@@ -137,7 +118,6 @@ function computeMoodHabitInsights(keys, energyValues, habitStats) {
     line2 = `You had 1 low-energy day (1–4) in this range: ${avgLo}% completion.`;
   }
 
-  // Comparison nudge (only if we have both)
   let compare = "";
   if (avgHi != null && avgLo != null) {
     const diff = avgHi - avgLo;
@@ -151,7 +131,6 @@ function computeMoodHabitInsights(keys, energyValues, habitStats) {
     }
   }
 
-  // If we don’t have enough data, return a gentle message
   if (!line1 && !line2) {
     return {
       title: "Insight",
@@ -192,13 +171,49 @@ function renderMoodInsight(insight) {
   `;
 }
 
+// ---------- Pattern highlights ----------
+function getDayBadge(energy, habitPercent) {
+  // Returns { icon, label, style } or null
+
+  if (energy == null) return null;
+
+  // Perfect day: high energy + strong habits
+  if (energy >= 7 && habitPercent >= 80) {
+    return {
+      icon: "👑",
+      label: "Perfect day",
+      style: "border:1px solid rgba(34,197,94,0.45); background:rgba(34,197,94,0.08);"
+    };
+  }
+
+  // High energy but low execution
+  if (energy >= 7 && habitPercent < 50) {
+    return {
+      icon: "⚠️",
+      label: "High energy / low habits",
+      style: "border:1px solid rgba(245,158,11,0.5); background:rgba(245,158,11,0.10);"
+    };
+  }
+
+  // Low-energy day
+  if (energy <= 4) {
+    return {
+      icon: "🧊",
+      label: "Low energy day",
+      style: "border:1px solid rgba(59,130,246,0.40); background:rgba(59,130,246,0.08);"
+    };
+  }
+
+  return null;
+}
+
 // ---------- Init ----------
 function initMoodData() {
   const saved = localStorage.getItem("moodData");
   if (saved) {
     try {
       moodData = JSON.parse(saved) || {};
-    } catch (e) {
+    } catch {
       moodData = {};
     }
   } else {
@@ -253,7 +268,6 @@ function openMoodGraph(range = "7") {
       <canvas id="moodChartCanvas" height="320"></canvas>
     </div>
 
-    <!-- ✅ Insight lives directly UNDER the chart (your request) -->
     <div id="moodInsight"></div>
 
     <div id="moodEmojiRow" style="
@@ -274,9 +288,7 @@ function openMoodGraph(range = "7") {
   }
 
   const select = document.getElementById("moodRangeSelect");
-  if (select) {
-    select.onchange = () => openMoodGraph(select.value);
-  }
+  if (select) select.onchange = () => openMoodGraph(select.value);
 
   setTimeout(() => renderMoodChart(range), 0);
 }
@@ -286,7 +298,7 @@ function renderMoodChart(range) {
   if (!canvas) return;
 
   if (moodChartInstance) {
-    try { moodChartInstance.destroy(); } catch (e) {}
+    try { moodChartInstance.destroy(); } catch {}
     moodChartInstance = null;
   }
 
@@ -309,27 +321,35 @@ function renderMoodChart(range) {
     return s ?? null;
   });
 
-  // Habit completion for correlation
   const habitStats = keys.map(k => getHabitCompletionForDay(k));
 
-  // ✅ Render Insight under the chart
+  // Insight under chart
   const insight = computeMoodHabitInsights(keys, energyValues, habitStats);
   renderMoodInsight(insight);
 
-  // Emoji row under chart
+  // Emoji row cards (with badges!)
   const emojiRow = document.getElementById("moodEmojiRow");
   if (emojiRow) {
     emojiRow.innerHTML = keys.map((k, i) => {
       const hs = habitStats[i];
       const habitsLine = (hs && hs.total) ? `${hs.done}/${hs.total}` : "—";
+      const habitPct = (hs && hs.total) ? hs.percent : 0;
+
+      const badge = getDayBadge(energyValues[i], habitPct);
+
       return `
         <div style="
           padding:10px 8px;
           border-radius:14px;
           border:1px solid rgba(255,255,255,0.12);
           background:rgba(255,255,255,0.05);
-        ">
-          <div style="font-size:0.72rem; color:#9ca3af; font-weight:800;">${labels[i]}</div>
+          ${badge ? badge.style : ""}
+        " title="${badge ? badge.label : ""}">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:0.72rem; color:#9ca3af; font-weight:800;">${labels[i]}</div>
+            ${badge ? `<div style="font-size:0.95rem;">${badge.icon}</div>` : `<div style="width:16px;"></div>`}
+          </div>
+
           <div style="font-size:1.2rem; margin-top:6px;">${moodEmojis[i]}</div>
           <div style="font-size:0.85rem; margin-top:6px; color:#e5e7eb;">Energy: ${energyValues[i] ?? "—"}</div>
           <div style="font-size:0.8rem; margin-top:6px; color:#9ca3af;">Habits: ${habitsLine}</div>
@@ -339,7 +359,6 @@ function renderMoodChart(range) {
   }
 
   const ctx = canvas.getContext("2d");
-
   moodChartInstance = new Chart(ctx, {
     type: "line",
     data: {
@@ -370,9 +389,7 @@ function renderMoodChart(range) {
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: {
-          labels: { color: "rgba(255,255,255,0.8)" }
-        },
+        legend: { labels: { color: "rgba(255,255,255,0.8)" } },
         tooltip: {
           callbacks: {
             afterBody: (items) => {
@@ -425,7 +442,6 @@ function renderMoodTracker() {
 
   let html = `
     <div style="display:flex; gap:16px; align-items:stretch; flex-wrap:wrap;">
-      <!-- LEFT: Today -->
       <div style="
         flex:1;
         min-width:280px;
@@ -474,7 +490,6 @@ function renderMoodTracker() {
         </div>
       </div>
 
-      <!-- RIGHT: Past 7 Days (CLICKABLE) -->
       <div
         onclick="openMoodGraph('7')"
         style="
@@ -506,6 +521,9 @@ function renderMoodTracker() {
             const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
             const isToday = k === key;
 
+            const hs = getHabitCompletionForDay(k);
+            const badge = getDayBadge(entry?.energy ?? null, hs?.total ? hs.percent : 0);
+
             return `
               <div style="
                 text-align:center;
@@ -513,8 +531,13 @@ function renderMoodTracker() {
                 border-radius:14px;
                 border:1px solid rgba(255,255,255,0.12);
                 background:${isToday ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.05)"};
-              ">
-                <div style="font-size:0.78rem; color:#9ca3af; font-weight:800;">${dayLabel}</div>
+                ${badge ? badge.style : ""}
+              " title="${badge ? badge.label : ""}">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-size:0.78rem; color:#9ca3af; font-weight:800;">${dayLabel}</div>
+                  ${badge ? `<div style="font-size:0.95rem;">${badge.icon}</div>` : `<div style="width:16px;"></div>`}
+                </div>
+
                 <div style="font-size:1.25rem; margin-top:6px;">
                   ${entry?.mood ? entry.mood : "—"}
                 </div>
@@ -527,7 +550,7 @@ function renderMoodTracker() {
         </div>
 
         <div style="margin-top:10px; color:#6b7280; font-size:0.82rem;">
-          Tip: Click this box to open charts. Today is highlighted.
+          Badges: 👑 perfect day • ⚠️ high energy/low habits • 🧊 low energy
         </div>
       </div>
     </div>
