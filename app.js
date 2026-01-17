@@ -39,6 +39,7 @@ function showPage(pageName) {
     if (pageName === 'dashboard') {
         ensureDailyBriefUI();
         updateDailyBrief();
+        updateStreakWithContent(); // ✅ NEW
     }
 }
 
@@ -61,18 +62,12 @@ function updateClock() {
     });
 }
 
-/* ------------------ DAILY BRIEF ------------------ */
-
+/* ------------------ HELPERS ------------------ */
 function todayKey() {
     return new Date().toISOString().split('T')[0];
 }
 
-function seededPick(arr, seed) {
-    let h = 0;
-    for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i);
-    return arr[Math.abs(h) % arr.length];
-}
-
+/* ------------------ CONTENT SIGNAL ------------------ */
 function getContentSignal() {
     try {
         const data = JSON.parse(localStorage.getItem('contentData') || '{}');
@@ -85,10 +80,57 @@ function getContentSignal() {
     }
 }
 
-function buildDailyBrief() {
-    const day = todayKey();
-    const seed = day + '|brief';
+/* ------------------ STREAK + CONTENT BOOST ------------------ */
+function updateStreakWithContent() {
+    if (typeof getDayCompletion !== 'function') return;
 
+    const today = todayKey();
+    const habits = getDayCompletion(today);
+    const content = getContentSignal();
+
+    let effectivePercent = habits.percent;
+
+    // 🔥 Content boost logic
+    if (habits.percent >= 60 && habits.percent < 80) {
+        if (content.hours >= 1 || content.videos >= 1) {
+            effectivePercent = 80;
+        }
+    }
+
+    const statusEl = document.getElementById('dailyStatus');
+    if (statusEl) {
+        statusEl.textContent =
+            effectivePercent >= 80
+                ? 'Day secured. Streak protected.'
+                : 'Push for 80% to secure the day.';
+        statusEl.style.color = effectivePercent >= 80 ? '#22c55e' : '#f87171';
+    }
+
+    // Persist streak memory
+    const lastKey = localStorage.getItem('lastStreakDay');
+    let streak = Number(localStorage.getItem('currentStreak') || 0);
+
+    if (effectivePercent >= 80) {
+        if (lastKey !== today) {
+            streak += 1;
+            localStorage.setItem('currentStreak', streak);
+            localStorage.setItem('lastStreakDay', today);
+        }
+    }
+
+    const streakEl = document.getElementById('currentStreak');
+    if (streakEl) streakEl.textContent = streak;
+}
+
+/* ------------------ DAILY BRIEF ------------------ */
+function seededPick(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i);
+    return arr[Math.abs(h) % arr.length];
+}
+
+function buildDailyBrief() {
+    const seed = todayKey();
     const content = getContentSignal();
 
     const openers = [
@@ -100,32 +142,23 @@ function buildDailyBrief() {
     ];
 
     const contentWins = [
-        "Content work logged today. Momentum is real—protect it.",
-        "You showed up for content. Stay in motion.",
-        "Content execution recorded. Keep pressure on the day.",
-        "Progress logged. Don’t coast—compound."
+        "Content work logged. That counts—keep stacking.",
+        "Output recorded. Momentum is real.",
+        "You showed up creatively. Protect the streak.",
+        "Content execution locked in."
     ];
 
-    const contentNudge = [
-        "No content logged yet. One focused block still moves the needle.",
-        "Nothing recorded for content today. Start small—start now.",
-        "The easiest content session still counts. Begin.",
-        "No output yet. One session changes the day."
+    const nudges = [
+        "No content yet. One focused block changes the day.",
+        "Nothing logged—start small, start now.",
+        "One session today still moves the needle.",
+        "Create first. Optimize later."
     ];
 
-    const neutral = [
-        "Win the basics first—everything else follows.",
-        "Small actions decide the outcome today.",
-        "Lock the first habit immediately.",
-        "Consistency beats intensity."
-    ];
-
-    let line;
-    if (content.hours > 0 || content.videos > 0) {
-        line = seededPick(contentWins, seed + 'win');
-    } else {
-        line = seededPick(contentNudge, seed + 'nudge');
-    }
+    const line =
+        content.hours > 0 || content.videos > 0
+            ? seededPick(contentWins, seed)
+            : seededPick(nudges, seed);
 
     return `${seededPick(openers, seed)} ${line}`;
 }
@@ -159,7 +192,6 @@ function updateDailyBrief() {
 }
 
 /* ------------------ INIT ------------------ */
-
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof initHabitData === 'function') initHabitData();
     if (typeof initHabitsList === 'function') initHabitsList();
@@ -179,4 +211,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ensureDailyBriefUI();
     updateDailyBrief();
+    updateStreakWithContent();
 });
