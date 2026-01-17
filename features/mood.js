@@ -1,5 +1,5 @@
 // ============================================
-// MOOD MODULE (Energy + Mood + History Graph + Habit Correlation)
+// MOOD MODULE (Energy + Mood + History Graph + Habit Correlation + Insights)
 // ============================================
 
 // Stored shape:
@@ -98,6 +98,100 @@ function getHabitCompletionForDay(dayKey) {
   }
 }
 
+// ---------- Insight helper ----------
+function computeMoodHabitInsights(keys, energyValues, habitStats) {
+  // We’ll compute:
+  // - Avg habit % on high-energy days (>=7)
+  // - Avg habit % on low-energy days (<=4)
+  // And compare them.
+  const hi = [];
+  const lo = [];
+
+  for (let i = 0; i < keys.length; i++) {
+    const e = energyValues[i];
+    const hs = habitStats[i];
+    if (e == null) continue;
+    if (!hs || !hs.total) continue;
+
+    if (e >= 7) hi.push(hs.percent);
+    if (e <= 4) lo.push(hs.percent);
+  }
+
+  const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+  const avgHi = avg(hi);
+  const avgLo = avg(lo);
+
+  // Build 1–2 simple sentences
+  let line1 = "";
+  let line2 = "";
+
+  if (avgHi != null && hi.length >= 2) {
+    line1 = `On high-energy days (7–10), you averaged ${avgHi}% habit completion.`;
+  } else if (avgHi != null && hi.length === 1) {
+    line1 = `You had 1 high-energy day (7–10) in this range: ${avgHi}% habit completion.`;
+  }
+
+  if (avgLo != null && lo.length >= 2) {
+    line2 = `On low-energy days (1–4), you averaged ${avgLo}% completion.`;
+  } else if (avgLo != null && lo.length === 1) {
+    line2 = `You had 1 low-energy day (1–4) in this range: ${avgLo}% completion.`;
+  }
+
+  // Comparison nudge (only if we have both)
+  let compare = "";
+  if (avgHi != null && avgLo != null) {
+    const diff = avgHi - avgLo;
+    const abs = Math.abs(diff);
+    if (abs >= 5) {
+      compare = diff > 0
+        ? `That’s ${abs} points higher when your energy is high.`
+        : `That’s ${abs} points higher when your energy is low.`;
+    } else {
+      compare = `Your completion stays pretty consistent across energy levels.`;
+    }
+  }
+
+  // If we don’t have enough data, return a gentle message
+  if (!line1 && !line2) {
+    return {
+      title: "Insight",
+      body: "Log a few more days of energy + habits to unlock patterns here.",
+      compare: ""
+    };
+  }
+
+  return {
+    title: "Insight",
+    body: [line1, line2].filter(Boolean).join(" "),
+    compare
+  };
+}
+
+function renderMoodInsight(insight) {
+  const el = document.getElementById("moodInsight");
+  if (!el) return;
+
+  el.innerHTML = `
+    <div style="
+      margin-top:12px;
+      padding:14px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.10));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    ">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="font-weight:900; color:white;">🧠 ${insight.title}</div>
+        <div style="color:rgba(255,255,255,0.55); font-size:0.85rem;">auto</div>
+      </div>
+      <div style="margin-top:8px; color:rgba(255,255,255,0.85); line-height:1.35;">
+        ${insight.body}
+      </div>
+      ${insight.compare ? `<div style="margin-top:8px; color:rgba(255,255,255,0.75);">${insight.compare}</div>` : ""}
+    </div>
+  `;
+}
+
 // ---------- Init ----------
 function initMoodData() {
   const saved = localStorage.getItem("moodData");
@@ -159,6 +253,9 @@ function openMoodGraph(range = "7") {
       <canvas id="moodChartCanvas" height="320"></canvas>
     </div>
 
+    <!-- ✅ Insight lives directly UNDER the chart (your request) -->
+    <div id="moodInsight"></div>
+
     <div id="moodEmojiRow" style="
       margin-top:12px;
       display:grid;
@@ -214,6 +311,10 @@ function renderMoodChart(range) {
 
   // Habit completion for correlation
   const habitStats = keys.map(k => getHabitCompletionForDay(k));
+
+  // ✅ Render Insight under the chart
+  const insight = computeMoodHabitInsights(keys, energyValues, habitStats);
+  renderMoodInsight(insight);
 
   // Emoji row under chart
   const emojiRow = document.getElementById("moodEmojiRow");
