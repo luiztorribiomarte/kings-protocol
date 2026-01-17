@@ -1,279 +1,162 @@
 // ============================================
-// GOALS MODULE
+// GOALS MODULE (standalone, no habits)
 // ============================================
 
-let goalsData = [];
+let goals = [];
 
-// Initialize goals data
+/* ---------- Init ---------- */
 function initGoalsData() {
-    const saved = localStorage.getItem('goalsData');
-    if (saved) {
-        goalsData = JSON.parse(saved);
+  const saved = localStorage.getItem("goals");
+  if (saved) {
+    try {
+      goals = JSON.parse(saved) || [];
+    } catch {
+      goals = [];
     }
+  }
 }
 
-// Save goals data
-function saveGoalsData() {
-    localStorage.setItem('goalsData', JSON.stringify(goalsData));
+/* ---------- Save ---------- */
+function saveGoals() {
+  localStorage.setItem("goals", JSON.stringify(goals));
 }
 
-// Render goals
+/* ---------- Render ---------- */
 function renderGoals() {
-    const container = document.getElementById('goalsGrid');
-    if (!container) return;
+  const container = document.getElementById("goalsGrid");
+  if (!container) return;
 
-    if (goalsData.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #6B7280; padding: 40px;">No goals yet. Click "➕ Add New Goal" to get started!</div>';
-        return;
-    }
+  if (!goals.length) {
+    container.innerHTML = `
+      <div style="
+        text-align:center;
+        color:#9CA3AF;
+        padding:40px;
+        font-size:1.05em;
+      ">
+        No goals yet. Click <strong>+ Add New Goal</strong> to get started.
+      </div>
+    `;
+    return;
+  }
 
-    let html = '';
-    goalsData.forEach(goal => {
-        const progress = goal.target ? Math.round((goal.current / goal.target) * 100) : 0;
-        
-        html += `
-            <div class="goal-card" onclick="showGoalDetails('${goal.id}')">
-                <div class="goal-title">${goal.title}</div>
-                ${goal.target ? `
-                    <div class="goal-progress">
-                        <div class="goal-progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
-                    </div>
-                    <div class="goal-stats">
-                        <span>${goal.current || 0} / ${goal.target}</span>
-                        <span>${progress}%</span>
-                    </div>
-                ` : `
-                    <div style="color: #9CA3AF; margin-top: 10px;">Non-measurable goal</div>
-                `}
-                ${goal.deadline ? `<div style="color: #6B7280; margin-top: 10px; font-size: 0.85em;">📅 ${goal.deadline}</div>` : ''}
+  container.innerHTML = goals
+    .map(
+      (goal) => `
+      <div class="goal-card" style="
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:14px;
+        padding:18px;
+        margin-bottom:16px;
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+          <div>
+            <div style="color:white; font-weight:700; font-size:1.1em;">
+              ${escapeHtml(goal.title)}
             </div>
-        `;
-    });
+            ${
+              goal.description
+                ? `<div style="color:#9CA3AF; margin-top:6px;">${escapeHtml(
+                    goal.description
+                  )}</div>`
+                : ""
+            }
+          </div>
 
-    container.innerHTML = html;
+          <button
+            onclick="deleteGoal('${goal.id}')"
+            style="
+              background:rgba(255,80,80,0.15);
+              border:1px solid rgba(255,80,80,0.35);
+              color:#ffb4b4;
+              padding:6px 12px;
+              border-radius:8px;
+              cursor:pointer;
+            "
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    `
+    )
+    .join("");
 }
 
-// Open add goal modal
+/* ---------- Add Goal ---------- */
 function openAddGoal() {
-    const modal = document.getElementById('modal');
-    const modalBody = document.getElementById('modalBody');
-    
-    if (!modal || !modalBody) return;
+  const modal = document.getElementById("modal");
+  const modalBody = document.getElementById("modalBody");
+  if (!modal || !modalBody) return;
 
-    let html = '<h2 style="color: white; margin-bottom: 20px;">Add New Goal</h2>';
-    html += '<div class="form-group">';
-    html += '<label>Goal Title *</label>';
-    html += '<input type="text" id="goalTitle" class="form-input" placeholder="e.g., Reach 25K YouTube Subscribers">';
-    html += '</div>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Target Number (Optional)</label>';
-    html += '<input type="number" id="goalTarget" class="form-input" placeholder="e.g., 25000">';
-    html += '</div>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Current Progress (Optional)</label>';
-    html += '<input type="number" id="goalCurrent" class="form-input" placeholder="e.g., 750">';
-    html += '</div>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Deadline (Optional)</label>';
-    html += '<input type="text" id="goalDeadline" class="form-input" placeholder="e.g., May 2026">';
-    html += '</div>';
-    
-    html += '<div class="form-actions">';
-    html += '<button onclick="saveNewGoal()" class="form-submit">Add Goal</button>';
-    html += '<button onclick="closeModal()" class="form-cancel">Cancel</button>';
-    html += '</div>';
+  modalBody.innerHTML = `
+    <h2 style="color:white; margin-bottom:16px;">Add New Goal</h2>
 
-    modalBody.innerHTML = html;
-    modal.style.display = 'flex';
+    <div class="form-group">
+      <label>Goal Title *</label>
+      <input id="goalTitle" class="form-input" placeholder="e.g. Build discipline" />
+    </div>
+
+    <div class="form-group">
+      <label>Description (optional)</label>
+      <textarea id="goalDescription" class="form-input" rows="4"
+        placeholder="Why this goal matters..."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <button onclick="saveNewGoal()" class="form-submit">Add Goal</button>
+      <button onclick="closeModal()" class="form-cancel">Cancel</button>
+    </div>
+  `;
+
+  modal.style.display = "flex";
 }
 
-// Save new goal
 function saveNewGoal() {
-    const title = document.getElementById('goalTitle').value.trim();
-    const target = document.getElementById('goalTarget').value;
-    const current = document.getElementById('goalCurrent').value;
-    const deadline = document.getElementById('goalDeadline').value.trim();
+  const titleEl = document.getElementById("goalTitle");
+  const descEl = document.getElementById("goalDescription");
 
-    if (!title) {
-        alert('Please enter a goal title');
-        return;
-    }
+  if (!titleEl || !titleEl.value.trim()) {
+    alert("Please enter a goal title");
+    return;
+  }
 
-    const goal = {
-        id: Date.now().toString(),
-        title,
-        target: target ? parseInt(target) : null,
-        current: current ? parseInt(current) : 0,
-        deadline: deadline || null,
-        createdAt: new Date().toISOString(),
-        history: []
-    };
+  goals.push({
+    id: `goal_${Date.now()}`,
+    title: titleEl.value.trim(),
+    description: descEl ? descEl.value.trim() : "",
+    createdAt: new Date().toISOString()
+  });
 
-    goalsData.push(goal);
-    saveGoalsData();
-    closeModal();
-    renderGoals();
+  saveGoals();
+  closeModal();
+  renderGoals();
 }
 
-// Show goal details
-function showGoalDetails(goalId) {
-    const goal = goalsData.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const modal = document.getElementById('modal');
-    const modalBody = document.getElementById('modalBody');
-    
-    if (!modal || !modalBody) return;
-
-    const progress = goal.target ? Math.round((goal.current / goal.target) * 100) : 0;
-
-    let html = `<h2 style="color: white; margin-bottom: 20px;">${goal.title}</h2>`;
-    
-    if (goal.target) {
-        html += `
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="font-size: 3em; color: white; font-weight: bold; margin-bottom: 10px;">${progress}%</div>
-                <div class="goal-progress" style="margin-bottom: 10px;">
-                    <div class="goal-progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
-                </div>
-                <div style="color: #9CA3AF;">${goal.current} / ${goal.target}</div>
-            </div>
-        `;
-    }
-
-    if (goal.deadline) {
-        html += `<div style="color: #9CA3AF; margin-bottom: 20px;">📅 Deadline: ${goal.deadline}</div>`;
-    }
-
-    html += '<div style="display: flex; gap: 10px; margin-bottom: 10px;">';
-    html += `<button onclick="updateGoalProgress('${goalId}')" class="form-submit">Update Progress</button>`;
-    html += `<button onclick="editGoal('${goalId}')" class="form-submit">Edit</button>`;
-    html += '</div>';
-    
-    html += '<div style="display: flex; gap: 10px;">';
-    html += `<button onclick="deleteGoal('${goalId}')" class="form-cancel" style="background: rgba(255,50,50,0.2); border-color: rgba(255,50,50,0.3); color: #ff9999;">Delete Goal</button>`;
-    html += '<button onclick="closeModal()" class="form-cancel">Close</button>';
-    html += '</div>';
-
-    modalBody.innerHTML = html;
-    modal.style.display = 'flex';
-}
-
-// Update goal progress
-function updateGoalProgress(goalId) {
-    const goal = goalsData.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const modalBody = document.getElementById('modalBody');
-
-    let html = `<h2 style="color: white; margin-bottom: 20px;">Update Progress</h2>`;
-    html += `<div style="color: #9CA3AF; margin-bottom: 20px;">${goal.title}</div>`;
-    
-    html += '<div class="form-group">';
-    html += '<label>Current Progress</label>';
-    html += `<input type="number" id="newProgress" class="form-input" value="${goal.current || 0}" placeholder="Enter current progress">`;
-    html += '</div>';
-    
-    html += '<div class="form-actions">';
-    html += `<button onclick="saveGoalProgress('${goalId}')" class="form-submit">Update</button>`;
-    html += `<button onclick="showGoalDetails('${goalId}')" class="form-cancel">Cancel</button>`;
-    html += '</div>';
-
-    modalBody.innerHTML = html;
-}
-
-// Save goal progress
-function saveGoalProgress(goalId) {
-    const goal = goalsData.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const newProgress = parseInt(document.getElementById('newProgress').value);
-    
-    if (isNaN(newProgress)) {
-        alert('Please enter a valid number');
-        return;
-    }
-
-    goal.current = newProgress;
-    goal.history.push({
-        date: new Date().toISOString(),
-        value: newProgress
-    });
-
-    saveGoalsData();
-    renderGoals();
-    showGoalDetails(goalId);
-}
-
-// Edit goal
-function editGoal(goalId) {
-    const goal = goalsData.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const modalBody = document.getElementById('modalBody');
-
-    let html = '<h2 style="color: white; margin-bottom: 20px;">Edit Goal</h2>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Goal Title</label>';
-    html += `<input type="text" id="editGoalTitle" class="form-input" value="${goal.title}">`;
-    html += '</div>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Target Number</label>';
-    html += `<input type="number" id="editGoalTarget" class="form-input" value="${goal.target || ''}">`;
-    html += '</div>';
-    
-    html += '<div class="form-group">';
-    html += '<label>Deadline</label>';
-    html += `<input type="text" id="editGoalDeadline" class="form-input" value="${goal.deadline || ''}">`;
-    html += '</div>';
-    
-    html += '<div class="form-actions">';
-    html += `<button onclick="saveEditedGoal('${goalId}')" class="form-submit">Save Changes</button>`;
-    html += `<button onclick="showGoalDetails('${goalId}')" class="form-cancel">Cancel</button>`;
-    html += '</div>';
-
-    modalBody.innerHTML = html;
-}
-
-// Save edited goal
-function saveEditedGoal(goalId) {
-    const goal = goalsData.find(g => g.id === goalId);
-    if (!goal) return;
-
-    const title = document.getElementById('editGoalTitle').value.trim();
-    const target = document.getElementById('editGoalTarget').value;
-    const deadline = document.getElementById('editGoalDeadline').value.trim();
-
-    if (!title) {
-        alert('Please enter a goal title');
-        return;
-    }
-
-    goal.title = title;
-    goal.target = target ? parseInt(target) : null;
-    goal.deadline = deadline || null;
-
-    saveGoalsData();
-    renderGoals();
-    showGoalDetails(goalId);
-}
-
-// Delete goal
+/* ---------- Delete ---------- */
 function deleteGoal(goalId) {
-    if (!confirm('Are you sure you want to delete this goal?')) {
-        return;
-    }
+  if (!confirm("Delete this goal?")) return;
 
-    const index = goalsData.findIndex(g => g.id === goalId);
-    if (index !== -1) {
-        goalsData.splice(index, 1);
-        saveGoalsData();
-        renderGoals();
-        closeModal();
-    }
+  goals = goals.filter((g) => g.id !== goalId);
+  saveGoals();
+  renderGoals();
 }
+
+/* ---------- Helpers ---------- */
+function escapeHtml(str) {
+  return String(str || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/* ---------- Boot ---------- */
+(function bootGoals() {
+  initGoalsData();
+  if (document.getElementById("goalsGrid")) {
+    renderGoals();
+  }
+})();
