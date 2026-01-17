@@ -6,161 +6,169 @@ let contentData = {
     subscribers: 0,
     videosThisMonth: 0,
     hoursLogged: 0,
+    activity: {}, // YYYY-MM-DD → { videos: number, hours: number }
     videoIdeas: [],
-    notes: '',
-    monthlyGoal: 12,
-    streak: {
-        current: 0,
-        lastActiveDate: null
-    }
+    notes: ''
 };
 
-function initContentData() {
-    const saved = localStorage.getItem('contentData');
-    if (saved) contentData = JSON.parse(saved);
-    updateContentStreak(false);
+// ---------- Helpers ----------
+function getContentDayKey(date = new Date()) {
+    return date.toISOString().split('T')[0];
 }
 
+// ---------- Init ----------
+function initContentData() {
+    const saved = localStorage.getItem('contentData');
+    if (saved) {
+        try {
+            contentData = JSON.parse(saved);
+        } catch {
+            contentData = contentData;
+        }
+    }
+}
+
+// ---------- Save ----------
 function saveContentData() {
     localStorage.setItem('contentData', JSON.stringify(contentData));
 }
 
-function getToday() {
-    return new Date().toISOString().split('T')[0];
-}
-
-function isYesterday(d) {
-    const x = new Date(d);
-    const y = new Date();
-    y.setDate(y.getDate() - 1);
-    return x.toDateString() === y.toDateString();
-}
-
-function updateContentStreak(acted) {
-    const today = getToday();
-    const last = contentData.streak.lastActiveDate;
-
-    if (!last && acted) {
-        contentData.streak.current = 1;
-        contentData.streak.lastActiveDate = today;
-    } else if (last === today) {
-        return;
-    } else if (last && isYesterday(last) && acted) {
-        contentData.streak.current++;
-        contentData.streak.lastActiveDate = today;
-    } else if (acted) {
-        contentData.streak.current = 1;
-        contentData.streak.lastActiveDate = today;
+// ---------- Activity Logging ----------
+function logContentActivity(type, amount = 1) {
+    const today = getContentDayKey();
+    if (!contentData.activity[today]) {
+        contentData.activity[today] = { videos: 0, hours: 0 };
     }
-
-    saveContentData();
+    contentData.activity[today][type] += amount;
 }
 
+// ---------- Render ----------
 function renderContentTracker() {
-    const c = document.getElementById('contentContainer');
-    if (!c) return;
+    const container = document.getElementById('contentContainer');
+    if (!container) return;
 
-    const streak = contentData.streak.current || 0;
-    const goalPct = Math.min(
-        100,
-        Math.round((contentData.videosThisMonth / contentData.monthlyGoal) * 100)
-    );
-
-    c.innerHTML = `
-        <div class="content-streak-card">
-            ${streak > 0
-                ? `🔥 Content Streak: <strong>${streak} day${streak > 1 ? 's' : ''}</strong>`
-                : `Log content today to start your streak`}
-        </div>
-
-        <div class="monthly-goal-card">
-            <div style="margin-bottom:6px;">
-                🎯 Monthly Video Goal — ${contentData.videosThisMonth} / ${contentData.monthlyGoal}
-            </div>
-            <div class="goal-bar">
-                <div class="goal-fill" style="width:${goalPct}%;"></div>
-            </div>
-        </div>
-
-        <div class="section-title" style="margin-top:20px;">🎬 Content Tracker</div>
+    let html = `
+        <div class="section-title">🎬 Content Tracker</div>
 
         <div class="content-stats">
             <div class="content-stat-card">
-                <div>Subscribers</div>
-                <div class="stat-big">${contentData.subscribers}</div>
-                <input id="subsInput" type="number">
+                <div class="stat-label">Subscribers</div>
+                <div class="stat-number">${contentData.subscribers}</div>
+                <input id="subsInput" type="number" placeholder="Update" />
                 <button onclick="updateSubscribers()">Update</button>
             </div>
 
             <div class="content-stat-card">
-                <div>Videos This Month</div>
-                <div class="stat-big">${contentData.videosThisMonth}</div>
-                <button onclick="changeVideosCount(-1)">−</button>
+                <div class="stat-label">Videos This Month</div>
+                <div class="stat-number">${contentData.videosThisMonth}</div>
+                <button onclick="changeVideosCount(-1)">-</button>
                 <button onclick="changeVideosCount(1)">+</button>
             </div>
 
             <div class="content-stat-card">
-                <div>Hours Logged</div>
-                <div class="stat-big">${contentData.hoursLogged}</div>
-                <button onclick="changeHoursLogged(-1)">−</button>
+                <div class="stat-label">Hours Logged</div>
+                <div class="stat-number">${contentData.hoursLogged}</div>
+                <button onclick="changeHoursLogged(-1)">-</button>
                 <button onclick="changeHoursLogged(1)">+</button>
             </div>
         </div>
 
-        <div class="ideas-list">
+        <!-- Content Activity History -->
+        <div style="margin-top:30px;">
+            <div class="section-title">📆 Content Activity (Last 14 Days)</div>
+            <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-top:12px;">
+                ${renderContentHistory()}
+            </div>
+        </div>
+
+        <!-- Video Ideas -->
+        <div style="margin-top:40px;">
             <div class="section-title">💡 Video Ideas</div>
             <button onclick="addVideoIdea()">➕ Add Idea</button>
-            ${contentData.videoIdeas.length === 0
-                ? `<p class="muted">No ideas yet.</p>`
-                : contentData.videoIdeas.map((v,i)=>`
-                    <div class="idea-item">
-                        <strong>${v.title}</strong>
-                        <button onclick="deleteVideoIdea(${i})">Delete</button>
-                    </div>
-                `).join('')}
+            ${renderVideoIdeas()}
         </div>
 
-        <div class="ideas-list">
+        <!-- Notes -->
+        <div style="margin-top:40px;">
             <div class="section-title">📝 Content Notes</div>
-            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes||''}</textarea>
+            <textarea id="contentNotes" onchange="saveContentNotes()">${contentData.notes}</textarea>
         </div>
     `;
+
+    container.innerHTML = html;
 }
 
+// ---------- History Grid ----------
+function renderContentHistory() {
+    let out = '';
+    for (let i = 13; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = getContentDayKey(d);
+        const activity = contentData.activity[key];
+        const active = activity && (activity.videos > 0 || activity.hours > 0);
+
+        out += `
+            <div style="
+                padding:12px;
+                border-radius:10px;
+                text-align:center;
+                background:${active ? 'rgba(34,197,94,.2)' : 'rgba(255,255,255,.05)'};
+                border:1px solid ${active ? '#22c55e' : 'rgba(255,255,255,.15)'};
+                color:white;
+                font-size:.85rem;
+            ">
+                <div>${d.getDate()}</div>
+                ${active ? '🔥' : '•'}
+            </div>
+        `;
+    }
+    return out;
+}
+
+// ---------- Actions ----------
 function updateSubscribers() {
-    const v = parseInt(document.getElementById('subsInput').value);
-    if (isNaN(v)) return;
-    contentData.subscribers = v;
-    updateContentStreak(true);
-    renderContentTracker();
+    const val = parseInt(document.getElementById('subsInput').value);
+    if (!isNaN(val)) {
+        contentData.subscribers = val;
+        saveContentData();
+        renderContentTracker();
+    }
 }
 
-function changeVideosCount(d) {
-    contentData.videosThisMonth = Math.max(0, contentData.videosThisMonth + d);
-    updateContentStreak(true);
-    renderContentTracker();
-}
-
-function changeHoursLogged(d) {
-    contentData.hoursLogged = Math.max(0, contentData.hoursLogged + d);
-    updateContentStreak(true);
-    renderContentTracker();
-}
-
-function addVideoIdea() {
-    const t = prompt('Video idea title');
-    if (!t) return;
-    contentData.videoIdeas.push({ title: t });
-    updateContentStreak(true);
-    renderContentTracker();
-}
-
-function deleteVideoIdea(i) {
-    contentData.videoIdeas.splice(i, 1);
+function changeVideosCount(delta) {
+    contentData.videosThisMonth = Math.max(0, contentData.videosThisMonth + delta);
+    if (delta > 0) logContentActivity('videos', delta);
     saveContentData();
     renderContentTracker();
 }
 
+function changeHoursLogged(delta) {
+    contentData.hoursLogged = Math.max(0, contentData.hoursLogged + delta);
+    if (delta > 0) logContentActivity('hours', delta);
+    saveContentData();
+    renderContentTracker();
+}
+
+// ---------- Ideas ----------
+function addVideoIdea() {
+    const title = prompt('Video idea:');
+    if (!title) return;
+    contentData.videoIdeas.push({ title });
+    saveContentData();
+    renderContentTracker();
+}
+
+function renderVideoIdeas() {
+    if (!contentData.videoIdeas.length) {
+        return `<p style="opacity:.6;">No ideas yet</p>`;
+    }
+    return contentData.videoIdeas
+        .map((i, idx) => `<div>• ${i.title}</div>`)
+        .join('');
+}
+
+// ---------- Notes ----------
 function saveContentNotes() {
     contentData.notes = document.getElementById('contentNotes').value;
     saveContentData();
