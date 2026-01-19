@@ -1,128 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Kings Protocol</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kings Protocol</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:,">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
 
-  <!-- ================= HEADER ================= -->
-  <header class="top-bar">
-    <div class="time-card">
-      <div id="currentTime">--:--</div>
-      <div id="currentCity">New York</div>
-      <div id="currentDate"></div>
+<body class="fire-mode">
+    <div class="container">
+
+        <!-- Header -->
+        <div style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px;">
+
+                <!-- Clock -->
+                <div class="widget" id="clockWidget" style="flex: 1;">
+                    <div class="widget-icon">🕐</div>
+                    <div>
+                        <div class="widget-value" id="currentTime">--:--</div>
+                        <div class="widget-label" id="currentLocation">New York</div>
+                        <div class="widget-sublabel" id="currentDate">---</div>
+                    </div>
+                </div>
+
+                <!-- Weather -->
+                <div class="widget" id="weatherWidget" style="flex: 1;">
+                    <div class="widget-icon">🌤️</div>
+                    <div>
+                        <div class="widget-value">72°F</div>
+                        <div class="widget-label">Yonkers</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <h1 style="
+                text-align: center;
+                font-size: 2.5em;
+                margin: 20px 0;
+                background: linear-gradient(135deg, #ffffff 0%, #9CA3AF 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            ">
+                Kings Protocol
+            </h1>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-tabs" style="display:flex; width:100%;">
+            <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
+            <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
+            <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
+            <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
+            <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
+            <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
+            <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboardPage" class="page active">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="daysAt80">0/7</div>
+                    <div class="stat-label">Days at 80%+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="weeklyCompletion">0%</div>
+                    <div class="stat-label">Weekly Completion</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="currentStreak">0</div>
+                    <div class="stat-label">Current Streak</div>
+                </div>
+            </div>
+
+            <div id="dailyStatus" style="
+                margin-top: 18px;
+                margin-bottom: 22px;
+                padding: 16px 18px;
+                border-radius: 14px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.18);
+                color: #E5E7EB;
+            ">
+                Checking today’s status…
+            </div>
+
+            <div class="habit-section">
+                <div class="section-title">😊 Energy & Mood</div>
+                <div id="moodTracker"></div>
+            </div>
+
+            <div class="habit-section">
+                <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>📋 Daily Habits - This Week</span>
+                    <button onclick="openManageHabits()" style="
+                        padding: 8px 16px;
+                        background: rgba(255,255,255,0.1);
+                        border: 1px solid rgba(255,255,255,0.2);
+                        border-radius: 8px;
+                        color: white;
+                        cursor: pointer;
+                    ">
+                        ⚙️ Manage Habits
+                    </button>
+                </div>
+                <div id="habitGrid"></div>
+            </div>
+
+            <div class="streak-section">
+                <div class="streak-display">
+                    <div class="streak-number" id="streakNumber">0</div>
+                    <div class="streak-label">DAY STREAK</div>
+                    <div class="streak-best">Best: <span id="bestStreak">0</span></div>
+                </div>
+                <div id="milestones"></div>
+            </div>
+        </div>
+
+        <!-- Other Pages -->
+        <div id="goalsHabitsPage" class="page"><div id="goalsGrid"></div></div>
+        <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
+        <div id="journalPage" class="page"><div id="journalContainer"></div></div>
+        <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
+        <div id="contentPage" class="page"><div id="contentContainer"></div></div>
+        <div id="booksPage" class="page"><div id="booksContainer"></div></div>
+
+        <div id="settingsPage" class="page">
+            <div class="section-title">⚙️ Settings</div>
+            <p style="color:#9CA3AF; text-align:center; padding:40px;">Coming Soon…</p>
+        </div>
+
     </div>
 
-    <div class="weather-card">
-      <div id="weatherTemp">--°F</div>
-      <div id="weatherCity">--</div>
-    </div>
-  </header>
-
-  <h1 class="app-title">Kings Protocol</h1>
-
-  <!-- ================= NAV ================= -->
-  <nav class="main-nav">
-    <button onclick="showPage('dashboardPage')">Dashboard</button>
-    <button onclick="showPage('goalsPage')">Goals</button>
-    <button onclick="showPage('workoutsPage')">Workouts</button>
-    <button onclick="showPage('journalPage')">Journal</button>
-    <button onclick="showPage('visionPage')">Vision Board</button>
-    <button onclick="showPage('contentPage')">Content</button>
-    <button onclick="showPage('booksPage')">Books</button>
-    <button onclick="showPage('settingsPage')">Settings</button>
-  </nav>
-
-  <!-- ================= PAGES ================= -->
-
-  <!-- DASHBOARD -->
-  <section id="dashboardPage" class="page active">
-    <!-- existing dashboard content untouched -->
-  </section>
-
-  <!-- ================= GOALS (NEW / FIXED) ================= -->
-  <section id="goalsPage" class="page">
-
-    <div style="
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      margin-bottom:24px;
-    ">
-      <h2 style="color:white;font-size:1.6em;">Goals</h2>
-
-      <button
-        onclick="openAddGoal()"
-        style="
-          background:linear-gradient(135deg,#7c7cff,#b86bff);
-          border:none;
-          color:white;
-          padding:10px 18px;
-          border-radius:10px;
-          font-weight:600;
-          cursor:pointer;
-        ">
-        + Add New Goal
-      </button>
+    <!-- Modal -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
     </div>
 
-    <div id="goalsGrid">
-      <p class="empty-state">
-        No goals yet. Click <strong>+ Add New Goal</strong> to get started.
-      </p>
-    </div>
-
-  </section>
-
-  <!-- WORKOUTS -->
-  <section id="workoutsPage" class="page"></section>
-
-  <!-- JOURNAL -->
-  <section id="journalPage" class="page"></section>
-
-  <!-- VISION -->
-  <section id="visionPage" class="page"></section>
-
-  <!-- CONTENT -->
-  <section id="contentPage" class="page"></section>
-
-  <!-- BOOKS -->
-  <section id="booksPage" class="page"></section>
-
-  <!-- SETTINGS -->
-  <section id="settingsPage" class="page"></section>
-
-  <!-- ================= MODALS ================= -->
-
-  <!-- Add Goal Modal -->
-  <div id="addGoalModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Add New Goal</h3>
-
-      <input
-        id="newGoalTitle"
-        type="text"
-        placeholder="Goal title"
-      />
-
-      <textarea
-        id="newGoalDescription"
-        placeholder="Optional description"
-      ></textarea>
-
-      <div class="modal-actions">
-        <button onclick="closeAddGoal()">Cancel</button>
-        <button onclick="saveGoal()">Save Goal</button>
-      </div>
-    </div>
-  </div>
-
-   <!-- Scripts -->
+    <!-- Scripts -->
     <script src="features/habits.js"></script>
     <script src="features/goals.js"></script>
     <script src="features/mood.js"></script>
