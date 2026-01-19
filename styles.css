@@ -534,3 +534,79 @@ input, textarea, select{
   margin-left: auto;
   margin-right: auto;
 }
+/* ================================
+   GOAL CATEGORY TILES (SQUAREISH)
+================================ */
+
+.category-card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.category-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+}
+
+.category-overlay {
+  position: relative;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.65),
+    rgba(0,0,0,0.05)
+  );
+  text-align: left;
+}
+
+.category-title {
+  font-weight: 800;
+  color: white;
+}
+
+.category-count {
+  color: #d1d5db;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+/* small, non-obnoxious image button */
+.category-image-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.45);
+  color: white;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.category-image-btn:hover {
+  background: rgba(0,0,0,0.65);
+}
+
+/* Add Category Card */
+.add-category-card {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.add-category-plus {
+  font-size: 2rem;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
