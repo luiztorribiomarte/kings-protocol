@@ -1,10 +1,11 @@
 // ============================================
-// GOALS MODULE — CATEGORY GRID w/ IMAGES
+// GOALS MODULE — DRAGGABLE CATEGORY BOARD
 // ============================================
 
 let goals = [];
 let categories = [];
 let activeCategory = null;
+let dragCategoryId = null;
 
 /* ---------- Init ---------- */
 function initGoalsData() {
@@ -22,17 +23,17 @@ function initGoalsData() {
 
   if (!categories.length) {
     categories = [
-      { id: "money", name: "Money", image: "" },
-      { id: "social", name: "Social Media", image: "" },
-      { id: "learning", name: "Learning", image: "" },
-      { id: "health", name: "Health", image: "" },
-      { id: "finance", name: "Finance", image: "" }
+      { id: "money", name: "Money", image: "", order: 0 },
+      { id: "social", name: "Social Media", image: "", order: 1 },
+      { id: "learning", name: "Learning", image: "", order: 2 },
+      { id: "health", name: "Health", image: "", order: 3 },
+      { id: "finance", name: "Finance", image: "", order: 4 }
     ];
     saveCategories();
   }
 
   goals.forEach(g => {
-    if (!g.category) g.category = "uncategorized";
+    if (!g.category) g.category = "money";
   });
 }
 
@@ -59,60 +60,99 @@ function renderGoals() {
 
 /* ---------- Category Grid ---------- */
 function renderCategoryGrid(container) {
+  const ordered = [...categories].sort((a, b) => a.order - b.order);
+
   container.innerHTML = `
     <div class="goals-grid">
-      ${categories.map(cat => {
-        const count = goals.filter(g => g.category === cat.id).length;
-        return `
-          <div class="goal-card category-card" onclick="openCategory('${cat.id}')">
-            ${cat.image ? `<img src="${cat.image}" class="category-image" />` : ``}
+      ${ordered.map(cat => {
+        const catGoals = goals.filter(g => g.category === cat.id);
+        const percent = catGoals.length ? Math.min(100, catGoals.length * 20) : 0;
 
-            <button class="category-image-btn" onclick="event.stopPropagation(); openCategoryImage('${cat.id}')">
-              📷
+        return `
+          <div class="category-tile"
+               draggable="true"
+               ondragstart="onDragStart('${cat.id}')"
+               ondragover="onDragOver(event)"
+               ondrop="onDrop('${cat.id}')"
+               onclick="openCategory('${cat.id}')">
+
+            ${cat.image ? `<img src="${cat.image}" class="category-bg">` : ``}
+
+            <button class="category-menu-btn"
+              onclick="event.stopPropagation(); openCategoryMenu('${cat.id}')">
+              ⋯
             </button>
 
-            <div class="category-overlay">
+            <div class="category-content">
               <div class="category-title">${cat.name}</div>
-              <div class="category-count">${count} goals</div>
+              <div class="category-meta">${catGoals.length} goals</div>
+
+              <div class="category-progress">
+                <div class="category-progress-bar" style="width:${percent}%"></div>
+              </div>
             </div>
           </div>
         `;
       }).join("")}
 
-      <div class="goal-card category-card add-category-card" onclick="openAddCategory()">
-        <div class="add-category-plus">＋</div>
+      <div class="category-tile add-category-tile" onclick="openAddCategory()">
+        <div class="add-plus">＋</div>
         <div>Add Category</div>
       </div>
     </div>
   `;
 }
 
-/* ---------- Category Image ---------- */
-function openCategoryImage(categoryId) {
+/* ---------- Drag & Drop ---------- */
+function onDragStart(id) {
+  dragCategoryId = id;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+}
+
+function onDrop(targetId) {
+  if (dragCategoryId === targetId) return;
+
+  const a = categories.find(c => c.id === dragCategoryId);
+  const b = categories.find(c => c.id === targetId);
+  if (!a || !b) return;
+
+  const temp = a.order;
+  a.order = b.order;
+  b.order = temp;
+
+  saveCategories();
+  renderGoals();
+}
+
+/* ---------- Category Menu ---------- */
+function openCategoryMenu(categoryId) {
   openModal(`
-    <h2>Category Image</h2>
-    <input type="file" accept="image/*" onchange="saveCategoryImage(event, '${categoryId}')" />
+    <h2>Category Options</h2>
+    <div class="form-group">
+      <label>Image URL</label>
+      <input id="categoryImageUrl" class="form-input" placeholder="https://..." />
+    </div>
     <div class="form-actions">
+      <button class="form-submit" onclick="saveCategoryImageUrl('${categoryId}')">Save</button>
       <button class="form-cancel" onclick="closeModal()">Cancel</button>
     </div>
   `);
 }
 
-function saveCategoryImage(e, categoryId) {
-  const file = e.target.files[0];
-  if (!file) return;
+function saveCategoryImageUrl(categoryId) {
+  const input = document.getElementById("categoryImageUrl");
+  if (!input || !input.value.trim()) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    const cat = categories.find(c => c.id === categoryId);
-    if (cat) {
-      cat.image = reader.result;
-      saveCategories();
-      closeModal();
-      renderGoals();
-    }
-  };
-  reader.readAsDataURL(file);
+  const cat = categories.find(c => c.id === categoryId);
+  if (cat) {
+    cat.image = input.value.trim();
+    saveCategories();
+    closeModal();
+    renderGoals();
+  }
 }
 
 /* ---------- Category View ---------- */
@@ -177,7 +217,8 @@ function saveNewCategory() {
   categories.push({
     id: "cat_" + Date.now(),
     name: input.value.trim(),
-    image: ""
+    image: "",
+    order: categories.length
   });
 
   saveCategories();
