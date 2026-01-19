@@ -1,19 +1,41 @@
 // ============================================
-// GOALS MODULE (standalone, no habits)
+// GOALS MODULE — CATEGORY-BASED (EXTENDED)
 // ============================================
 
 let goals = [];
+let categories = [];
+let activeCategory = null;
 
 /* ---------- Init ---------- */
 function initGoalsData() {
-  const saved = localStorage.getItem("goals");
-  if (saved) {
-    try {
-      goals = JSON.parse(saved) || [];
-    } catch {
-      goals = [];
-    }
+  try {
+    goals = JSON.parse(localStorage.getItem("goals")) || [];
+  } catch {
+    goals = [];
   }
+
+  try {
+    categories = JSON.parse(localStorage.getItem("goalCategories")) || [];
+  } catch {
+    categories = [];
+  }
+
+  // Default categories (only added once)
+  if (!categories.length) {
+    categories = [
+      { id: "money", name: "Money" },
+      { id: "social", name: "Social Media" },
+      { id: "learning", name: "Learning" },
+      { id: "health", name: "Health" },
+      { id: "finance", name: "Finance" }
+    ];
+    saveCategories();
+  }
+
+  // Backfill old goals
+  goals.forEach(g => {
+    if (!g.category) g.category = "uncategorized";
+  });
 }
 
 /* ---------- Save ---------- */
@@ -21,111 +43,142 @@ function saveGoals() {
   localStorage.setItem("goals", JSON.stringify(goals));
 }
 
-/* ---------- Render ---------- */
+function saveCategories() {
+  localStorage.setItem("goalCategories", JSON.stringify(categories));
+}
+
+/* ---------- Render Entry ---------- */
 function renderGoals() {
   const container = document.getElementById("goalsGrid");
   if (!container) return;
 
-  if (!goals.length) {
-    container.innerHTML = `
-      <div style="
-        text-align:center;
-        color:#9CA3AF;
-        padding:40px;
-        font-size:1.05em;
-      ">
-        No goals yet. Click <strong>+ Add New Goal</strong> to get started.
-      </div>
-    `;
-    return;
+  if (!activeCategory) {
+    renderCategoryGrid(container);
+  } else {
+    renderGoalsInCategory(container, activeCategory);
   }
+}
 
-  container.innerHTML = goals
-    .map(
-      (goal) => `
-      <div class="goal-card" style="
-        background:rgba(255,255,255,0.05);
-        border:1px solid rgba(255,255,255,0.12);
-        border-radius:14px;
-        padding:18px;
-        margin-bottom:16px;
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:start;">
-          <div>
-            <div style="color:white; font-weight:700; font-size:1.1em;">
-              ${escapeHtml(goal.title)}
-            </div>
-            ${
-              goal.description
-                ? `<div style="color:#9CA3AF; margin-top:6px;">${escapeHtml(
-                    goal.description
-                  )}</div>`
-                : ""
-            }
+/* ---------- Category Grid ---------- */
+function renderCategoryGrid(container) {
+  container.innerHTML = `
+    <div class="goals-grid">
+      ${categories.map(cat => {
+        const count = goals.filter(g => g.category === cat.id).length;
+        return `
+          <div class="goal-card" onclick="openCategory('${cat.id}')">
+            <div style="font-weight:800;">${cat.name}</div>
+            <div style="color:#9CA3AF; margin-top:6px;">${count} goals</div>
           </div>
+        `;
+      }).join("")}
 
-          <button
-            onclick="deleteGoal('${goal.id}')"
-            style="
-              background:rgba(255,80,80,0.15);
-              border:1px solid rgba(255,80,80,0.35);
-              color:#ffb4b4;
-              padding:6px 12px;
-              border-radius:8px;
-              cursor:pointer;
-            "
-          >
-            Delete
-          </button>
-        </div>
+      <div class="goal-card" onclick="openAddCategory()" style="text-align:center;">
+        <div style="font-size:1.5em;">＋</div>
+        <div style="margin-top:6px;">Add Category</div>
       </div>
-    `
-    )
-    .join("");
+    </div>
+  `;
+}
+
+/* ---------- Category View ---------- */
+function openCategory(categoryId) {
+  activeCategory = categoryId;
+  renderGoals();
+}
+
+function renderGoalsInCategory(container, categoryId) {
+  const cat = categories.find(c => c.id === categoryId);
+  const filtered = goals.filter(g => g.category === categoryId);
+
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <button onclick="goBackToCategories()">← Back</button>
+      <div style="font-weight:800;">${cat.name}</div>
+      <button onclick="openAddGoal('${categoryId}')">+ Add Goal</button>
+    </div>
+
+    ${
+      filtered.length === 0
+        ? `<div style="color:#9CA3AF; padding:40px; text-align:center;">No goals in this category yet.</div>`
+        : filtered.map(goal => `
+            <div class="goal-card">
+              <div style="display:flex; justify-content:space-between;">
+                <div>
+                  <div style="font-weight:700;">${escapeHtml(goal.title)}</div>
+                  ${goal.description ? `<div style="color:#9CA3AF; margin-top:6px;">${escapeHtml(goal.description)}</div>` : ""}
+                </div>
+                <button onclick="deleteGoal('${goal.id}')">Delete</button>
+              </div>
+            </div>
+          `).join("")
+    }
+  `;
+}
+
+function goBackToCategories() {
+  activeCategory = null;
+  renderGoals();
+}
+
+/* ---------- Add Category ---------- */
+function openAddCategory() {
+  openModal(`
+    <h2>Add Category</h2>
+    <div class="form-group">
+      <label>Name</label>
+      <input id="newCategoryName" class="form-input" />
+    </div>
+    <div class="form-actions">
+      <button class="form-submit" onclick="saveNewCategory()">Add</button>
+      <button class="form-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+function saveNewCategory() {
+  const input = document.getElementById("newCategoryName");
+  if (!input || !input.value.trim()) return;
+
+  categories.push({
+    id: "cat_" + Date.now(),
+    name: input.value.trim()
+  });
+
+  saveCategories();
+  closeModal();
+  renderGoals();
 }
 
 /* ---------- Add Goal ---------- */
-function openAddGoal() {
-  const modal = document.getElementById("modal");
-  const modalBody = document.getElementById("modalBody");
-  if (!modal || !modalBody) return;
-
-  modalBody.innerHTML = `
-    <h2 style="color:white; margin-bottom:16px;">Add New Goal</h2>
-
+function openAddGoal(categoryId) {
+  openModal(`
+    <h2>Add Goal</h2>
     <div class="form-group">
-      <label>Goal Title *</label>
-      <input id="goalTitle" class="form-input" placeholder="e.g. Build discipline" />
+      <label>Title</label>
+      <input id="goalTitle" class="form-input" />
     </div>
-
     <div class="form-group">
-      <label>Description (optional)</label>
-      <textarea id="goalDescription" class="form-input" rows="4"
-        placeholder="Why this goal matters..."></textarea>
+      <label>Description</label>
+      <textarea id="goalDescription" class="form-input"></textarea>
     </div>
-
     <div class="form-actions">
-      <button onclick="saveNewGoal()" class="form-submit">Add Goal</button>
-      <button onclick="closeModal()" class="form-cancel">Cancel</button>
+      <button class="form-submit" onclick="saveNewGoal('${categoryId}')">Add</button>
+      <button class="form-cancel" onclick="closeModal()">Cancel</button>
     </div>
-  `;
-
-  modal.style.display = "flex";
+  `);
 }
 
-function saveNewGoal() {
-  const titleEl = document.getElementById("goalTitle");
-  const descEl = document.getElementById("goalDescription");
-
-  if (!titleEl || !titleEl.value.trim()) {
-    alert("Please enter a goal title");
-    return;
-  }
+function saveNewGoal(categoryId) {
+  const title = document.getElementById("goalTitle").value.trim();
+  const desc = document.getElementById("goalDescription").value.trim();
+  if (!title) return alert("Title required");
 
   goals.push({
-    id: `goal_${Date.now()}`,
-    title: titleEl.value.trim(),
-    description: descEl ? descEl.value.trim() : "",
+    id: "goal_" + Date.now(),
+    title,
+    description: desc,
+    category: categoryId,
     createdAt: new Date().toISOString()
   });
 
@@ -135,10 +188,9 @@ function saveNewGoal() {
 }
 
 /* ---------- Delete ---------- */
-function deleteGoal(goalId) {
+function deleteGoal(id) {
   if (!confirm("Delete this goal?")) return;
-
-  goals = goals.filter((g) => g.id !== goalId);
+  goals = goals.filter(g => g.id !== id);
   saveGoals();
   renderGoals();
 }
@@ -156,7 +208,5 @@ function escapeHtml(str) {
 /* ---------- Boot ---------- */
 (function bootGoals() {
   initGoalsData();
-  if (document.getElementById("goalsGrid")) {
-    renderGoals();
-  }
+  renderGoals();
 })();
