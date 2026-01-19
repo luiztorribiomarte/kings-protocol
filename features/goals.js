@@ -127,16 +127,27 @@ function onDrop(targetId) {
   renderGoals();
 }
 
-/* ---------- Category Menu ---------- */
+/* ---------- Category Menu (IMAGE VIA URL) ---------- */
 function openCategoryMenu(categoryId) {
+  const cat = categories.find(c => c.id === categoryId);
+
   openModal(`
-    <h2>Category Options</h2>
+    <h2>Category Image</h2>
+
     <div class="form-group">
       <label>Image URL</label>
-      <input id="categoryImageUrl" class="form-input" placeholder="https://..." />
+      <input
+        id="categoryImageUrl"
+        class="form-input"
+        placeholder="https://example.com/image.jpg"
+        value="${cat?.image || ""}"
+      />
     </div>
+
     <div class="form-actions">
-      <button class="form-submit" onclick="saveCategoryImageUrl('${categoryId}')">Save</button>
+      <button class="form-submit" onclick="saveCategoryImageUrl('${categoryId}')">
+        Save
+      </button>
       <button class="form-cancel" onclick="closeModal()">Cancel</button>
     </div>
   `);
@@ -144,11 +155,13 @@ function openCategoryMenu(categoryId) {
 
 function saveCategoryImageUrl(categoryId) {
   const input = document.getElementById("categoryImageUrl");
-  if (!input || !input.value.trim()) return;
+  if (!input) return;
+
+  const url = input.value.trim();
 
   const cat = categories.find(c => c.id === categoryId);
   if (cat) {
-    cat.image = input.value.trim();
+    cat.image = url;
     saveCategories();
     closeModal();
     renderGoals();
@@ -174,13 +187,19 @@ function renderGoalsInCategory(container, categoryId) {
 
     ${
       filtered.length === 0
-        ? `<div style="color:#9CA3AF; padding:40px; text-align:center;">No goals in this category yet.</div>`
+        ? `<div style="color:#9CA3AF; padding:40px; text-align:center;">
+             No goals in this category yet.
+           </div>`
         : filtered.map(goal => `
             <div class="goal-card">
               <div style="display:flex; justify-content:space-between;">
                 <div>
                   <div style="font-weight:700;">${escapeHtml(goal.title)}</div>
-                  ${goal.description ? `<div style="color:#9CA3AF; margin-top:6px;">${escapeHtml(goal.description)}</div>` : ""}
+                  ${goal.description
+                    ? `<div style="color:#9CA3AF; margin-top:6px;">
+                         ${escapeHtml(goal.description)}
+                       </div>`
+                    : ""}
                 </div>
                 <button onclick="deleteGoal('${goal.id}')">Delete</button>
               </div>
