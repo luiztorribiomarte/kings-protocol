@@ -1,5 +1,5 @@
 // ============================================
-// GOALS MODULE — CATEGORY-BASED (EXTENDED)
+// GOALS MODULE — CATEGORY GRID w/ IMAGES
 // ============================================
 
 let goals = [];
@@ -20,19 +20,17 @@ function initGoalsData() {
     categories = [];
   }
 
-  // Default categories (only added once)
   if (!categories.length) {
     categories = [
-      { id: "money", name: "Money" },
-      { id: "social", name: "Social Media" },
-      { id: "learning", name: "Learning" },
-      { id: "health", name: "Health" },
-      { id: "finance", name: "Finance" }
+      { id: "money", name: "Money", image: "" },
+      { id: "social", name: "Social Media", image: "" },
+      { id: "learning", name: "Learning", image: "" },
+      { id: "health", name: "Health", image: "" },
+      { id: "finance", name: "Finance", image: "" }
     ];
     saveCategories();
   }
 
-  // Backfill old goals
   goals.forEach(g => {
     if (!g.category) g.category = "uncategorized";
   });
@@ -66,19 +64,55 @@ function renderCategoryGrid(container) {
       ${categories.map(cat => {
         const count = goals.filter(g => g.category === cat.id).length;
         return `
-          <div class="goal-card" onclick="openCategory('${cat.id}')">
-            <div style="font-weight:800;">${cat.name}</div>
-            <div style="color:#9CA3AF; margin-top:6px;">${count} goals</div>
+          <div class="goal-card category-card" onclick="openCategory('${cat.id}')">
+            ${cat.image ? `<img src="${cat.image}" class="category-image" />` : ``}
+
+            <button class="category-image-btn" onclick="event.stopPropagation(); openCategoryImage('${cat.id}')">
+              📷
+            </button>
+
+            <div class="category-overlay">
+              <div class="category-title">${cat.name}</div>
+              <div class="category-count">${count} goals</div>
+            </div>
           </div>
         `;
       }).join("")}
 
-      <div class="goal-card" onclick="openAddCategory()" style="text-align:center;">
-        <div style="font-size:1.5em;">＋</div>
-        <div style="margin-top:6px;">Add Category</div>
+      <div class="goal-card category-card add-category-card" onclick="openAddCategory()">
+        <div class="add-category-plus">＋</div>
+        <div>Add Category</div>
       </div>
     </div>
   `;
+}
+
+/* ---------- Category Image ---------- */
+function openCategoryImage(categoryId) {
+  openModal(`
+    <h2>Category Image</h2>
+    <input type="file" accept="image/*" onchange="saveCategoryImage(event, '${categoryId}')" />
+    <div class="form-actions">
+      <button class="form-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+function saveCategoryImage(e, categoryId) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const cat = categories.find(c => c.id === categoryId);
+    if (cat) {
+      cat.image = reader.result;
+      saveCategories();
+      closeModal();
+      renderGoals();
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 /* ---------- Category View ---------- */
@@ -142,7 +176,8 @@ function saveNewCategory() {
 
   categories.push({
     id: "cat_" + Date.now(),
-    name: input.value.trim()
+    name: input.value.trim(),
+    image: ""
   });
 
   saveCategories();
