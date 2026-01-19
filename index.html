@@ -125,8 +125,28 @@
             </div>
         </div>
 
+        <!-- Goals & Habits Page -->
+        <div id="goalsHabitsPage" class="page">
+
+            <!-- Goals Header -->
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <span>🎯 Goals</span>
+                <button onclick="openAddGoal()" style="
+                    padding: 8px 16px;
+                    background: rgba(255,255,255,0.1);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    border-radius: 8px;
+                    color: white;
+                    cursor: pointer;
+                ">
+                    + Add New Goal
+                </button>
+            </div>
+
+            <div id="goalsGrid"></div>
+        </div>
+
         <!-- Other Pages -->
-        <div id="goalsHabitsPage" class="page"><div id="goalsGrid"></div></div>
         <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
         <div id="journalPage" class="page"><div id="journalContainer"></div></div>
         <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
