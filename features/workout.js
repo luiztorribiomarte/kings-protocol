@@ -23,9 +23,18 @@ function initWorkoutData() {
         lifetimePullups = parseInt(savedPullups);
     }
 
+    hideAddGoalButton();
     renderWorkoutLogger();
     renderExerciseCards();
     renderLifetimeCounters();
+}
+
+/* ---------- Hide Add Goal Button ---------- */
+function hideAddGoalButton() {
+    const addGoalBtn = document.querySelector('[onclick="openGoalModal()"]');
+    if (addGoalBtn) {
+        addGoalBtn.style.display = 'none';
+    }
 }
 
 /* ---------- UI: Workout Logger ---------- */
@@ -37,7 +46,6 @@ function renderWorkoutLogger() {
 
     const logger = document.createElement('div');
     logger.id = 'workoutLogger';
-    logger.className = 'workout-log';
     logger.style.marginBottom = '20px';
 
     logger.innerHTML = `
@@ -107,7 +115,7 @@ function renderExerciseCards() {
 
     if (exercises.length === 0) {
         container.innerHTML = `
-            <div style="text-align:center; color:#9CA3AF; padding:40px;">
+            <div id="emptyWorkoutState" style="text-align:center; color:#9CA3AF; padding:40px;">
                 No exercises logged yet. Start tracking your workouts above!
             </div>
         `;
@@ -137,10 +145,8 @@ function renderExerciseCards() {
                         <div style="color:#9CA3AF;">Start</div>
                         <div>${first.weight} lbs</div>
                     </div>
-                    <div>
-                        <div style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'};">
-                            ${weightGain >= 0 ? '+' : ''}${weightGain} lbs
-                        </div>
+                    <div style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'};">
+                        ${weightGain >= 0 ? '+' : ''}${weightGain} lbs
                     </div>
                 </div>
 
@@ -152,7 +158,7 @@ function renderExerciseCards() {
     }).join('');
 }
 
-/* ---------- Chart Modal ---------- */
+/* ---------- Modal ---------- */
 function showExerciseChart(exerciseName) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
@@ -165,14 +171,13 @@ function showExerciseChart(exerciseName) {
 
     modalBody.innerHTML = `
         <h2>${exerciseName}</h2>
-
         <p>Current: ${latest.weight} lbs</p>
         <p>Total Gain: ${weightGain >= 0 ? '+' : ''}${weightGain} lbs</p>
         <p>Total Sessions: ${sessions.length}</p>
 
-        <div style="margin-top:16px;">
+        <div style="margin-top:16px; display:flex; gap:10px;">
             <button onclick="deleteExercise('${exerciseName}')" class="form-cancel">
-                Delete Exercise
+                Delete
             </button>
             <button onclick="closeModal()" class="form-submit">
                 Close
@@ -193,7 +198,7 @@ function deleteExercise(exerciseName) {
     renderExerciseCards();
 }
 
-/* ---------- Lifetime Counters ---------- */
+/* ---------- Lifetime ---------- */
 function renderLifetimeCounters() {
     const pushupsEl = document.getElementById('lifetimePushups');
     const pullupsEl = document.getElementById('lifetimePullups');
