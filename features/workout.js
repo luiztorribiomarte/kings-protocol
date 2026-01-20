@@ -14,21 +14,17 @@ function initWorkoutData() {
     }
 
     const savedPushups = localStorage.getItem('lifetimePushups');
-    if (savedPushups) {
-        lifetimePushups = parseInt(savedPushups);
-    }
+    if (savedPushups) lifetimePushups = parseInt(savedPushups);
 
     const savedPullups = localStorage.getItem('lifetimePullups');
-    if (savedPullups) {
-        lifetimePullups = parseInt(savedPullups);
-    }
+    if (savedPullups) lifetimePullups = parseInt(savedPullups);
 
     injectWorkoutCategorySelect();
     renderLifetimeCounters();
     renderExerciseCards();
 }
 
-// Inject category dropdown safely (no HTML edits required)
+// Inject category dropdown
 function injectWorkoutCategorySelect() {
     const nameInput = document.getElementById('exerciseName');
     if (!nameInput || document.getElementById('exerciseCategory')) return;
@@ -100,10 +96,16 @@ function renderExerciseCards() {
 
     const exercises = Object.keys(workoutData);
 
+    // CLEAN empty state (no big box)
     if (exercises.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; color: #6B7280; padding: 40px;">
-                No exercises logged yet. Start tracking your workouts above!
+            <div style="
+                text-align:center;
+                color:#6B7280;
+                padding:30px 0;
+                font-size:0.95em;
+            ">
+                No exercises logged yet. Start tracking your workouts above.
             </div>
         `;
         return;
@@ -154,33 +156,31 @@ function renderExerciseCards() {
     container.innerHTML = html;
 }
 
-// Show exercise chart
+// Show exercise chart (unchanged)
 function showExerciseChart(exerciseName) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
     if (!modal || !modalBody) return;
 
     const data = workoutData[exerciseName];
-    const sessions = data.sessions;
-    const latest = sessions[sessions.length - 1];
-    const first = sessions[0];
-    const weightGain = latest.weight - first.weight;
 
-    let html = `
+    modalBody.innerHTML = `
         <h2 style="color:white;">${exerciseName}</h2>
-        <div style="color:#9CA3AF; margin-bottom:16px;">Category: ${data.category}</div>
-    `;
+        <div style="color:#9CA3AF; margin-bottom:20px;">
+            Category: ${data.category}
+        </div>
 
-    html += `
         <button onclick="deleteExercise('${exerciseName}')"
-            style="width:100%; padding:10px; background:rgba(255,60,60,0.2);
-            border:1px solid rgba(255,60,60,0.3); border-radius:8px;
-            color:#ffb4b4; cursor:pointer;">
+            style="width:100%; padding:10px;
+            background:rgba(255,60,60,0.2);
+            border:1px solid rgba(255,60,60,0.3);
+            border-radius:8px;
+            color:#ffb4b4;
+            cursor:pointer;">
             Delete Exercise
         </button>
     `;
 
-    modalBody.innerHTML = html;
     modal.style.display = 'flex';
 }
 
