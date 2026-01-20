@@ -6,7 +6,7 @@ let workoutData = {};
 let lifetimePushups = 0;
 let lifetimePullups = 0;
 
-/* ---------- Init ---------- */
+// Initialize workout data
 function initWorkoutData() {
     const saved = localStorage.getItem('workoutData');
     if (saved) {
@@ -23,62 +23,44 @@ function initWorkoutData() {
         lifetimePullups = parseInt(savedPullups);
     }
 
-    hideAddGoalButton();
-    renderWorkoutLogger();
-    renderExerciseCards();
+    injectWorkoutCategorySelect();
     renderLifetimeCounters();
+    renderExerciseCards();
 }
 
-/* ---------- Hide Add Goal Button ---------- */
-function hideAddGoalButton() {
-    const addGoalBtn = document.querySelector('[onclick="openGoalModal()"]');
-    if (addGoalBtn) {
-        addGoalBtn.style.display = 'none';
-    }
-}
+// Inject category dropdown safely (no HTML edits required)
+function injectWorkoutCategorySelect() {
+    const nameInput = document.getElementById('exerciseName');
+    if (!nameInput || document.getElementById('exerciseCategory')) return;
 
-/* ---------- UI: Workout Logger ---------- */
-function renderWorkoutLogger() {
-    const page = document.getElementById('workoutPage');
-    if (!page) return;
+    const select = document.createElement('select');
+    select.id = 'exerciseCategory';
+    select.className = 'form-input';
+    select.style.marginRight = '10px';
 
-    if (document.getElementById('workoutLogger')) return;
-
-    const logger = document.createElement('div');
-    logger.id = 'workoutLogger';
-    logger.style.marginBottom = '20px';
-
-    logger.innerHTML = `
-        <div class="section-title">💪 Log Workout</div>
-
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px;">
-            <input id="exerciseName" class="form-input" placeholder="Exercise (Bench Press)" />
-            <input id="exerciseWeight" class="form-input" type="number" placeholder="Weight (lbs)" />
-            <input id="exerciseSets" class="form-input" type="number" placeholder="Sets" />
-            <input id="exerciseReps" class="form-input" type="number" placeholder="Reps" />
-        </div>
-
-        <div style="margin-top:12px;">
-            <button onclick="logWorkout()" class="form-submit">
-                Log Workout
-            </button>
-        </div>
+    select.innerHTML = `
+        <option value="Push">Push</option>
+        <option value="Pull">Pull</option>
+        <option value="Legs">Legs</option>
+        <option value="Cardio">Cardio</option>
+        <option value="Custom">Custom</option>
     `;
 
-    page.insertBefore(logger, page.firstChild);
+    nameInput.parentNode.insertBefore(select, nameInput);
 }
 
-/* ---------- Save ---------- */
+// Save workout data
 function saveWorkoutData() {
     localStorage.setItem('workoutData', JSON.stringify(workoutData));
 }
 
-/* ---------- Log Workout ---------- */
+// Log workout
 function logWorkout() {
     const exerciseName = document.getElementById('exerciseName').value.trim();
     const weight = parseInt(document.getElementById('exerciseWeight').value);
     const reps = parseInt(document.getElementById('exerciseReps').value);
     const sets = parseInt(document.getElementById('exerciseSets').value);
+    const category = document.getElementById('exerciseCategory')?.value || 'Custom';
 
     if (!exerciseName || !weight || !reps || !sets) {
         alert('Please fill in all fields');
@@ -86,10 +68,15 @@ function logWorkout() {
     }
 
     if (!workoutData[exerciseName]) {
-        workoutData[exerciseName] = [];
+        workoutData[exerciseName] = {
+            category,
+            sessions: []
+        };
     }
 
-    workoutData[exerciseName].push({
+    workoutData[exerciseName].category = category;
+
+    workoutData[exerciseName].sessions.push({
         date: new Date().toISOString(),
         weight,
         reps,
@@ -106,7 +93,7 @@ function logWorkout() {
     renderExerciseCards();
 }
 
-/* ---------- Render Exercise Cards ---------- */
+// Render exercise cards
 function renderExerciseCards() {
     const container = document.getElementById('exerciseCards');
     if (!container) return;
@@ -115,90 +102,98 @@ function renderExerciseCards() {
 
     if (exercises.length === 0) {
         container.innerHTML = `
-            <div id="emptyWorkoutState" style="text-align:center; color:#9CA3AF; padding:40px;">
+            <div style="text-align: center; color: #6B7280; padding: 40px;">
                 No exercises logged yet. Start tracking your workouts above!
             </div>
         `;
         return;
     }
 
-    container.innerHTML = exercises.map(exerciseName => {
-        const sessions = workoutData[exerciseName];
+    let html = '';
+
+    exercises.forEach(exerciseName => {
+        const data = workoutData[exerciseName];
+        const sessions = data.sessions;
         const latest = sessions[sessions.length - 1];
         const first = sessions[0];
-        const totalSessions = sessions.length;
         const weightGain = latest.weight - first.weight;
 
-        return `
+        html += `
             <div class="exercise-card" onclick="showExerciseChart('${exerciseName}')">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <div style="font-weight:800;">${exerciseName}</div>
-                    <div style="color:#9CA3AF;">${totalSessions} sessions</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="color:white; margin:0;">${exerciseName}</h3>
+                    <span style="color:#9CA3AF; font-size:0.85em;">
+                        ${data.category} • ${sessions.length} sessions
+                    </span>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px;">
                     <div>
-                        <div style="color:#9CA3AF;">Current</div>
-                        <div>${latest.weight} lbs</div>
+                        <div style="color:#9CA3AF; font-size:0.8em;">Current</div>
+                        <div style="color:white; font-weight:700;">${latest.weight} lbs</div>
                     </div>
                     <div>
-                        <div style="color:#9CA3AF;">Start</div>
-                        <div>${first.weight} lbs</div>
+                        <div style="color:#9CA3AF; font-size:0.8em;">Started</div>
+                        <div style="color:white; font-weight:700;">${first.weight} lbs</div>
                     </div>
-                    <div style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'};">
-                        ${weightGain >= 0 ? '+' : ''}${weightGain} lbs
+                    <div>
+                        <div style="color:#9CA3AF; font-size:0.8em;">Gain</div>
+                        <div style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'}; font-weight:700;">
+                            ${weightGain > 0 ? '+' : ''}${weightGain} lbs
+                        </div>
                     </div>
                 </div>
 
-                <div style="margin-top:8px; color:#9CA3AF;">
+                <div style="margin-top:8px; color:#6B7280; font-size:0.85em;">
                     Latest: ${latest.sets} × ${latest.reps}
                 </div>
             </div>
         `;
-    }).join('');
+    });
+
+    container.innerHTML = html;
 }
 
-/* ---------- Modal ---------- */
+// Show exercise chart
 function showExerciseChart(exerciseName) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
     if (!modal || !modalBody) return;
 
-    const sessions = workoutData[exerciseName];
+    const data = workoutData[exerciseName];
+    const sessions = data.sessions;
     const latest = sessions[sessions.length - 1];
     const first = sessions[0];
     const weightGain = latest.weight - first.weight;
 
-    modalBody.innerHTML = `
-        <h2>${exerciseName}</h2>
-        <p>Current: ${latest.weight} lbs</p>
-        <p>Total Gain: ${weightGain >= 0 ? '+' : ''}${weightGain} lbs</p>
-        <p>Total Sessions: ${sessions.length}</p>
-
-        <div style="margin-top:16px; display:flex; gap:10px;">
-            <button onclick="deleteExercise('${exerciseName}')" class="form-cancel">
-                Delete
-            </button>
-            <button onclick="closeModal()" class="form-submit">
-                Close
-            </button>
-        </div>
+    let html = `
+        <h2 style="color:white;">${exerciseName}</h2>
+        <div style="color:#9CA3AF; margin-bottom:16px;">Category: ${data.category}</div>
     `;
 
+    html += `
+        <button onclick="deleteExercise('${exerciseName}')"
+            style="width:100%; padding:10px; background:rgba(255,60,60,0.2);
+            border:1px solid rgba(255,60,60,0.3); border-radius:8px;
+            color:#ffb4b4; cursor:pointer;">
+            Delete Exercise
+        </button>
+    `;
+
+    modalBody.innerHTML = html;
     modal.style.display = 'flex';
 }
 
-/* ---------- Delete ---------- */
+// Delete exercise
 function deleteExercise(exerciseName) {
     if (!confirm(`Delete all data for ${exerciseName}?`)) return;
-
     delete workoutData[exerciseName];
     saveWorkoutData();
-    closeModal();
     renderExerciseCards();
+    closeModal();
 }
 
-/* ---------- Lifetime ---------- */
+// Render lifetime counters
 function renderLifetimeCounters() {
     const pushupsEl = document.getElementById('lifetimePushups');
     const pullupsEl = document.getElementById('lifetimePullups');
@@ -206,3 +201,6 @@ function renderLifetimeCounters() {
     if (pushupsEl) pushupsEl.textContent = lifetimePushups.toLocaleString();
     if (pullupsEl) pullupsEl.textContent = lifetimePullups.toLocaleString();
 }
+
+// Boot
+initWorkoutData();
