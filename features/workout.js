@@ -6,7 +6,7 @@ let workoutData = {};
 let lifetimePushups = 0;
 let lifetimePullups = 0;
 
-// Initialize workout data
+/* ---------- INIT ---------- */
 function initWorkoutData() {
     const saved = localStorage.getItem('workoutData');
     if (saved) {
@@ -17,67 +17,100 @@ function initWorkoutData() {
         }
     }
 
-    const savedPushups = localStorage.getItem('lifetimePushups');
-    if (savedPushups) {
-        lifetimePushups = parseInt(savedPushups) || 0;
-    }
-
-    const savedPullups = localStorage.getItem('lifetimePullups');
-    if (savedPullups) {
-        lifetimePullups = parseInt(savedPullups) || 0;
-    }
-
     renderExerciseCards();
     renderLifetimeCounters();
 }
 
-// Save workout data
+/* ---------- SAVE ---------- */
 function saveWorkoutData() {
     localStorage.setItem('workoutData', JSON.stringify(workoutData));
 }
 
-// Log workout
+/* ---------- LOG WORKOUT ---------- */
 function logWorkout() {
-    const exerciseName = document.getElementById('exerciseName').value.trim();
+    const name = document.getElementById('exerciseName').value.trim();
     const weight = parseInt(document.getElementById('exerciseWeight').value);
-    const reps = parseInt(document.getElementById('exerciseReps').value);
     const sets = parseInt(document.getElementById('exerciseSets').value);
+    const reps = parseInt(document.getElementById('exerciseReps').value);
 
-    if (!exerciseName || !weight || !reps || !sets) {
+    if (!name || !weight || !sets || !reps) {
         alert('Please fill in all fields');
         return;
     }
 
-    if (!workoutData[exerciseName]) {
-        workoutData[exerciseName] = [];
+    if (!workoutData[name]) {
+        workoutData[name] = [];
     }
 
-    workoutData[exerciseName].push({
+    workoutData[name].push({
         date: new Date().toISOString(),
         weight,
-        reps,
-        sets
+        sets,
+        reps
     });
 
     saveWorkoutData();
 
-    // Clear inputs
     document.getElementById('exerciseName').value = '';
     document.getElementById('exerciseWeight').value = '';
-    document.getElementById('exerciseReps').value = '';
     document.getElementById('exerciseSets').value = '';
+    document.getElementById('exerciseReps').value = '';
 
     renderExerciseCards();
 }
 
-// Render exercise cards
+/* ---------- HELPERS ---------- */
+function isThisWeek(dateStr) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    return d >= startOfWeek;
+}
+
+/* ---------- WEEKLY SUMMARY ---------- */
+function buildWeeklySummary() {
+    let workouts = 0;
+    let totalSets = 0;
+    let totalReps = 0;
+
+    Object.values(workoutData).forEach(sessions => {
+        sessions.forEach(s => {
+            if (isThisWeek(s.date)) {
+                workouts += 1;
+                totalSets += s.sets;
+                totalReps += s.reps * s.sets;
+            }
+        });
+    });
+
+    return `
+        <div class="stats-grid" style="margin-bottom:18px;">
+            <div class="stat-card">
+                <div class="stat-value">${workouts}</div>
+                <div class="stat-label">Workouts This Week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${totalSets}</div>
+                <div class="stat-label">Total Sets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${totalReps}</div>
+                <div class="stat-label">Total Reps</div>
+            </div>
+        </div>
+    `;
+}
+
+/* ---------- RENDER ---------- */
 function renderExerciseCards() {
     const container = document.getElementById('exerciseCards');
     if (!container) return;
 
     const exercises = Object.keys(workoutData);
 
-    // Empty state
+    // Empty state (true empty only)
     if (exercises.length === 0) {
         container.innerHTML = `
             <div style="
@@ -94,43 +127,42 @@ function renderExerciseCards() {
         return;
     }
 
-    let html = '';
+    let html = buildWeeklySummary();
 
-    exercises.forEach(exerciseName => {
-        const sessions = workoutData[exerciseName];
+    exercises.forEach(name => {
+        const sessions = workoutData[name];
         const latest = sessions[sessions.length - 1];
         const first = sessions[0];
-        const totalSessions = sessions.length;
-        const weightGain = latest.weight - first.weight;
+        const gain = latest.weight - first.weight;
 
         html += `
-            <div class="exercise-card" onclick="showExerciseChart('${exerciseName}')">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="color:white; margin:0;">${exerciseName}</h3>
+            <div class="exercise-card" onclick="showExerciseChart('${name}')">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; color:white;">${name}</h3>
                     <span style="color:#9CA3AF; font-size:0.85em;">
-                        ${totalSessions} session${totalSessions !== 1 ? 's' : ''}
+                        ${sessions.length} session${sessions.length !== 1 ? 's' : ''}
                     </span>
                 </div>
 
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
                     <div>
                         <div style="color:#9CA3AF; font-size:0.8em;">Current</div>
-                        <div style="color:white; font-weight:700;">${latest.weight} lbs</div>
+                        <div style="font-weight:700;">${latest.weight} lbs</div>
                     </div>
                     <div>
                         <div style="color:#9CA3AF; font-size:0.8em;">Started</div>
-                        <div style="color:white; font-weight:700;">${first.weight} lbs</div>
+                        <div style="font-weight:700;">${first.weight} lbs</div>
                     </div>
                     <div>
                         <div style="color:#9CA3AF; font-size:0.8em;">Gain</div>
-                        <div style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'}; font-weight:700;">
-                            ${weightGain > 0 ? '+' : ''}${weightGain} lbs
+                        <div style="font-weight:700; color:${gain >= 0 ? '#10B981' : '#EF4444'};">
+                            ${gain > 0 ? '+' : ''}${gain} lbs
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-top:8px; color:#9CA3AF; font-size:0.8em;">
-                    Latest: ${latest.sets} × ${latest.reps} reps
+                <div style="margin-top:8px; font-size:0.8em; color:#9CA3AF;">
+                    Latest: ${latest.sets} × ${latest.reps}
                 </div>
             </div>
         `;
@@ -139,62 +171,55 @@ function renderExerciseCards() {
     container.innerHTML = html;
 }
 
-// Show exercise details
-function showExerciseChart(exerciseName) {
+/* ---------- MODAL ---------- */
+function showExerciseChart(name) {
     const modal = document.getElementById('modal');
-    const modalBody = document.getElementById('modalBody');
-    if (!modal || !modalBody) return;
+    const body = document.getElementById('modalBody');
+    if (!modal || !body) return;
 
-    const sessions = workoutData[exerciseName];
+    const sessions = workoutData[name];
     const latest = sessions[sessions.length - 1];
     const first = sessions[0];
-    const weightGain = latest.weight - first.weight;
+    const gain = latest.weight - first.weight;
 
-    let html = `
-        <h2 style="color:white; margin-bottom:16px;">${exerciseName}</h2>
+    body.innerHTML = `
+        <h2 style="margin-bottom:16px;">${name}</h2>
 
-        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:18px;">
+        <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Current</div>
                 <div class="stat-value">${latest.weight} lbs</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Total Gain</div>
-                <div class="stat-value" style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'};">
-                    ${weightGain > 0 ? '+' : ''}${weightGain} lbs
+                <div class="stat-value" style="color:${gain >= 0 ? '#10B981' : '#EF4444'};">
+                    ${gain > 0 ? '+' : ''}${gain} lbs
                 </div>
             </div>
         </div>
 
-        <div style="display:flex; gap:10px;">
-            <button onclick="deleteExercise('${exerciseName}')" style="flex:1;">
-                Delete Exercise
-            </button>
-            <button onclick="closeModal()" style="flex:1;">
-                Close
-            </button>
+        <div style="display:flex; gap:10px; margin-top:18px;">
+            <button onclick="deleteExercise('${name}')" style="flex:1;">Delete</button>
+            <button onclick="closeModal()" style="flex:1;">Close</button>
         </div>
     `;
 
-    modalBody.innerHTML = html;
     modal.style.display = 'flex';
 }
 
-// Delete exercise
-function deleteExercise(exerciseName) {
-    if (!confirm(`Delete all data for ${exerciseName}?`)) return;
-
-    delete workoutData[exerciseName];
+/* ---------- DELETE ---------- */
+function deleteExercise(name) {
+    if (!confirm(`Delete all data for ${name}?`)) return;
+    delete workoutData[name];
     saveWorkoutData();
     renderExerciseCards();
     closeModal();
 }
 
-// Pushups / Pullups (future-proofed)
+/* ---------- LIFETIME (FUTURE) ---------- */
 function renderLifetimeCounters() {
-    const pushupsEl = document.getElementById('lifetimePushups');
-    const pullupsEl = document.getElementById('lifetimePullups');
-
-    if (pushupsEl) pushupsEl.textContent = lifetimePushups.toLocaleString();
-    if (pullupsEl) pullupsEl.textContent = lifetimePullups.toLocaleString();
+    const p = document.getElementById('lifetimePushups');
+    const l = document.getElementById('lifetimePullups');
+    if (p) p.textContent = lifetimePushups;
+    if (l) l.textContent = lifetimePullups;
 }
