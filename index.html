@@ -17,8 +17,6 @@
     <!-- Header -->
     <div style="margin-bottom: 30px;">
       <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:20px;">
-
-        <!-- Clock -->
         <div class="widget" style="flex:1;">
           <div class="widget-icon">🕐</div>
           <div>
@@ -28,7 +26,6 @@
           </div>
         </div>
 
-        <!-- Weather -->
         <div class="widget" style="flex:1;">
           <div class="widget-icon">🌤️</div>
           <div>
@@ -36,7 +33,6 @@
             <div class="widget-label">Yonkers</div>
           </div>
         </div>
-
       </div>
 
       <h1 style="text-align:center; font-size:2.5em; margin:20px 0;">
@@ -56,9 +52,8 @@
       <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
     </div>
 
-    <!-- DASHBOARD (RESTORED) -->
+    <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
-
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-value" id="daysAt80">0/7</div>
@@ -74,9 +69,7 @@
         </div>
       </div>
 
-      <div id="dailyStatus">
-        Checking today’s status…
-      </div>
+      <div id="dailyStatus">Checking today’s status…</div>
 
       <div class="habit-section">
         <div class="section-title">😊 Energy & Mood</div>
@@ -96,10 +89,9 @@
         </div>
         <div id="milestones"></div>
       </div>
-
     </div>
 
-    <!-- OTHER PAGES -->
+    <!-- Goals -->
     <div id="goalsHabitsPage" class="page">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h2>🎯 Goals</h2>
@@ -108,10 +100,28 @@
       <div id="goalsGrid"></div>
     </div>
 
+    <!-- Workouts (FIXED) -->
     <div id="workoutPage" class="page">
+
+      <div class="workout-log" style="margin-bottom:20px;">
+        <div class="section-title">💪 Log Workout</div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
+          <input id="exerciseName" class="form-input" placeholder="Exercise (Bench Press)" />
+          <input id="exerciseWeight" class="form-input" type="number" placeholder="Weight (lbs)" />
+          <input id="exerciseSets" class="form-input" type="number" placeholder="Sets" />
+          <input id="exerciseReps" class="form-input" type="number" placeholder="Reps" />
+        </div>
+
+        <div style="margin-top:12px;">
+          <button onclick="logWorkout()">Log Workout</button>
+        </div>
+      </div>
+
       <div id="exerciseCards"></div>
     </div>
 
+    <!-- Other Pages -->
     <div id="journalPage" class="page"><div id="journalContainer"></div></div>
     <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
     <div id="contentPage" class="page"><div id="contentContainer"></div></div>
