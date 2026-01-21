@@ -1,5 +1,5 @@
 // ============================================
-// WORKOUT MODULE
+// WORKOUT MODULE (SAFE VERSION)
 // ============================================
 
 let workoutData = {};
@@ -38,7 +38,7 @@ function logWorkout() {
         return;
     }
 
-    if (!workoutData[name]) {
+    if (!Array.isArray(workoutData[name])) {
         workoutData[name] = [];
     }
 
@@ -63,10 +63,10 @@ function logWorkout() {
 function isThisWeek(dateStr) {
     const d = new Date(dateStr);
     const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    return d >= startOfWeek;
+    const start = new Date(now);
+    start.setDate(now.getDate() - now.getDay());
+    start.setHours(0, 0, 0, 0);
+    return d >= start;
 }
 
 /* ---------- WEEKLY SUMMARY ---------- */
@@ -76,11 +76,13 @@ function buildWeeklySummary() {
     let totalReps = 0;
 
     Object.values(workoutData).forEach(sessions => {
+        if (!Array.isArray(sessions)) return;
+
         sessions.forEach(s => {
             if (isThisWeek(s.date)) {
-                workouts += 1;
+                workouts++;
                 totalSets += s.sets;
-                totalReps += s.reps * s.sets;
+                totalReps += s.sets * s.reps;
             }
         });
     });
@@ -108,9 +110,10 @@ function renderExerciseCards() {
     const container = document.getElementById('exerciseCards');
     if (!container) return;
 
-    const exercises = Object.keys(workoutData);
+    const exercises = Object.keys(workoutData).filter(
+        key => Array.isArray(workoutData[key])
+    );
 
-    // Empty state (true empty only)
     if (exercises.length === 0) {
         container.innerHTML = `
             <div style="
@@ -137,8 +140,8 @@ function renderExerciseCards() {
 
         html += `
             <div class="exercise-card" onclick="showExerciseChart('${name}')">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h3 style="margin:0; color:white;">${name}</h3>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <h3 style="margin:0;">${name}</h3>
                     <span style="color:#9CA3AF; font-size:0.85em;">
                         ${sessions.length} session${sessions.length !== 1 ? 's' : ''}
                     </span>
@@ -146,23 +149,19 @@ function renderExerciseCards() {
 
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
                     <div>
-                        <div style="color:#9CA3AF; font-size:0.8em;">Current</div>
-                        <div style="font-weight:700;">${latest.weight} lbs</div>
+                        <div class="stat-label">Current</div>
+                        <div class="stat-value">${latest.weight} lbs</div>
                     </div>
                     <div>
-                        <div style="color:#9CA3AF; font-size:0.8em;">Started</div>
-                        <div style="font-weight:700;">${first.weight} lbs</div>
+                        <div class="stat-label">Started</div>
+                        <div class="stat-value">${first.weight} lbs</div>
                     </div>
                     <div>
-                        <div style="color:#9CA3AF; font-size:0.8em;">Gain</div>
-                        <div style="font-weight:700; color:${gain >= 0 ? '#10B981' : '#EF4444'};">
+                        <div class="stat-label">Gain</div>
+                        <div class="stat-value" style="color:${gain >= 0 ? '#10B981' : '#EF4444'};">
                             ${gain > 0 ? '+' : ''}${gain} lbs
                         </div>
                     </div>
-                </div>
-
-                <div style="margin-top:8px; font-size:0.8em; color:#9CA3AF;">
-                    Latest: ${latest.sets} × ${latest.reps}
                 </div>
             </div>
         `;
@@ -178,12 +177,14 @@ function showExerciseChart(name) {
     if (!modal || !body) return;
 
     const sessions = workoutData[name];
+    if (!Array.isArray(sessions)) return;
+
     const latest = sessions[sessions.length - 1];
     const first = sessions[0];
     const gain = latest.weight - first.weight;
 
     body.innerHTML = `
-        <h2 style="margin-bottom:16px;">${name}</h2>
+        <h2>${name}</h2>
 
         <div class="stats-grid">
             <div class="stat-card">
@@ -216,7 +217,7 @@ function deleteExercise(name) {
     closeModal();
 }
 
-/* ---------- LIFETIME (FUTURE) ---------- */
+/* ---------- LIFETIME ---------- */
 function renderLifetimeCounters() {
     const p = document.getElementById('lifetimePushups');
     const l = document.getElementById('lifetimePullups');
