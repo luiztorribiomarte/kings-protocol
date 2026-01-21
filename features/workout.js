@@ -10,39 +10,25 @@ let lifetimePullups = 0;
 function initWorkoutData() {
     const saved = localStorage.getItem('workoutData');
     if (saved) {
-        workoutData = JSON.parse(saved);
+        try {
+            workoutData = JSON.parse(saved) || {};
+        } catch {
+            workoutData = {};
+        }
     }
 
     const savedPushups = localStorage.getItem('lifetimePushups');
-    if (savedPushups) lifetimePushups = parseInt(savedPushups);
+    if (savedPushups) {
+        lifetimePushups = parseInt(savedPushups) || 0;
+    }
 
     const savedPullups = localStorage.getItem('lifetimePullups');
-    if (savedPullups) lifetimePullups = parseInt(savedPullups);
+    if (savedPullups) {
+        lifetimePullups = parseInt(savedPullups) || 0;
+    }
 
-    injectWorkoutCategorySelect();
-    renderLifetimeCounters();
     renderExerciseCards();
-}
-
-// Inject category dropdown
-function injectWorkoutCategorySelect() {
-    const nameInput = document.getElementById('exerciseName');
-    if (!nameInput || document.getElementById('exerciseCategory')) return;
-
-    const select = document.createElement('select');
-    select.id = 'exerciseCategory';
-    select.className = 'form-input';
-    select.style.marginRight = '10px';
-
-    select.innerHTML = `
-        <option value="Push">Push</option>
-        <option value="Pull">Pull</option>
-        <option value="Legs">Legs</option>
-        <option value="Cardio">Cardio</option>
-        <option value="Custom">Custom</option>
-    `;
-
-    nameInput.parentNode.insertBefore(select, nameInput);
+    renderLifetimeCounters();
 }
 
 // Save workout data
@@ -56,7 +42,6 @@ function logWorkout() {
     const weight = parseInt(document.getElementById('exerciseWeight').value);
     const reps = parseInt(document.getElementById('exerciseReps').value);
     const sets = parseInt(document.getElementById('exerciseSets').value);
-    const category = document.getElementById('exerciseCategory')?.value || 'Custom';
 
     if (!exerciseName || !weight || !reps || !sets) {
         alert('Please fill in all fields');
@@ -64,15 +49,10 @@ function logWorkout() {
     }
 
     if (!workoutData[exerciseName]) {
-        workoutData[exerciseName] = {
-            category,
-            sessions: []
-        };
+        workoutData[exerciseName] = [];
     }
 
-    workoutData[exerciseName].category = category;
-
-    workoutData[exerciseName].sessions.push({
+    workoutData[exerciseName].push({
         date: new Date().toISOString(),
         weight,
         reps,
@@ -81,6 +61,7 @@ function logWorkout() {
 
     saveWorkoutData();
 
+    // Clear inputs
     document.getElementById('exerciseName').value = '';
     document.getElementById('exerciseWeight').value = '';
     document.getElementById('exerciseReps').value = '';
@@ -96,14 +77,16 @@ function renderExerciseCards() {
 
     const exercises = Object.keys(workoutData);
 
-    // CLEAN empty state (no big box)
+    // Empty state
     if (exercises.length === 0) {
         container.innerHTML = `
             <div style="
                 text-align:center;
-                color:#6B7280;
-                padding:30px 0;
-                font-size:0.95em;
+                color:#9CA3AF;
+                padding:40px;
+                border-radius:18px;
+                border:1px solid rgba(255,255,255,0.12);
+                background:rgba(255,255,255,0.04);
             ">
                 No exercises logged yet. Start tracking your workouts above.
             </div>
@@ -114,22 +97,22 @@ function renderExerciseCards() {
     let html = '';
 
     exercises.forEach(exerciseName => {
-        const data = workoutData[exerciseName];
-        const sessions = data.sessions;
+        const sessions = workoutData[exerciseName];
         const latest = sessions[sessions.length - 1];
         const first = sessions[0];
+        const totalSessions = sessions.length;
         const weightGain = latest.weight - first.weight;
 
         html += `
             <div class="exercise-card" onclick="showExerciseChart('${exerciseName}')">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="color:white; margin:0;">${exerciseName}</h3>
                     <span style="color:#9CA3AF; font-size:0.85em;">
-                        ${data.category} • ${sessions.length} sessions
+                        ${totalSessions} session${totalSessions !== 1 ? 's' : ''}
                     </span>
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px;">
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
                     <div>
                         <div style="color:#9CA3AF; font-size:0.8em;">Current</div>
                         <div style="color:white; font-weight:700;">${latest.weight} lbs</div>
@@ -146,8 +129,8 @@ function renderExerciseCards() {
                     </div>
                 </div>
 
-                <div style="margin-top:8px; color:#6B7280; font-size:0.85em;">
-                    Latest: ${latest.sets} × ${latest.reps}
+                <div style="margin-top:8px; color:#9CA3AF; font-size:0.8em;">
+                    Latest: ${latest.sets} × ${latest.reps} reps
                 </div>
             </div>
         `;
@@ -156,44 +139,58 @@ function renderExerciseCards() {
     container.innerHTML = html;
 }
 
-// Show exercise chart (unchanged)
+// Show exercise details
 function showExerciseChart(exerciseName) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
     if (!modal || !modalBody) return;
 
-    const data = workoutData[exerciseName];
+    const sessions = workoutData[exerciseName];
+    const latest = sessions[sessions.length - 1];
+    const first = sessions[0];
+    const weightGain = latest.weight - first.weight;
 
-    modalBody.innerHTML = `
-        <h2 style="color:white;">${exerciseName}</h2>
-        <div style="color:#9CA3AF; margin-bottom:20px;">
-            Category: ${data.category}
+    let html = `
+        <h2 style="color:white; margin-bottom:16px;">${exerciseName}</h2>
+
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:18px;">
+            <div class="stat-card">
+                <div class="stat-label">Current</div>
+                <div class="stat-value">${latest.weight} lbs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Gain</div>
+                <div class="stat-value" style="color:${weightGain >= 0 ? '#10B981' : '#EF4444'};">
+                    ${weightGain > 0 ? '+' : ''}${weightGain} lbs
+                </div>
+            </div>
         </div>
 
-        <button onclick="deleteExercise('${exerciseName}')"
-            style="width:100%; padding:10px;
-            background:rgba(255,60,60,0.2);
-            border:1px solid rgba(255,60,60,0.3);
-            border-radius:8px;
-            color:#ffb4b4;
-            cursor:pointer;">
-            Delete Exercise
-        </button>
+        <div style="display:flex; gap:10px;">
+            <button onclick="deleteExercise('${exerciseName}')" style="flex:1;">
+                Delete Exercise
+            </button>
+            <button onclick="closeModal()" style="flex:1;">
+                Close
+            </button>
+        </div>
     `;
 
+    modalBody.innerHTML = html;
     modal.style.display = 'flex';
 }
 
 // Delete exercise
 function deleteExercise(exerciseName) {
     if (!confirm(`Delete all data for ${exerciseName}?`)) return;
+
     delete workoutData[exerciseName];
     saveWorkoutData();
     renderExerciseCards();
     closeModal();
 }
 
-// Render lifetime counters
+// Pushups / Pullups (future-proofed)
 function renderLifetimeCounters() {
     const pushupsEl = document.getElementById('lifetimePushups');
     const pullupsEl = document.getElementById('lifetimePullups');
@@ -201,6 +198,3 @@ function renderLifetimeCounters() {
     if (pushupsEl) pushupsEl.textContent = lifetimePushups.toLocaleString();
     if (pullupsEl) pullupsEl.textContent = lifetimePullups.toLocaleString();
 }
-
-// Boot
-initWorkoutData();
