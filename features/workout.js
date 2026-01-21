@@ -1,5 +1,5 @@
 // ============================================
-// WORKOUT MODULE (with categories)
+// WORKOUT MODULE (STABLE + CATEGORY SAFE)
 // ============================================
 
 let workoutData = {};
@@ -7,22 +7,19 @@ let lifetimePushups = 0;
 let lifetimePullups = 0;
 
 const DEFAULT_CATEGORY = "Other";
-const WORKOUT_CATEGORIES = ["Push", "Pull", "Legs", "Cardio", "Other"];
 
 // ---------------- INIT ----------------
 function initWorkoutData() {
     const saved = localStorage.getItem("workoutData");
-    if (saved) {
-        workoutData = JSON.parse(saved);
-    }
 
-    // Backward compatibility: ensure category exists
-    Object.keys(workoutData).forEach(exercise => {
-        workoutData[exercise] = workoutData[exercise].map(entry => ({
-            category: entry.category || DEFAULT_CATEGORY,
-            ...entry
-        }));
-    });
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            workoutData = normalizeWorkoutData(parsed);
+        } catch {
+            workoutData = {};
+        }
+    }
 
     const savedPushups = localStorage.getItem("lifetimePushups");
     if (savedPushups) lifetimePushups = parseInt(savedPushups);
@@ -32,6 +29,31 @@ function initWorkoutData() {
 
     renderLifetimeCounters();
     renderExerciseCards();
+}
+
+// ---------------- NORMALIZE DATA ----------------
+function normalizeWorkoutData(data) {
+    const clean = {};
+
+    Object.keys(data || {}).forEach(exercise => {
+        const sessions = Array.isArray(data[exercise]) ? data[exercise] : [];
+
+        const validSessions = sessions
+            .filter(s => s && typeof s === "object" && s.weight)
+            .map(s => ({
+                date: s.date || new Date().toISOString(),
+                weight: Number(s.weight),
+                reps: Number(s.reps || 0),
+                sets: Number(s.sets || 0),
+                category: s.category || DEFAULT_CATEGORY
+            }));
+
+        if (validSessions.length) {
+            clean[exercise] = validSessions;
+        }
+    });
+
+    return clean;
 }
 
 // ---------------- SAVE ----------------
@@ -51,7 +73,7 @@ function logWorkout() {
         return;
     }
 
-    if (!workoutData[exerciseName]) {
+    if (!Array.isArray(workoutData[exerciseName])) {
         workoutData[exerciseName] = [];
     }
 
@@ -73,8 +95,8 @@ function logWorkout() {
     renderExerciseCards();
 }
 
-// ---------------- RENDER EXERCISES ----------------
-function renderExerciseCards(filterCategory = "All") {
+// ---------------- RENDER ----------------
+function renderExerciseCards() {
     const container = document.getElementById("exerciseCards");
     if (!container) return;
 
@@ -90,19 +112,18 @@ function renderExerciseCards(filterCategory = "All") {
 
     let html = "";
 
-    exercises.forEach(exerciseName => {
-        const sessions = workoutData[exerciseName];
-        const latest = sessions[sessions.length - 1];
+    exercises.forEach(exercise => {
+        const sessions = workoutData[exercise];
+        if (!Array.isArray(sessions) || !sessions.length) return;
+
         const first = sessions[0];
-
-        if (filterCategory !== "All" && latest.category !== filterCategory) return;
-
-        const weightGain = latest.weight - first.weight;
+        const latest = sessions[sessions.length - 1];
+        const gain = latest.weight - first.weight;
 
         html += `
-            <div class="exercise-card" onclick="showExerciseChart('${exerciseName}')">
+            <div class="exercise-card" onclick="showExerciseChart('${exercise}')">
                 <div style="display:flex; justify-content:space-between;">
-                    <h3 style="color:white;">${exerciseName}</h3>
+                    <h3 style="color:white;">${exercise}</h3>
                     <span style="color:#9CA3AF;">${latest.category}</span>
                 </div>
 
@@ -117,47 +138,39 @@ function renderExerciseCards(filterCategory = "All") {
                     </div>
                     <div>
                         <div style="color:#9CA3AF;">Gain</div>
-                        <div style="color:${weightGain >= 0 ? "#10B981" : "#EF4444"};">
-                            ${weightGain > 0 ? "+" : ""}${weightGain} lbs
+                        <div style="color:${gain >= 0 ? "#10B981" : "#EF4444"};">
+                            ${gain > 0 ? "+" : ""}${gain} lbs
                         </div>
                     </div>
-                </div>
-
-                <div style="margin-top:8px; color:#6B7280;">
-                    ${latest.sets} × ${latest.reps} reps
                 </div>
             </div>`;
     });
 
-    container.innerHTML = html || `
-        <div style="text-align:center; color:#6B7280; padding:40px;">
-            No workouts in this category yet.
-        </div>`;
+    container.innerHTML = html;
 }
 
 // ---------------- MODAL ----------------
-function showExerciseChart(exerciseName) {
+function showExerciseChart(exercise) {
     const modal = document.getElementById("modal");
     const modalBody = document.getElementById("modalBody");
     if (!modal || !modalBody) return;
 
-    const sessions = workoutData[exerciseName];
-    const latest = sessions[sessions.length - 1];
+    const sessions = workoutData[exercise];
+    if (!sessions || !sessions.length) return;
+
     const first = sessions[0];
-    const weightGain = latest.weight - first.weight;
+    const latest = sessions[sessions.length - 1];
 
     modalBody.innerHTML = `
-        <h2 style="color:white;">${exerciseName}</h2>
+        <h2 style="color:white;">${exercise}</h2>
         <p style="color:#9CA3AF;">Category: ${latest.category}</p>
+        <p style="color:white;">${first.weight} → ${latest.weight} lbs</p>
 
-        <div style="margin:20px 0;">
-            <strong style="color:white;">Progress:</strong>
-            ${first.weight} → ${latest.weight} lbs
-        </div>
-
-        <button onclick="deleteExercise('${exerciseName}')"
-            style="background:rgba(255,60,60,0.2);border:1px solid rgba(255,60,60,0.4);
-            padding:10px;border-radius:8px;color:#ffb4b4;cursor:pointer;">
+        <button onclick="deleteExercise('${exercise}')"
+            style="margin-top:20px;padding:10px;
+            background:rgba(255,60,60,0.2);
+            border:1px solid rgba(255,60,60,0.4);
+            border-radius:8px;color:#ffb4b4;">
             Delete Exercise
         </button>
     `;
@@ -166,9 +179,9 @@ function showExerciseChart(exerciseName) {
 }
 
 // ---------------- DELETE ----------------
-function deleteExercise(exerciseName) {
-    if (!confirm(`Delete all data for ${exerciseName}?`)) return;
-    delete workoutData[exerciseName];
+function deleteExercise(exercise) {
+    if (!confirm(`Delete all data for ${exercise}?`)) return;
+    delete workoutData[exercise];
     saveWorkoutData();
     renderExerciseCards();
     closeModal();
