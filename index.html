@@ -12,7 +12,7 @@
 </head>
 
 <body class="fire-mode">
-    <div class="container">
+    <div class="container" style="position:relative;">
 
         <!-- Header -->
         <div style="margin-bottom: 30px;">
@@ -63,98 +63,53 @@
             <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
         </div>
 
-        <!-- Dashboard -->
-        <div id="dashboardPage" class="page active">
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="daysAt80">0/7</div>
-                    <div class="stat-label">Days at 80%+</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="weeklyCompletion">0%</div>
-                    <div class="stat-label">Weekly Completion</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="currentStreak">0</div>
-                    <div class="stat-label">Current Streak</div>
-                </div>
-            </div>
-
-            <div id="dailyStatus" style="
-                margin-top: 18px;
-                margin-bottom: 22px;
-                padding: 16px 18px;
-                border-radius: 14px;
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.18);
-                color: #E5E7EB;
-            ">
-                Checking today’s status…
-            </div>
-
-            <div class="habit-section">
-                <div class="section-title">😊 Energy & Mood</div>
-                <div id="moodTracker"></div>
-            </div>
-
-            <div class="habit-section">
-                <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>📋 Daily Habits - This Week</span>
-                    <button onclick="openManageHabits()" style="
-                        padding: 8px 16px;
-                        background: rgba(255,255,255,0.1);
-                        border: 1px solid rgba(255,255,255,0.2);
-                        border-radius: 8px;
-                        color: white;
-                        cursor: pointer;
-                    ">
-                        ⚙️ Manage Habits
-                    </button>
-                </div>
-                <div id="habitGrid"></div>
-            </div>
-
-            <div class="streak-section">
-                <div class="streak-display">
-                    <div class="streak-number" id="streakNumber">0</div>
-                    <div class="streak-label">DAY STREAK</div>
-                    <div class="streak-best">Best: <span id="bestStreak">0</span></div>
-                </div>
-                <div id="milestones"></div>
-            </div>
+        <!-- ADD GOAL BUTTON (SCOPED) -->
+        <div id="addGoalWrapper" style="
+            display:none;
+            position:absolute;
+            top:190px;
+            right:26px;
+            z-index:5;
+        ">
+            <button class="mode-toggle" onclick="openAddGoal()">
+                + Add New Goal
+            </button>
         </div>
 
-      <!-- Goals & Habits Page -->
-<div id="goalsHabitsPage" class="page">
-    <div id="goalsGrid"></div>
-</div>
+        <!-- Dashboard -->
+        <div id="dashboardPage" class="page active"></div>
 
-            <!-- Goals Header -->
-            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <span>🎯 Goals</span>
-                <button onclick="openAddGoal()" style="
-                    padding: 8px 16px;
-                    background: rgba(255,255,255,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    border-radius: 8px;
-                    color: white;
-                    cursor: pointer;
-                ">
-                    + Add New Goal
-                </button>
-            </div>
-
+        <!-- Goals -->
+        <div id="goalsHabitsPage" class="page">
             <div id="goalsGrid"></div>
         </div>
 
-        <!-- Other Pages -->
-        <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
-        <div id="journalPage" class="page"><div id="journalContainer"></div></div>
-        <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
-        <div id="contentPage" class="page"><div id="contentContainer"></div></div>
-        <div id="booksPage" class="page"><div id="booksContainer"></div></div>
+        <!-- Workouts -->
+        <div id="workoutPage" class="page">
+            <div id="exerciseCards"></div>
+        </div>
 
+        <!-- Journal -->
+        <div id="journalPage" class="page">
+            <div id="journalContainer"></div>
+        </div>
+
+        <!-- Vision Board -->
+        <div id="visionBoardPage" class="page">
+            <div id="visionBoardContainer"></div>
+        </div>
+
+        <!-- Content -->
+        <div id="contentPage" class="page">
+            <div id="contentContainer"></div>
+        </div>
+
+        <!-- Books -->
+        <div id="booksPage" class="page">
+            <div id="booksContainer"></div>
+        </div>
+
+        <!-- Settings -->
         <div id="settingsPage" class="page">
             <div class="section-title">⚙️ Settings</div>
             <p style="color:#9CA3AF; text-align:center; padding:40px;">Coming Soon…</p>
@@ -180,6 +135,27 @@
     <script src="features/reading-list.js"></script>
     <script src="features/content-tracker.js"></script>
     <script src="app.js?v=8"></script>
+
+    <!-- Scoped Add Goal Logic -->
+    <script>
+        function syncAddGoalButton() {
+            const btn = document.getElementById('addGoalWrapper');
+            const goalsPage = document.getElementById('goalsHabitsPage');
+            if (!btn || !goalsPage) return;
+
+            btn.style.display = goalsPage.classList.contains('active')
+                ? 'block'
+                : 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', syncAddGoalButton);
+
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                setTimeout(syncAddGoalButton, 0);
+            });
+        });
+    </script>
 
 </body>
 </html>
