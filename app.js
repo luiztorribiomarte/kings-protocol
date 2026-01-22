@@ -1,6 +1,5 @@
 // ============================================
 // CORE APP.JS
-// Dashboard initialization + utilities
 // ============================================
 
 let notificationsOn = true;
@@ -29,17 +28,9 @@ function showPage(pageName) {
         tabs[indexMap[pageName]].classList.add('active');
     }
 
-    if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
-    if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
-    if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
-    if (pageName === 'books' && typeof renderReadingList === 'function') renderReadingList();
-    if (pageName === 'goalsHabits' && typeof renderGoals === 'function') renderGoals();
-    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
-
     if (pageName === 'dashboard') {
         ensureDailyBriefUI();
         updateDailyBrief();
-        updateStreakWithContent();
 
         ensureMomentumSnapshotUI();
         updateMomentumSnapshot();
@@ -47,9 +38,15 @@ function showPage(pageName) {
         ensureLastActionUI();
         updateLastActionUI();
 
+        initEnergyMood();      // 🔥 RESTORED
+        renderEnergyMood();    // 🔥 RESTORED
+
         initDailyFocus();
         renderTodos();
     }
+
+    if (pageName === 'goalsHabits' && typeof renderGoals === 'function') renderGoals();
+    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
 }
 
 /* ------------------ CLOCK ------------------ */
@@ -96,7 +93,6 @@ function seededPick(arr, seed) {
 
 function buildDailyBrief() {
     const seed = todayKey();
-
     const lines = [
         "Discipline compounds quietly.",
         "Win the morning, the day follows.",
@@ -104,26 +100,73 @@ function buildDailyBrief() {
         "One clean action changes momentum.",
         "You already know what to do."
     ];
-
     return seededPick(lines, seed);
 }
 
 function ensureDailyBriefUI() {
     if (document.getElementById('dailyBriefCard')) return;
-
     const dash = document.getElementById('dashboardPage');
     if (!dash) return;
 
     const card = document.createElement('div');
     card.id = 'dailyBriefCard';
     card.className = 'habit-section';
-    card.innerHTML = `<div id="dailyBriefText">Loading…</div>`;
+    card.innerHTML = `<div id="dailyBriefText"></div>`;
     dash.insertBefore(card, dash.children[1]);
 }
 
 function updateDailyBrief() {
     const el = document.getElementById('dailyBriefText');
     if (el) el.textContent = buildDailyBrief();
+}
+
+/* ------------------ ENERGY & MOOD (RESTORED) ------------------ */
+let energyMood = JSON.parse(localStorage.getItem('energyMood') || '{}');
+
+function initEnergyMood() {
+    if (!energyMood[todayKey()]) {
+        energyMood[todayKey()] = { energy: 0, mood: 0 };
+        localStorage.setItem('energyMood', JSON.stringify(energyMood));
+    }
+}
+
+function setEnergy(value) {
+    energyMood[todayKey()].energy = value;
+    localStorage.setItem('energyMood', JSON.stringify(energyMood));
+    renderEnergyMood();
+    setLastAction('Updated energy');
+}
+
+function setMood(value) {
+    energyMood[todayKey()].mood = value;
+    localStorage.setItem('energyMood', JSON.stringify(energyMood));
+    renderEnergyMood();
+    setLastAction('Updated mood');
+}
+
+function renderEnergyMood() {
+    const container = document.getElementById('energyMoodSection');
+    if (!container) return;
+
+    const today = energyMood[todayKey()] || { energy: 0, mood: 0 };
+
+    container.innerHTML = `
+        <div class="section-title">😊 Energy & Mood</div>
+        <div style="display:flex; gap:20px; margin-top:12px;">
+            <div>
+                <div>Energy</div>
+                <input type="range" min="0" max="10" value="${today.energy}" 
+                    oninput="setEnergy(this.value)">
+                <div>${today.energy}/10</div>
+            </div>
+            <div>
+                <div>Mood</div>
+                <input type="range" min="0" max="10" value="${today.mood}" 
+                    oninput="setMood(this.value)">
+                <div>${today.mood}/10</div>
+            </div>
+        </div>
+    `;
 }
 
 /* ------------------ LAST ACTION ------------------ */
@@ -136,7 +179,6 @@ function setLastAction(label) {
 
 function ensureLastActionUI() {
     if (document.getElementById('lastActionCard')) return;
-
     const dash = document.getElementById('dashboardPage');
     if (!dash) return;
 
@@ -145,7 +187,7 @@ function ensureLastActionUI() {
     card.className = 'habit-section';
     card.innerHTML = `
         <div class="section-title">🕘 Last Action</div>
-        <div id="lastActionText">No activity logged yet.</div>
+        <div id="lastActionText"></div>
     `;
     dash.appendChild(card);
 }
@@ -156,40 +198,28 @@ function updateLastActionUI() {
 
     const raw = localStorage.getItem('lastAction');
     if (!raw) {
-        el.textContent = 'No activity logged yet.';
+        el.textContent = 'No activity yet.';
         return;
     }
 
-    try {
-        const { label, timestamp } = JSON.parse(raw);
-        el.textContent = `${label} (${timeAgo(timestamp)})`;
-    } catch {
-        el.textContent = 'No activity logged yet.';
-    }
+    const { label, timestamp } = JSON.parse(raw);
+    el.textContent = `${label} (${timeAgo(timestamp)})`;
 }
 
-/* ------------------ MOMENTUM SNAPSHOT ------------------ */
+/* ------------------ MOMENTUM ------------------ */
 function ensureMomentumSnapshotUI() {
     if (document.getElementById('momentumSnapshot')) return;
-
     const dash = document.getElementById('dashboardPage');
     if (!dash) return;
 
-    const wrap = document.createElement('div');
-    wrap.id = 'momentumSnapshot';
-    wrap.className = 'habit-section';
-
-    wrap.innerHTML = `
+    const card = document.createElement('div');
+    card.id = 'momentumSnapshot';
+    card.className = 'habit-section';
+    card.innerHTML = `
         <div class="section-title">🔥 Momentum Snapshot</div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="msStreak">0</div>
-                <div class="stat-label">Current Streak</div>
-            </div>
-        </div>
+        <div id="msStreak">0</div>
     `;
-
-    dash.appendChild(wrap);
+    dash.appendChild(card);
 }
 
 function updateMomentumSnapshot() {
@@ -207,12 +237,11 @@ function saveTodos() {
 function addTodo() {
     const input = document.getElementById('todoInput');
     if (!input || !input.value.trim()) return;
-
     todos.push({ text: input.value.trim(), done: false });
     input.value = '';
     saveTodos();
     renderTodos();
-    setLastAction('Todo added');
+    setLastAction('Added todo');
 }
 
 function toggleTodo(i) {
@@ -232,12 +261,12 @@ function renderTodos() {
     if (!list) return;
 
     if (!todos.length) {
-        list.innerHTML = `<div style="color:#9CA3AF;">No tasks yet.</div>`;
+        list.innerHTML = '<div style="opacity:.6">No tasks yet.</div>';
         return;
     }
 
     list.innerHTML = todos.map((t, i) => `
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; gap:8px; margin-bottom:6px;">
             <input type="checkbox" ${t.done ? 'checked' : ''} onclick="toggleTodo(${i})">
             <span style="flex:1; ${t.done ? 'text-decoration:line-through; opacity:.6;' : ''}">
                 ${t.text}
@@ -247,19 +276,10 @@ function renderTodos() {
     `).join('');
 }
 
-/* ------------------ STREAK ------------------ */
-function updateStreakWithContent() {
-    const streakEl = document.getElementById('currentStreak');
-    if (streakEl) {
-        streakEl.textContent = localStorage.getItem('currentStreak') || '0';
-    }
-}
-
 /* ------------------ DAILY FOCUS ------------------ */
 function initDailyFocus() {
     const input = document.getElementById('dailyFocusInput');
     if (!input) return;
-
     input.value = localStorage.getItem('dailyFocus') || '';
     input.oninput = () => localStorage.setItem('dailyFocus', input.value);
 }
@@ -277,6 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ensureLastActionUI();
     updateLastActionUI();
+
+    initEnergyMood();
+    renderEnergyMood();
 
     initDailyFocus();
     renderTodos();
