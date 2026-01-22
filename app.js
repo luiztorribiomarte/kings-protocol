@@ -1,306 +1,149 @@
-// ============================================
-// CORE APP.JS
-// ============================================
-
-let notificationsOn = true;
-
-/* ------------------ PAGE NAV ------------------ */
-function showPage(pageName) {
+// ===============================
+// GLOBAL PAGE NAVIGATION
+// ===============================
+function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
 
-    const page = document.getElementById(pageName + 'Page');
-    if (page) page.classList.add('active');
+    if (page === 'dashboard') {
+        document.getElementById('dashboardPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(1)').classList.add('active');
 
-    const indexMap = {
-        dashboard: 0,
-        goalsHabits: 1,
-        workout: 2,
-        journal: 3,
-        visionBoard: 4,
-        content: 5,
-        books: 6,
-        settings: 7
-    };
+        // 🔁 Re-render dashboard-specific modules
+        if (typeof renderMood === 'function') renderMood();
+        if (typeof renderHabits === 'function') renderHabits();
+        if (typeof renderTodos === 'function') renderTodos();
 
-    const tabs = document.querySelectorAll('.nav-tab');
-    if (tabs[indexMap[pageName]]) {
-        tabs[indexMap[pageName]].classList.add('active');
+    } else if (page === 'goalsHabits') {
+        document.getElementById('goalsHabitsPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
+        if (typeof renderGoals === 'function') renderGoals();
+
+    } else if (page === 'workout') {
+        document.getElementById('workoutPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(3)').classList.add('active');
+        if (typeof renderExerciseCards === 'function') renderExerciseCards();
+
+    } else if (page === 'journal') {
+        document.getElementById('journalPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(4)').classList.add('active');
+
+    } else if (page === 'visionBoard') {
+        document.getElementById('visionBoardPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(5)').classList.add('active');
+
+    } else if (page === 'content') {
+        document.getElementById('contentPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(6)').classList.add('active');
+
+    } else if (page === 'books') {
+        document.getElementById('booksPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(7)').classList.add('active');
+
+    } else if (page === 'settings') {
+        document.getElementById('settingsPage').classList.add('active');
+        document.querySelector('.nav-tab:nth-child(8)').classList.add('active');
     }
-
-    if (pageName === 'dashboard') {
-        ensureDailyBriefUI();
-        updateDailyBrief();
-
-        ensureMomentumSnapshotUI();
-        updateMomentumSnapshot();
-
-        ensureLastActionUI();
-        updateLastActionUI();
-
-        initEnergyMood();      // 🔥 RESTORED
-        renderEnergyMood();    // 🔥 RESTORED
-
-        initDailyFocus();
-        renderTodos();
-    }
-
-    if (pageName === 'goalsHabits' && typeof renderGoals === 'function') renderGoals();
-    if (pageName === 'workout' && typeof renderExerciseCards === 'function') renderExerciseCards();
 }
 
-/* ------------------ CLOCK ------------------ */
-function updateClock() {
+// ===============================
+// TIME + DATE
+// ===============================
+function updateTime() {
     const now = new Date();
-    let h = now.getHours();
-    const m = String(now.getMinutes()).padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-
     const timeEl = document.getElementById('currentTime');
     const dateEl = document.getElementById('currentDate');
 
-    if (timeEl) timeEl.textContent = `${h}:${m} ${ampm}`;
-    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric'
-    });
-}
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 
-/* ------------------ HELPERS ------------------ */
-function todayKey() {
-    return new Date().toISOString().split('T')[0];
-}
-
-function timeAgo(ts) {
-    const diff = Date.now() - ts;
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs} hr ago`;
-    const days = Math.floor(hrs / 24);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
-}
-
-/* ------------------ DAILY BRIEF ------------------ */
-function seededPick(arr, seed) {
-    let h = 0;
-    for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i);
-    return arr[Math.abs(h) % arr.length];
-}
-
-function buildDailyBrief() {
-    const seed = todayKey();
-    const lines = [
-        "Discipline compounds quietly.",
-        "Win the morning, the day follows.",
-        "Focus beats motivation.",
-        "One clean action changes momentum.",
-        "You already know what to do."
-    ];
-    return seededPick(lines, seed);
-}
-
-function ensureDailyBriefUI() {
-    if (document.getElementById('dailyBriefCard')) return;
-    const dash = document.getElementById('dashboardPage');
-    if (!dash) return;
-
-    const card = document.createElement('div');
-    card.id = 'dailyBriefCard';
-    card.className = 'habit-section';
-    card.innerHTML = `<div id="dailyBriefText"></div>`;
-    dash.insertBefore(card, dash.children[1]);
-}
-
-function updateDailyBrief() {
-    const el = document.getElementById('dailyBriefText');
-    if (el) el.textContent = buildDailyBrief();
-}
-
-/* ------------------ ENERGY & MOOD (RESTORED) ------------------ */
-let energyMood = JSON.parse(localStorage.getItem('energyMood') || '{}');
-
-function initEnergyMood() {
-    if (!energyMood[todayKey()]) {
-        energyMood[todayKey()] = { energy: 0, mood: 0 };
-        localStorage.setItem('energyMood', JSON.stringify(energyMood));
+    if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
     }
 }
 
-function setEnergy(value) {
-    energyMood[todayKey()].energy = value;
-    localStorage.setItem('energyMood', JSON.stringify(energyMood));
-    renderEnergyMood();
-    setLastAction('Updated energy');
-}
+setInterval(updateTime, 1000);
+updateTime();
 
-function setMood(value) {
-    energyMood[todayKey()].mood = value;
-    localStorage.setItem('energyMood', JSON.stringify(energyMood));
-    renderEnergyMood();
-    setLastAction('Updated mood');
-}
-
-function renderEnergyMood() {
-    const container = document.getElementById('energyMoodSection');
-    if (!container) return;
-
-    const today = energyMood[todayKey()] || { energy: 0, mood: 0 };
-
-    container.innerHTML = `
-        <div class="section-title">😊 Energy & Mood</div>
-        <div style="display:flex; gap:20px; margin-top:12px;">
-            <div>
-                <div>Energy</div>
-                <input type="range" min="0" max="10" value="${today.energy}" 
-                    oninput="setEnergy(this.value)">
-                <div>${today.energy}/10</div>
-            </div>
-            <div>
-                <div>Mood</div>
-                <input type="range" min="0" max="10" value="${today.mood}" 
-                    oninput="setMood(this.value)">
-                <div>${today.mood}/10</div>
-            </div>
-        </div>
-    `;
-}
-
-/* ------------------ LAST ACTION ------------------ */
-function setLastAction(label) {
-    localStorage.setItem('lastAction', JSON.stringify({
-        label,
-        timestamp: Date.now()
-    }));
-}
-
-function ensureLastActionUI() {
-    if (document.getElementById('lastActionCard')) return;
-    const dash = document.getElementById('dashboardPage');
-    if (!dash) return;
-
-    const card = document.createElement('div');
-    card.id = 'lastActionCard';
-    card.className = 'habit-section';
-    card.innerHTML = `
-        <div class="section-title">🕘 Last Action</div>
-        <div id="lastActionText"></div>
-    `;
-    dash.appendChild(card);
-}
-
-function updateLastActionUI() {
-    const el = document.getElementById('lastActionText');
-    if (!el) return;
-
-    const raw = localStorage.getItem('lastAction');
-    if (!raw) {
-        el.textContent = 'No activity yet.';
-        return;
-    }
-
-    const { label, timestamp } = JSON.parse(raw);
-    el.textContent = `${label} (${timeAgo(timestamp)})`;
-}
-
-/* ------------------ MOMENTUM ------------------ */
-function ensureMomentumSnapshotUI() {
-    if (document.getElementById('momentumSnapshot')) return;
-    const dash = document.getElementById('dashboardPage');
-    if (!dash) return;
-
-    const card = document.createElement('div');
-    card.id = 'momentumSnapshot';
-    card.className = 'habit-section';
-    card.innerHTML = `
-        <div class="section-title">🔥 Momentum Snapshot</div>
-        <div id="msStreak">0</div>
-    `;
-    dash.appendChild(card);
-}
-
-function updateMomentumSnapshot() {
-    const el = document.getElementById('msStreak');
-    if (el) el.textContent = localStorage.getItem('currentStreak') || '0';
-}
-
-/* ------------------ TODO LIST ------------------ */
-let todos = JSON.parse(localStorage.getItem('todos') || '[]');
-
-function saveTodos() {
-    localStorage.setItem('todos', JSON.stringify(todos));
-}
+// ===============================
+// TODO LIST (DASHBOARD)
+// ===============================
+let todos = JSON.parse(localStorage.getItem('todos')) || [];
 
 function addTodo() {
     const input = document.getElementById('todoInput');
     if (!input || !input.value.trim()) return;
-    todos.push({ text: input.value.trim(), done: false });
+
+    todos.push({
+        text: input.value.trim(),
+        done: false
+    });
+
     input.value = '';
     saveTodos();
     renderTodos();
-    setLastAction('Added todo');
 }
 
-function toggleTodo(i) {
-    todos[i].done = !todos[i].done;
+function toggleTodo(index) {
+    todos[index].done = !todos[index].done;
     saveTodos();
     renderTodos();
 }
 
-function deleteTodo(i) {
-    todos.splice(i, 1);
+function deleteTodo(index) {
+    todos.splice(index, 1);
     saveTodos();
     renderTodos();
+}
+
+function saveTodos() {
+    localStorage.setItem('todos', JSON.stringify(todos));
 }
 
 function renderTodos() {
     const list = document.getElementById('todoList');
     if (!list) return;
 
+    list.innerHTML = '';
+
     if (!todos.length) {
-        list.innerHTML = '<div style="opacity:.6">No tasks yet.</div>';
+        list.innerHTML = `<div style="color:#9CA3AF;">No tasks yet.</div>`;
         return;
     }
 
-    list.innerHTML = todos.map((t, i) => `
-        <div style="display:flex; gap:8px; margin-bottom:6px;">
-            <input type="checkbox" ${t.done ? 'checked' : ''} onclick="toggleTodo(${i})">
-            <span style="flex:1; ${t.done ? 'text-decoration:line-through; opacity:.6;' : ''}">
-                ${t.text}
+    todos.forEach((todo, i) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.marginBottom = '6px';
+
+        row.innerHTML = `
+            <span style="cursor:pointer; ${todo.done ? 'text-decoration:line-through; color:#6B7280;' : ''}"
+                  onclick="toggleTodo(${i})">
+                ${todo.text}
             </span>
-            <button onclick="deleteTodo(${i})">×</button>
-        </div>
-    `).join('');
+            <button onclick="deleteTodo(${i})" style="background:none; border:none; color:#EF4444; cursor:pointer;">✕</button>
+        `;
+
+        list.appendChild(row);
+    });
 }
 
-/* ------------------ DAILY FOCUS ------------------ */
-function initDailyFocus() {
-    const input = document.getElementById('dailyFocusInput');
-    if (!input) return;
-    input.value = localStorage.getItem('dailyFocus') || '';
-    input.oninput = () => localStorage.setItem('dailyFocus', input.value);
-}
-
-/* ------------------ INIT ------------------ */
+// ===============================
+// INITIAL LOAD
+// ===============================
 document.addEventListener('DOMContentLoaded', () => {
-    updateClock();
-    setInterval(updateClock, 1000);
+    showPage('dashboard');
 
-    ensureDailyBriefUI();
-    updateDailyBrief();
+    if (typeof initHabits === 'function') initHabits();
+    if (typeof initGoalsData === 'function') initGoalsData();
+    if (typeof initWorkoutData === 'function') initWorkoutData();
+    if (typeof initMood === 'function') initMood();
 
-    ensureMomentumSnapshotUI();
-    updateMomentumSnapshot();
-
-    ensureLastActionUI();
-    updateLastActionUI();
-
-    initEnergyMood();
-    renderEnergyMood();
-
-    initDailyFocus();
     renderTodos();
 });
