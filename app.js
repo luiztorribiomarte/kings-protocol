@@ -147,3 +147,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderTodos();
 });
+// ============================================
+// APP BOOT: ensure modules render reliably
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  // Mood (Energy & Mood)
+  try {
+    if (typeof initMoodData === "function") initMoodData();
+
+    // Only render mood if the dashboard mood container exists
+    const moodEl = document.getElementById("moodTracker");
+    if (moodEl && typeof renderMoodTracker === "function") {
+      renderMoodTracker();
+      console.log("[Kings Protocol] Mood module rendered.");
+    }
+  } catch (err) {
+    console.warn("[Kings Protocol] Mood module failed to render:", err);
+  }
+});
