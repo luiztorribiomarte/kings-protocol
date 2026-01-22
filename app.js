@@ -34,7 +34,7 @@ function showPage(page) {
     if (typeof renderMoodTracker === "function") renderMoodTracker();
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderTodos === "function") renderTodos();
-    renderLifeScore();
+    if (typeof renderLifeScore === "function") renderLifeScore();
 
   } else if (page === "goalsHabits") {
     document.getElementById("goalsHabitsPage").classList.add("active");
@@ -187,7 +187,6 @@ function renderLifeScore() {
     dashboard.prepend(card);
   }
 
-  // HABITS SCORE
   let habitPercent = 0;
   if (typeof getDayCompletion === "function") {
     const today = new Date().toISOString().split("T")[0];
@@ -196,7 +195,6 @@ function renderLifeScore() {
   }
   const habitScore = Math.round((habitPercent / 100) * 50);
 
-  // MOOD SCORE
   let energyScore = 0;
   try {
     const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
@@ -205,12 +203,10 @@ function renderLifeScore() {
     energyScore = Math.round((energy / 10) * 25);
   } catch {}
 
-  // TODO SCORE
   const totalTodos = todos.length;
   const completedTodos = todos.filter(t => t.done).length;
   const todoScore = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 20);
 
-  // STREAK BONUS
   let streakBonus = 0;
   try {
     const streak = parseInt(localStorage.getItem("currentStreak") || "0");
@@ -219,7 +215,6 @@ function renderLifeScore() {
 
   const totalScore = habitScore + energyScore + todoScore + streakBonus;
 
-  // STATUS + COLOR LOGIC
   let status = "Slipping";
   let color = "red";
   if (totalScore >= 80) {
@@ -268,59 +263,6 @@ function renderLifeScore() {
   if (numEl) animateNumber(numEl, 0, totalScore);
 }
 
-
-  // HABITS SCORE
-  let habitPercent = 0;
-  if (typeof getDayCompletion === "function") {
-    const today = new Date().toISOString().split("T")[0];
-    const data = getDayCompletion(today);
-    habitPercent = data.percent || 0;
-  }
-
-  const habitScore = Math.round((habitPercent / 100) * 50);
-
-  // MOOD SCORE
-  let energyScore = 0;
-  try {
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const todayKey = new Date().toISOString().split("T")[0];
-    const energy = moodData[todayKey]?.energy || 5;
-    energyScore = Math.round((energy / 10) * 25);
-  } catch {}
-
-  // TODO SCORE
-  const totalTodos = todos.length;
-  const completedTodos = todos.filter(t => t.done).length;
-  const todoScore = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 20);
-
-  // STREAK BONUS
-  let streakBonus = 0;
-  try {
-    const streak = parseInt(localStorage.getItem("currentStreak") || "0");
-    streakBonus = Math.min(5, streak);
-  } catch {}
-
-  const totalScore = habitScore + energyScore + todoScore + streakBonus;
-
-  let status = "Slipping";
-  if (totalScore >= 80) status = "Dominating";
-  else if (totalScore >= 60) status = "Solid";
-  else if (totalScore >= 40) status = "Recovering";
-
-  card.innerHTML = `
-    <div class="section-title">👑 Life Score</div>
-    <div style="font-size:2rem; font-weight:900;">${totalScore} / 100</div>
-    <div style="margin-top:6px; color:#9CA3AF;">Status: <strong style="color:white;">${status}</strong></div>
-
-    <div style="margin-top:12px; font-size:0.9rem; color:#9CA3AF;">
-      Habits: ${habitScore}/50<br>
-      Energy: ${energyScore}/25<br>
-      Tasks: ${todoScore}/20<br>
-      Streak: +${streakBonus}
-    </div>
-  `;
-}
-
 // ===============================
 // INITIAL LOAD
 // ===============================
@@ -338,6 +280,5 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderTodos();
-      if (typeof renderLifeScore === 'function') renderLifeScore();
-
+  renderLifeScore();
 });
