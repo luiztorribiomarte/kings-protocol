@@ -29,7 +29,6 @@ function showPage(pageName) {
         tabs[indexMap[pageName]].classList.add('active');
     }
 
-    // Keep ALL existing render hooks exactly as you had them
     if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
     if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
     if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
@@ -40,8 +39,9 @@ function showPage(pageName) {
     if (pageName === 'dashboard') {
         ensureDailyBriefUI();
         updateDailyBrief();
-        updateStreakWithContent(); // ✅ existing
-        initDailyFocus();          // ✅ NEW (safe)
+        updateStreakWithContent();
+        initDailyFocus();
+        renderTodos();
     }
 }
 
@@ -92,7 +92,6 @@ function updateStreakWithContent() {
 
     let effectivePercent = habits.percent;
 
-    // 🔥 Content boost logic
     if (habits.percent >= 60 && habits.percent < 80) {
         if (content.hours >= 1 || content.videos >= 1) {
             effectivePercent = 80;
@@ -108,7 +107,6 @@ function updateStreakWithContent() {
         statusEl.style.color = effectivePercent >= 80 ? '#22c55e' : '#f87171';
     }
 
-    // Persist streak memory
     const lastKey = localStorage.getItem('lastStreakDay');
     let streak = Number(localStorage.getItem('currentStreak') || 0);
 
@@ -127,7 +125,9 @@ function updateStreakWithContent() {
 /* ------------------ DAILY BRIEF ------------------ */
 function seededPick(arr, seed) {
     let h = 0;
-    for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i);
+    for (let i = 0; i < seed.length; i++) {
+        h = Math.imul(31, h) + seed.charCodeAt(i);
+    }
     return arr[Math.abs(h) % arr.length];
 }
 
@@ -193,26 +193,72 @@ function updateDailyBrief() {
     if (el) el.textContent = buildDailyBrief();
 }
 
-/* ------------------ DAILY FOCUS (NEW, ADDITIVE) ------------------ */
+/* ------------------ DAILY FOCUS (ADD-ON) ------------------ */
 function initDailyFocus() {
     const input = document.getElementById('dailyFocusInput');
     if (!input) return;
 
-    // Prevent duplicate listeners if showPage('dashboard') runs multiple times
     if (input.dataset.bound === "1") return;
     input.dataset.bound = "1";
 
-    const saved = localStorage.getItem('dailyFocus') || '';
-    if (!input.value) input.value = saved;
+    input.value = localStorage.getItem('dailyFocus') || '';
 
     input.addEventListener('input', () => {
         localStorage.setItem('dailyFocus', input.value);
     });
 }
 
+/* ------------------ TODO LIST (ADD-ON) ------------------ */
+let todos = JSON.parse(localStorage.getItem('todos') || '[]');
+
+function saveTodos() {
+    localStorage.setItem('todos', JSON.stringify(todos));
+}
+
+function addTodo() {
+    const input = document.getElementById('todoInput');
+    if (!input || !input.value.trim()) return;
+
+    if (todos.length >= 5) {
+        alert('Max 5 tasks per day.');
+        return;
+    }
+
+    todos.push({ text: input.value.trim(), done: false });
+    input.value = '';
+    saveTodos();
+    renderTodos();
+}
+
+function toggleTodo(index) {
+    todos[index].done = !todos[index].done;
+    saveTodos();
+    renderTodos();
+}
+
+function deleteTodo(index) {
+    todos.splice(index, 1);
+    saveTodos();
+    renderTodos();
+}
+
+function renderTodos() {
+    const list = document.getElementById('todoList');
+    if (!list) return;
+
+    list.innerHTML = todos.map((t, i) => `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <input type="checkbox" ${t.done ? 'checked' : ''} onclick="toggleTodo(${i})">
+            <span style="flex:1; ${t.done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                ${t.text}
+            </span>
+            <button onclick="deleteTodo(${i})">×</button>
+        </div>
+    `).join('');
+}
+
 /* ------------------ INIT ------------------ */
 document.addEventListener('DOMContentLoaded', () => {
-    // Keep ALL your existing init calls
     if (typeof initHabitData === 'function') initHabitData();
     if (typeof initHabitsList === 'function') initHabitsList();
     if (typeof initMoodData === 'function') initMoodData();
@@ -233,21 +279,18 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDailyBrief();
     updateStreakWithContent();
 
-    // NEW: bind daily focus if the textarea exists
     initDailyFocus();
+    renderTodos();
 });
 
 // ===============================
-// MODAL SYSTEM (RESTORED)
+// MODAL SYSTEM
 // ===============================
 function openModal(contentHTML) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
 
-    if (!modal || !modalBody) {
-        alert('Modal system not found. Make sure modal HTML exists.');
-        return;
-    }
+    if (!modal || !modalBody) return;
 
     modalBody.innerHTML = contentHTML;
     modal.style.display = 'flex';
