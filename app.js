@@ -157,7 +157,7 @@ function renderTodos() {
 }
 
 // ===============================
-// LIFE SCORE ENGINE (ELITE VERSION)
+// LIFE SCORE ENGINE
 // ===============================
 function animateNumber(el, start, end, duration = 800) {
   let startTime = null;
@@ -264,7 +264,7 @@ function renderLifeScore() {
 }
 
 // ===============================
-// INITIAL LOAD
+// INITIAL LOAD (SINGLE BOOT SYSTEM)
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
   showPage("dashboard");
