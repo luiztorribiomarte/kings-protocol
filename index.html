@@ -1,156 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kings Protocol</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kings Protocol</title>
 
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:,">
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
-  <div class="container">
+<body class="fire-mode">
+    <div class="container">
 
-    <!-- Header -->
-    <div style="margin-bottom: 30px;">
-      <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:20px;">
-        <div class="widget" style="flex:1;">
-          <div class="widget-icon">🕐</div>
-          <div>
-            <div class="widget-value" id="currentTime">--:--</div>
-            <div class="widget-label">New York</div>
-            <div class="widget-sublabel" id="currentDate">---</div>
-          </div>
+        <!-- Header -->
+        <div style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px;">
+                <div class="widget" id="clockWidget" style="flex: 1;">
+                    <div class="widget-icon">🕐</div>
+                    <div>
+                        <div class="widget-value" id="currentTime">--:--</div>
+                        <div class="widget-label" id="currentLocation">New York</div>
+                        <div class="widget-sublabel" id="currentDate">---</div>
+                    </div>
+                </div>
+
+                <div class="widget" id="weatherWidget" style="flex: 1;">
+                    <div class="widget-icon">🌤️</div>
+                    <div>
+                        <div class="widget-value">72°F</div>
+                        <div class="widget-label">Yonkers</div>
+                    </div>
+                </div>
+            </div>
+
+            <h1 style="
+                text-align: center;
+                font-size: 2.5em;
+                margin: 20px 0;
+                background: linear-gradient(135deg, #ffffff 0%, #9CA3AF 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            ">
+                Kings Protocol
+            </h1>
         </div>
 
-        <div class="widget" style="flex:1;">
-          <div class="widget-icon">🌤️</div>
-          <div>
-            <div class="widget-value">72°F</div>
-            <div class="widget-label">Yonkers</div>
-          </div>
+        <!-- Navigation -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
+            <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
+            <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
+            <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
+            <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
+            <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
+            <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
         </div>
-      </div>
 
-      <h1 style="text-align:center; font-size:2.5em; margin:20px 0;">
-        Kings Protocol
-      </h1>
+        <!-- Dashboard -->
+        <div id="dashboardPage" class="page active">
+
+            <!-- DAILY FOCUS (NEW) -->
+            <div class="habit-section">
+                <div class="section-title">🎯 Daily Focus</div>
+                <textarea
+                    id="dailyFocusInput"
+                    class="form-input"
+                    rows="2"
+                    placeholder="What is the one thing that matters today?"
+                ></textarea>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="daysAt80">0/7</div>
+                    <div class="stat-label">Days at 80%+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="weeklyCompletion">0%</div>
+                    <div class="stat-label">Weekly Completion</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="currentStreak">0</div>
+                    <div class="stat-label">Current Streak</div>
+                </div>
+            </div>
+
+            <div id="dailyStatus">
+                Checking today’s status…
+            </div>
+
+            <div class="habit-section">
+                <div class="section-title">😊 Energy & Mood</div>
+                <div id="moodTracker"></div>
+            </div>
+
+            <div class="habit-section">
+                <div class="section-title">📋 Daily Habits - This Week</div>
+                <div id="habitGrid"></div>
+            </div>
+
+            <div class="streak-section">
+                <div class="streak-display">
+                    <div class="streak-number" id="streakNumber">0</div>
+                    <div class="streak-label">DAY STREAK</div>
+                    <div class="streak-best">Best: <span id="bestStreak">0</span></div>
+                </div>
+                <div id="milestones"></div>
+            </div>
+        </div>
+
+        <!-- Other Pages -->
+        <div id="goalsHabitsPage" class="page"><div id="goalsGrid"></div></div>
+        <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
+        <div id="journalPage" class="page"><div id="journalContainer"></div></div>
+        <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
+        <div id="contentPage" class="page"><div id="contentContainer"></div></div>
+        <div id="booksPage" class="page"><div id="booksContainer"></div></div>
+
+        <div id="settingsPage" class="page">
+            <div class="section-title">⚙️ Settings</div>
+            <p style="color:#9CA3AF; text-align:center; padding:40px;">Coming Soon…</p>
+        </div>
+
     </div>
 
-    <!-- Navigation -->
-    <div class="nav-tabs">
-      <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
-      <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
-      <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
-      <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
-      <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
-      <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
-      <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
-      <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
+    <!-- Modal -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
     </div>
 
-    <!-- Dashboard -->
-    <div id="dashboardPage" class="page active">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="daysAt80">0/7</div>
-          <div class="stat-label">Days at 80%+</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="weeklyCompletion">0%</div>
-          <div class="stat-label">Weekly Completion</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="currentStreak">0</div>
-          <div class="stat-label">Current Streak</div>
-        </div>
-      </div>
-
-      <div id="dailyStatus">Checking today’s status…</div>
-
-      <div class="habit-section">
-        <div class="section-title">😊 Energy & Mood</div>
-        <div id="moodTracker"></div>
-      </div>
-
-      <div class="habit-section">
-        <div class="section-title">📋 Daily Habits</div>
-        <div id="habitGrid"></div>
-      </div>
-
-      <div class="streak-section">
-        <div class="streak-display">
-          <div class="streak-number" id="streakNumber">0</div>
-          <div class="streak-label">DAY STREAK</div>
-          <div class="streak-best">Best: <span id="bestStreak">0</span></div>
-        </div>
-        <div id="milestones"></div>
-      </div>
-    </div>
-
-    <!-- Goals -->
-    <div id="goalsHabitsPage" class="page">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h2>🎯 Goals</h2>
-        <button onclick="openAddGoal()">+ Add New Goal</button>
-      </div>
-      <div id="goalsGrid"></div>
-    </div>
-
-    <!-- Workouts (FIXED) -->
-    <div id="workoutPage" class="page">
-
-      <div class="workout-log" style="margin-bottom:20px;">
-        <div class="section-title">💪 Log Workout</div>
-
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
-          <input id="exerciseName" class="form-input" placeholder="Exercise (Bench Press)" />
-          <input id="exerciseWeight" class="form-input" type="number" placeholder="Weight (lbs)" />
-          <input id="exerciseSets" class="form-input" type="number" placeholder="Sets" />
-          <input id="exerciseReps" class="form-input" type="number" placeholder="Reps" />
-        </div>
-
-        <div style="margin-top:12px;">
-          <button onclick="logWorkout()">Log Workout</button>
-        </div>
-      </div>
-
-      <div id="exerciseCards"></div>
-    </div>
-
-    <!-- Other Pages -->
-    <div id="journalPage" class="page"><div id="journalContainer"></div></div>
-    <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
-    <div id="contentPage" class="page"><div id="contentContainer"></div></div>
-    <div id="booksPage" class="page"><div id="booksContainer"></div></div>
-
-    <div id="settingsPage" class="page">
-      <p style="text-align:center; color:#9CA3AF;">Coming soon…</p>
-    </div>
-
-  </div>
-
-  <!-- Modal -->
-  <div id="modal" class="modal" onclick="closeModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-      <span class="close" onclick="closeModal()">&times;</span>
-      <div id="modalBody"></div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
-  <script src="features/habits.js"></script>
-  <script src="features/goals.js"></script>
-  <script src="features/mood.js"></script>
-  <script src="features/workout.js"></script>
-  <script src="features/journal.js"></script>
-  <script src="features/vision-board.js"></script>
-  <script src="features/reading-list.js"></script>
-  <script src="features/content-tracker.js"></script>
-  <script src="app.js"></script>
+    <!-- Scripts -->
+    <script src="features/habits.js"></script>
+    <script src="features/goals.js"></script>
+    <script src="features/mood.js"></script>
+    <script src="features/workout.js"></script>
+    <script src="features/journal.js"></script>
+    <script src="features/vision-board.js"></script>
+    <script src="features/reading-list.js"></script>
+    <script src="features/content-tracker.js"></script>
+    <script src="app.js"></script>
 
 </body>
 </html>
