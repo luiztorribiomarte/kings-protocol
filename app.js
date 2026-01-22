@@ -40,8 +40,12 @@ function showPage(pageName) {
         ensureDailyBriefUI();
         updateDailyBrief();
         updateStreakWithContent();
+
         initDailyFocus();
         renderTodos();
+
+        ensureMomentumSnapshotUI();   // ✅ NEW
+        updateMomentumSnapshot();     // ✅ NEW
     }
 }
 
@@ -92,6 +96,7 @@ function updateStreakWithContent() {
 
     let effectivePercent = habits.percent;
 
+    // 🔥 Content boost logic
     if (habits.percent >= 60 && habits.percent < 80) {
         if (content.hours >= 1 || content.videos >= 1) {
             effectivePercent = 80;
@@ -107,6 +112,7 @@ function updateStreakWithContent() {
         statusEl.style.color = effectivePercent >= 80 ? '#22c55e' : '#f87171';
     }
 
+    // Persist streak memory
     const lastKey = localStorage.getItem('lastStreakDay');
     let streak = Number(localStorage.getItem('currentStreak') || 0);
 
@@ -125,9 +131,7 @@ function updateStreakWithContent() {
 /* ------------------ DAILY BRIEF ------------------ */
 function seededPick(arr, seed) {
     let h = 0;
-    for (let i = 0; i < seed.length; i++) {
-        h = Math.imul(31, h) + seed.charCodeAt(i);
-    }
+    for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i);
     return arr[Math.abs(h) % arr.length];
 }
 
@@ -198,6 +202,7 @@ function initDailyFocus() {
     const input = document.getElementById('dailyFocusInput');
     if (!input) return;
 
+    // Prevent duplicate listeners
     if (input.dataset.bound === "1") return;
     input.dataset.bound = "1";
 
@@ -231,6 +236,7 @@ function addTodo() {
 }
 
 function toggleTodo(index) {
+    if (!todos[index]) return;
     todos[index].done = !todos[index].done;
     saveTodos();
     renderTodos();
@@ -246,15 +252,143 @@ function renderTodos() {
     const list = document.getElementById('todoList');
     if (!list) return;
 
+    if (!todos.length) {
+        list.innerHTML = `
+            <div style="color:#9CA3AF; padding:10px 2px;">
+                No tasks yet. Add up to 5 for today.
+            </div>
+        `;
+        return;
+    }
+
     list.innerHTML = todos.map((t, i) => `
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
             <input type="checkbox" ${t.done ? 'checked' : ''} onclick="toggleTodo(${i})">
             <span style="flex:1; ${t.done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
-                ${t.text}
+                ${escapeInline(t.text)}
             </span>
-            <button onclick="deleteTodo(${i})">×</button>
+            <button
+                onclick="deleteTodo(${i})"
+                style="border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:white; border-radius:10px; padding:6px 10px; cursor:pointer;"
+                title="Delete"
+            >×</button>
         </div>
     `).join('');
+}
+
+function escapeInline(str) {
+    return String(str || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+/* ------------------ MOMENTUM SNAPSHOT (ADD-ON) ------------------ */
+function ensureMomentumSnapshotUI() {
+    if (document.getElementById('momentumSnapshot')) return;
+
+    const dash = document.getElementById('dashboardPage');
+    if (!dash) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'momentumSnapshot';
+    wrap.className = 'habit-section';
+
+    wrap.innerHTML = `
+        <div class="section-title">🔥 Momentum Snapshot</div>
+        <div class="stats-grid" style="margin-bottom:0;">
+            <div class="stat-card" style="cursor:default;">
+                <div class="stat-value" id="msWorkouts">0</div>
+                <div class="stat-label">Workouts (7d)</div>
+            </div>
+            <div class="stat-card" style="cursor:default;">
+                <div class="stat-value" id="msGoals">0</div>
+                <div class="stat-label">Goals added (7d)</div>
+            </div>
+            <div class="stat-card" style="cursor:default;">
+                <div class="stat-value" id="msStreak">0</div>
+                <div class="stat-label">Streak</div>
+            </div>
+        </div>
+    `;
+
+    // Insert it right after your todo block if it exists, otherwise after focus, otherwise near top.
+    const focus = document.getElementById('dailyFocusInput');
+    const todoListEl = document.getElementById('todoList');
+
+    const focusSection = focus ? focus.closest('.habit-section') : null;
+    const todoSection = todoListEl ? todoListEl.closest('.habit-section') : null;
+
+    if (todoSection && todoSection.parentElement === dash) {
+        dash.insertBefore(wrap, todoSection.nextElementSibling);
+        return;
+    }
+    if (focusSection && focusSection.parentElement === dash) {
+        dash.insertBefore(wrap, focusSection.nextElementSibling);
+        return;
+    }
+
+    dash.insertBefore(wrap, dash.children[1] || null);
+}
+
+function updateMomentumSnapshot() {
+    const workoutsEl = document.getElementById('msWorkouts');
+    const goalsEl = document.getElementById('msGoals');
+    const streakEl = document.getElementById('msStreak');
+
+    if (!workoutsEl || !goalsEl || !streakEl) return;
+
+    workoutsEl.textContent = String(getWorkoutsLast7Days());
+    goalsEl.textContent = String(getGoalsAddedLast7Days());
+
+    // Use your existing streak value (so no risk / no rewrites)
+    const streak = Number(localStorage.getItem('currentStreak') || 0);
+    streakEl.textContent = String(streak);
+}
+
+function getWorkoutsLast7Days() {
+    const raw = localStorage.getItem('workoutData');
+    if (!raw) return 0;
+
+    let data = {};
+    try { data = JSON.parse(raw) || {}; } catch { return 0; }
+
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+
+    let count = 0;
+    for (const exerciseName of Object.keys(data)) {
+        const sessions = Array.isArray(data[exerciseName]) ? data[exerciseName] : [];
+        for (const s of sessions) {
+            const d = new Date(s.date || s.createdAt || s.time || 0);
+            if (!isNaN(d.getTime()) && d >= start) count += 1;
+        }
+    }
+    return count;
+}
+
+function getGoalsAddedLast7Days() {
+    const raw = localStorage.getItem('goals');
+    if (!raw) return 0;
+
+    let arr = [];
+    try { arr = JSON.parse(raw) || []; } catch { return 0; }
+
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+
+    let count = 0;
+    for (const g of arr) {
+        const d = new Date(g.createdAt || g.date || g.time || 0);
+        if (!isNaN(d.getTime()) && d >= start) count += 1;
+    }
+    return count;
 }
 
 /* ------------------ INIT ------------------ */
@@ -281,16 +415,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initDailyFocus();
     renderTodos();
+
+    ensureMomentumSnapshotUI();  // ✅ NEW
+    updateMomentumSnapshot();    // ✅ NEW
 });
 
 // ===============================
-// MODAL SYSTEM
+// MODAL SYSTEM (RESTORED)
 // ===============================
 function openModal(contentHTML) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
 
-    if (!modal || !modalBody) return;
+    if (!modal || !modalBody) {
+        alert('Modal system not found. Make sure modal HTML exists.');
+        return;
+    }
 
     modalBody.innerHTML = contentHTML;
     modal.style.display = 'flex';
