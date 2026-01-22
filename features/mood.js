@@ -173,11 +173,8 @@ function renderMoodInsight(insight) {
 
 // ---------- Pattern highlights ----------
 function getDayBadge(energy, habitPercent) {
-  // Returns { icon, label, style } or null
-
   if (energy == null) return null;
 
-  // Perfect day: high energy + strong habits
   if (energy >= 7 && habitPercent >= 80) {
     return {
       icon: "👑",
@@ -186,7 +183,6 @@ function getDayBadge(energy, habitPercent) {
     };
   }
 
-  // High energy but low execution
   if (energy >= 7 && habitPercent < 50) {
     return {
       icon: "⚠️",
@@ -195,7 +191,6 @@ function getDayBadge(energy, habitPercent) {
     };
   }
 
-  // Low-energy day
   if (energy <= 4) {
     return {
       icon: "🧊",
@@ -323,11 +318,9 @@ function renderMoodChart(range) {
 
   const habitStats = keys.map(k => getHabitCompletionForDay(k));
 
-  // Insight under chart
   const insight = computeMoodHabitInsights(keys, energyValues, habitStats);
   renderMoodInsight(insight);
 
-  // Emoji row cards (with badges!)
   const emojiRow = document.getElementById("moodEmojiRow");
   if (emojiRow) {
     emojiRow.innerHTML = keys.map((k, i) => {
@@ -558,3 +551,50 @@ function renderMoodTracker() {
 
   container.innerHTML = html;
 }
+
+// ---------- Boot (fixes “empty mood section”) ----------
+(function bootMoodModule() {
+  function safeRender() {
+    try {
+      // always reload latest stored data before rendering
+      initMoodData();
+      renderMoodTracker();
+    } catch (e) {
+      console.error("Mood render failed:", e);
+    }
+  }
+
+  // render on initial load
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", safeRender);
+  } else {
+    safeRender();
+  }
+
+  // re-render when returning to dashboard via showPage(...)
+  try {
+    if (typeof window.showPage === "function" && !window.showPage.__moodWrapped) {
+      const originalShowPage = window.showPage;
+
+      const wrapped = function(pageId) {
+        const res = originalShowPage.apply(this, arguments);
+
+        // your nav uses showPage('dashboard')
+        if (pageId === "dashboard" || pageId === "dashboardPage") {
+          setTimeout(safeRender, 0);
+        }
+        return res;
+      };
+
+      wrapped.__moodWrapped = true;
+      window.showPage = wrapped;
+    }
+  } catch (e) {
+    console.error("Mood showPage wrap failed:", e);
+  }
+
+  // if another tab updates moodData
+  window.addEventListener("storage", (e) => {
+    if (e.key === "moodData") safeRender();
+  });
+})();
