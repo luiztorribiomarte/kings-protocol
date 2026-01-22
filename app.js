@@ -29,6 +29,7 @@ function showPage(pageName) {
         tabs[indexMap[pageName]].classList.add('active');
     }
 
+    // Keep ALL existing render hooks exactly as you had them
     if (pageName === 'journal' && typeof renderJournalPage === 'function') renderJournalPage();
     if (pageName === 'visionBoard' && typeof renderVisionBoard === 'function') renderVisionBoard();
     if (pageName === 'content' && typeof renderContentTracker === 'function') renderContentTracker();
@@ -39,7 +40,8 @@ function showPage(pageName) {
     if (pageName === 'dashboard') {
         ensureDailyBriefUI();
         updateDailyBrief();
-        updateStreakWithContent(); // ✅ NEW
+        updateStreakWithContent(); // ✅ existing
+        initDailyFocus();          // ✅ NEW (safe)
     }
 }
 
@@ -191,8 +193,26 @@ function updateDailyBrief() {
     if (el) el.textContent = buildDailyBrief();
 }
 
+/* ------------------ DAILY FOCUS (NEW, ADDITIVE) ------------------ */
+function initDailyFocus() {
+    const input = document.getElementById('dailyFocusInput');
+    if (!input) return;
+
+    // Prevent duplicate listeners if showPage('dashboard') runs multiple times
+    if (input.dataset.bound === "1") return;
+    input.dataset.bound = "1";
+
+    const saved = localStorage.getItem('dailyFocus') || '';
+    if (!input.value) input.value = saved;
+
+    input.addEventListener('input', () => {
+        localStorage.setItem('dailyFocus', input.value);
+    });
+}
+
 /* ------------------ INIT ------------------ */
 document.addEventListener('DOMContentLoaded', () => {
+    // Keep ALL your existing init calls
     if (typeof initHabitData === 'function') initHabitData();
     if (typeof initHabitsList === 'function') initHabitsList();
     if (typeof initMoodData === 'function') initMoodData();
@@ -212,7 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureDailyBriefUI();
     updateDailyBrief();
     updateStreakWithContent();
+
+    // NEW: bind daily focus if the textarea exists
+    initDailyFocus();
 });
+
 // ===============================
 // MODAL SYSTEM (RESTORED)
 // ===============================
