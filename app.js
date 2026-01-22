@@ -157,8 +157,22 @@ function renderTodos() {
 }
 
 // ===============================
-// LIFE SCORE ENGINE (NEW)
+// LIFE SCORE ENGINE (ELITE VERSION)
 // ===============================
+function animateNumber(el, start, end, duration = 800) {
+  let startTime = null;
+
+  function step(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const progress = Math.min((timestamp - startTime) / duration, 1);
+    const value = Math.floor(start + (end - start) * progress);
+    el.textContent = value;
+    if (progress < 1) requestAnimationFrame(step);
+  }
+
+  requestAnimationFrame(step);
+}
+
 function renderLifeScore() {
   const containerId = "lifeScoreCard";
   let card = document.getElementById(containerId);
@@ -172,6 +186,88 @@ function renderLifeScore() {
     card.className = "habit-section";
     dashboard.prepend(card);
   }
+
+  // HABITS SCORE
+  let habitPercent = 0;
+  if (typeof getDayCompletion === "function") {
+    const today = new Date().toISOString().split("T")[0];
+    const data = getDayCompletion(today);
+    habitPercent = data.percent || 0;
+  }
+  const habitScore = Math.round((habitPercent / 100) * 50);
+
+  // MOOD SCORE
+  let energyScore = 0;
+  try {
+    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+    const todayKey = new Date().toISOString().split("T")[0];
+    const energy = moodData[todayKey]?.energy || 5;
+    energyScore = Math.round((energy / 10) * 25);
+  } catch {}
+
+  // TODO SCORE
+  const totalTodos = todos.length;
+  const completedTodos = todos.filter(t => t.done).length;
+  const todoScore = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 20);
+
+  // STREAK BONUS
+  let streakBonus = 0;
+  try {
+    const streak = parseInt(localStorage.getItem("currentStreak") || "0");
+    streakBonus = Math.min(5, streak);
+  } catch {}
+
+  const totalScore = habitScore + energyScore + todoScore + streakBonus;
+
+  // STATUS + COLOR LOGIC
+  let status = "Slipping";
+  let color = "red";
+  if (totalScore >= 80) {
+    status = "Dominating";
+    color = "green";
+  } else if (totalScore >= 60) {
+    status = "Solid";
+    color = "yellow";
+  } else if (totalScore >= 40) {
+    status = "Recovering";
+    color = "yellow";
+  }
+
+  let glowClass =
+    color === "green" ? "life-glow-green" :
+    color === "yellow" ? "life-glow-yellow" :
+    "life-glow-red";
+
+  const angle = Math.round((totalScore / 100) * 360);
+
+  card.innerHTML = `
+    <div class="section-title">👑 Life Score</div>
+
+    <div class="life-score-wrap">
+      <div class="life-ring ${glowClass} life-pulse"
+        style="background: conic-gradient(
+          ${color === "green" ? "#22c55e" : color === "yellow" ? "#eab308" : "#ef4444"} ${angle}deg,
+          rgba(255,255,255,0.08) ${angle}deg
+        );">
+        <span id="lifeScoreNumber">0</span>
+      </div>
+
+      <div>
+        <div style="font-size:1.1rem; font-weight:800;">Status: ${status}</div>
+        <div class="life-score-details">
+          Habits: ${habitScore}/50<br>
+          Energy: ${energyScore}/25<br>
+          Tasks: ${todoScore}/20<br>
+          Streak: +${streakBonus}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const numEl = document.getElementById("lifeScoreNumber");
+  if (numEl) animateNumber(numEl, 0, totalScore);
+}
+
 
   // HABITS SCORE
   let habitPercent = 0;
