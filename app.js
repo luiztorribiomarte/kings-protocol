@@ -1,5 +1,5 @@
 // ===============================
-// GLOBAL MODAL SYSTEM (NEW - REQUIRED FOR MOOD GRAPH)
+// GLOBAL MODAL SYSTEM
 // ===============================
 function openModal(html) {
   const modal = document.getElementById("modal");
@@ -31,10 +31,10 @@ function showPage(page) {
     document.getElementById("dashboardPage").classList.add("active");
     document.querySelector(".nav-tab:nth-child(1)").classList.add("active");
 
-    // 🔁 Re-render dashboard modules safely
     if (typeof renderMoodTracker === "function") renderMoodTracker();
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderTodos === "function") renderTodos();
+    renderLifeScore();
 
   } else if (page === "goalsHabits") {
     document.getElementById("goalsHabitsPage").classList.add("active");
@@ -93,7 +93,7 @@ setInterval(updateTime, 1000);
 updateTime();
 
 // ===============================
-// TODO LIST (DASHBOARD)
+// TODO LIST
 // ===============================
 let todos = JSON.parse(localStorage.getItem("todos")) || [];
 
@@ -101,26 +101,26 @@ function addTodo() {
   const input = document.getElementById("todoInput");
   if (!input || !input.value.trim()) return;
 
-  todos.push({
-    text: input.value.trim(),
-    done: false
-  });
+  todos.push({ text: input.value.trim(), done: false });
 
   input.value = "";
   saveTodos();
   renderTodos();
+  renderLifeScore();
 }
 
 function toggleTodo(index) {
   todos[index].done = !todos[index].done;
   saveTodos();
   renderTodos();
+  renderLifeScore();
 }
 
 function deleteTodo(index) {
   todos.splice(index, 1);
   saveTodos();
   renderTodos();
+  renderLifeScore();
 }
 
 function saveTodos() {
@@ -157,23 +157,90 @@ function renderTodos() {
 }
 
 // ===============================
-// INITIAL LOAD (MERGED + CLEAN)
+// LIFE SCORE ENGINE (NEW)
+// ===============================
+function renderLifeScore() {
+  const containerId = "lifeScoreCard";
+  let card = document.getElementById(containerId);
+
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  if (!card) {
+    card = document.createElement("div");
+    card.id = containerId;
+    card.className = "habit-section";
+    dashboard.prepend(card);
+  }
+
+  // HABITS SCORE
+  let habitPercent = 0;
+  if (typeof getDayCompletion === "function") {
+    const today = new Date().toISOString().split("T")[0];
+    const data = getDayCompletion(today);
+    habitPercent = data.percent || 0;
+  }
+
+  const habitScore = Math.round((habitPercent / 100) * 50);
+
+  // MOOD SCORE
+  let energyScore = 0;
+  try {
+    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+    const todayKey = new Date().toISOString().split("T")[0];
+    const energy = moodData[todayKey]?.energy || 5;
+    energyScore = Math.round((energy / 10) * 25);
+  } catch {}
+
+  // TODO SCORE
+  const totalTodos = todos.length;
+  const completedTodos = todos.filter(t => t.done).length;
+  const todoScore = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 20);
+
+  // STREAK BONUS
+  let streakBonus = 0;
+  try {
+    const streak = parseInt(localStorage.getItem("currentStreak") || "0");
+    streakBonus = Math.min(5, streak);
+  } catch {}
+
+  const totalScore = habitScore + energyScore + todoScore + streakBonus;
+
+  let status = "Slipping";
+  if (totalScore >= 80) status = "Dominating";
+  else if (totalScore >= 60) status = "Solid";
+  else if (totalScore >= 40) status = "Recovering";
+
+  card.innerHTML = `
+    <div class="section-title">👑 Life Score</div>
+    <div style="font-size:2rem; font-weight:900;">${totalScore} / 100</div>
+    <div style="margin-top:6px; color:#9CA3AF;">Status: <strong style="color:white;">${status}</strong></div>
+
+    <div style="margin-top:12px; font-size:0.9rem; color:#9CA3AF;">
+      Habits: ${habitScore}/50<br>
+      Energy: ${energyScore}/25<br>
+      Tasks: ${todoScore}/20<br>
+      Streak: +${streakBonus}
+    </div>
+  `;
+}
+
+// ===============================
+// INITIAL LOAD
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
   showPage("dashboard");
 
-  // Init modules safely
   if (typeof initHabits === "function") initHabits();
   if (typeof initGoalsData === "function") initGoalsData();
   if (typeof initWorkoutData === "function") initWorkoutData();
   if (typeof initMoodData === "function") initMoodData();
 
-  // Render mood only if container exists
   const moodEl = document.getElementById("moodTracker");
   if (moodEl && typeof renderMoodTracker === "function") {
     renderMoodTracker();
-    console.log("[Kings Protocol] Mood module rendered.");
   }
 
   renderTodos();
+  renderLifeScore();
 });
