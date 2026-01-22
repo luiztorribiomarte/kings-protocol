@@ -338,5 +338,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderTodos();
-  renderLifeScore();
+      if (typeof renderLifeScore === 'function') renderLifeScore();
+
 });
