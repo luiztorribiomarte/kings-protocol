@@ -37,6 +37,7 @@ function showPage(page) {
     if (typeof renderLifeScore === "function") renderLifeScore();
     if (typeof renderInsights === "function") renderInsights();
     if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+    if (typeof renderDNAProfile === "function") renderDNAProfile();
 
   } else if (page === "goalsHabits") {
     document.getElementById("goalsHabitsPage").classList.add("active");
@@ -111,6 +112,7 @@ function addTodo() {
   renderLifeScore();
   renderInsights();
   renderWeeklyGraph();
+  renderDNAProfile();
 }
 
 function toggleTodo(index) {
@@ -120,6 +122,7 @@ function toggleTodo(index) {
   renderLifeScore();
   renderInsights();
   renderWeeklyGraph();
+  renderDNAProfile();
 }
 
 function deleteTodo(index) {
@@ -129,6 +132,7 @@ function deleteTodo(index) {
   renderLifeScore();
   renderInsights();
   renderWeeklyGraph();
+  renderDNAProfile();
 }
 
 function saveTodos() {
@@ -288,6 +292,18 @@ function avg(arr) {
   return arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
 
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function stdDev(arr) {
+  const clean = arr.filter(v => Number.isFinite(v));
+  if (clean.length <= 1) return 0;
+  const m = avg(clean);
+  const variance = avg(clean.map(v => (v - m) ** 2));
+  return Math.sqrt(variance);
+}
+
 function renderInsights() {
   const dashboard = document.getElementById("dashboardPage");
   if (!dashboard) return;
@@ -334,7 +350,7 @@ function renderInsights() {
 }
 
 // ===============================
-// WEEKLY PERFORMANCE GRAPH (NEW)
+// WEEKLY PERFORMANCE GRAPH
 // ===============================
 let weeklyChart = null;
 
@@ -370,7 +386,7 @@ function renderWeeklyGraph() {
     typeof getDayCompletion === "function" ? getDayCompletion(d).percent || 0 : 0
   );
 
-  const energyData = days.map(d => (moodData[d]?.energy || 0) * 10); // scaled to %
+  const energyData = days.map(d => (moodData[d]?.energy || 0) * 10); // 0–100 scale
   const todoData = days.map(() => {
     const total = todos.length;
     const done = todos.filter(t => t.done).length;
@@ -410,6 +426,185 @@ function renderWeeklyGraph() {
 }
 
 // ===============================
+// PRODUCTIVITY DNA (NEW)
+// ===============================
+function getCurrentStreakSafe() {
+  try {
+    const s = parseInt(localStorage.getItem("currentStreak") || "0");
+    return Number.isFinite(s) ? s : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function getHabitPercentForDay(dayKey) {
+  try {
+    if (typeof getDayCompletion === "function") {
+      const data = getDayCompletion(dayKey);
+      return data?.percent ? data.percent : 0;
+    }
+  } catch {}
+  return 0;
+}
+
+function getEnergyForDay(dayKey) {
+  try {
+    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+    const e = moodData?.[dayKey]?.energy;
+    return Number.isFinite(e) ? e : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function getTaskEfficiencyPercent() {
+  const total = todos.length;
+  const done = todos.filter(t => t.done).length;
+  return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+function buildBar(label, value, hint) {
+  const v = clamp(Math.round(value), 0, 100);
+  return `
+    <div style="margin-top:12px;">
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
+        <div style="color:#E5E7EB; font-weight:800;">${label}</div>
+        <div style="color:#9CA3AF; font-weight:800;">${v}</div>
+      </div>
+      <div style="margin-top:8px; height:10px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden;">
+        <div style="height:100%; width:${v}%; border-radius:999px; background:linear-gradient(90deg, rgba(99,102,241,0.95), rgba(236,72,153,0.95));"></div>
+      </div>
+      ${hint ? `<div style="margin-top:8px; color:#9CA3AF; font-size:0.9rem; line-height:1.35;">${hint}</div>` : ""}
+    </div>
+  `;
+}
+
+function getDNASummary(discipline, consistency, execution, volatility) {
+  // “best it can be” = specific + actionable, not generic
+  let type = "Balanced Builder";
+  let line = "You’re steady—now push for a higher floor.";
+
+  if (discipline >= 75 && consistency >= 70 && volatility <= 35) {
+    type = "Iron Operator";
+    line = "You don’t rely on motivation. You execute.";
+  } else if (execution >= 75 && discipline < 60) {
+    type = "Burst Finisher";
+    line = "You can finish tasks, but habits aren’t locked in yet.";
+  } else if (discipline >= 70 && execution < 55) {
+    type = "Routine Soldier";
+    line = "Habits are strong, but task output is the bottleneck.";
+  } else if (volatility >= 65) {
+    type = "Chaos Reactor";
+    line = "Your days swing hard. Build consistency to unlock progress.";
+  } else if (consistency >= 75 && discipline < 55) {
+    type = "Steady Starter";
+    line = "You’re consistent—now raise the intensity.";
+  }
+
+  // make it “what to do next” based on weakest metric
+  const metrics = [
+    { k: "Discipline", v: discipline },
+    { k: "Consistency", v: consistency },
+    { k: "Execution", v: execution },
+    { k: "Volatility", v: 100 - volatility } // invert for weakness detection (higher = better)
+  ].sort((a, b) => a.v - b.v);
+
+  const weakest = metrics[0]?.k || "Execution";
+
+  let directive = "Next move: tighten your system.";
+  if (weakest === "Discipline") directive = "Next move: make 1 habit non-negotiable daily.";
+  if (weakest === "Consistency") directive = "Next move: stop the swings—aim for repeatable 70% days.";
+  if (weakest === "Execution") directive = "Next move: cap tasks at 3 and finish them.";
+  if (weakest === "Volatility") directive = "Next move: stabilize sleep + start times for 7 days.";
+
+  return { type, line, directive };
+}
+
+function renderDNAProfile() {
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  let card = document.getElementById("dnaCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "dnaCard";
+    card.className = "habit-section";
+    // put it right under Weekly Performance
+    dashboard.insertBefore(card, dashboard.children[3] || null);
+  }
+
+  const days = getLastNDays(14);
+  const habitPercents = days.map(getHabitPercentForDay);
+  const energies = days.map(getEnergyForDay); // 0–10
+
+  const habitAvg = avg(habitPercents); // 0–100
+  const habitStd = stdDev(habitPercents); // 0–?
+  const energyAvg = avg(energies); // 0–10
+  const energyStd = stdDev(energies);
+
+  const taskEfficiency = getTaskEfficiencyPercent(); // 0–100
+  const streak = getCurrentStreakSafe();
+
+  // DISCIPLINE: habits avg (70%) + streak (30%)
+  const streakScore = clamp(streak * 5, 0, 100);
+  const discipline = clamp(habitAvg * 0.7 + streakScore * 0.3, 0, 100);
+
+  // CONSISTENCY: lower variability = higher score (habits + energy)
+  // map std dev into a 0–100 score
+  const habitConsistency = clamp(100 - habitStd * 1.4, 0, 100); // 1.4 tuned for typical % swings
+  const energyConsistency = clamp(100 - energyStd * 12, 0, 100); // 12 tuned for 0–10 scale
+  const consistency = clamp(habitConsistency * 0.65 + energyConsistency * 0.35, 0, 100);
+
+  // EXECUTION: tasks (55%) + habits avg (45%)
+  const execution = clamp(taskEfficiency * 0.55 + habitAvg * 0.45, 0, 100);
+
+  // VOLATILITY: based on day-to-day swings (habits + energy)
+  // high std dev => high volatility
+  const volatility = clamp(habitStd * 1.2 + energyStd * 10, 0, 100);
+
+  const summary = getDNASummary(discipline, consistency, execution, volatility);
+
+  const disciplineHint =
+    `Based on your last 14 days: avg habits ${habitAvg.toFixed(1)}% + streak score ${streakScore}.`;
+
+  const consistencyHint =
+    `Your steadiness is driven by swings: habits σ ${habitStd.toFixed(1)}, energy σ ${energyStd.toFixed(2)}. Lower is better.`;
+
+  const executionHint =
+    `Tasks are ${taskEfficiency}% complete right now. This score blends tasks + habits.`;
+
+  const volatilityHint =
+    volatility >= 60
+      ? `Big swings detected. Your output is inconsistent day to day.`
+      : `Your swings are controlled. Keep your baseline stable.`;
+
+  card.innerHTML = `
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div>
+        <div class="section-title">🧬 Productivity DNA</div>
+        <div style="color:#E5E7EB; font-weight:900; font-size:1.05rem;">${summary.type}</div>
+        <div style="margin-top:6px; color:#9CA3AF; line-height:1.4;">
+          ${summary.line}<br>
+          <span style="color:#E5E7EB; font-weight:800;">${summary.directive}</span>
+        </div>
+      </div>
+
+      <div style="min-width:200px; text-align:right;">
+        <div style="color:#9CA3AF; font-weight:800;">Window</div>
+        <div style="color:#E5E7EB; font-weight:900;">Last 14 days</div>
+        <div style="margin-top:8px; color:#9CA3AF; font-weight:800;">Streak</div>
+        <div style="color:#E5E7EB; font-weight:900;">${streak} days</div>
+      </div>
+    </div>
+
+    ${buildBar("Discipline", discipline, disciplineHint)}
+    ${buildBar("Consistency", consistency, consistencyHint)}
+    ${buildBar("Execution", execution, executionHint)}
+    ${buildBar("Volatility", 100 - volatility, volatilityHint)}
+  `;
+}
+
+// ===============================
 // INITIAL LOAD
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
@@ -429,4 +624,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderLifeScore();
   renderInsights();
   renderWeeklyGraph();
+  renderDNAProfile();
 });
