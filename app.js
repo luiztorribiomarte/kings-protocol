@@ -1,7 +1,8 @@
 // ============================================
 // KINGS PROTOCOL — APP.JS (STABLE ARCHITECTURE)
 // Keeps all existing globals so nothing breaks
-// Adds an internal APP namespace to prevent collisions
+// Adds internal APP namespace to prevent collisions
+// Adds Weekly Performance chart (Habits + Energy + Tasks)
 // ============================================
 
 /* ------------------------------------------------
@@ -17,12 +18,27 @@ APP.utils = {
     return Array.from(root.querySelectorAll(sel));
   },
   safeCall(fnName, ...args) {
-    // calls a global function if it exists
     try {
       const fn = window[fnName];
       if (typeof fn === "function") return fn(...args);
     } catch {}
     return null;
+  },
+  dayKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  },
+  pastDays(n = 7) {
+    const out = [];
+    const now = new Date();
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      out.push(d);
+    }
+    return out;
   }
 };
 
@@ -89,11 +105,12 @@ APP.nav = {
     // Dashboard renders
     if (page === "dashboard") {
       APP.utils.safeCall("renderMoodTracker");
-      // habits module name has varied; try both safely
+      // habits module name may vary; try both safely
       APP.utils.safeCall("renderHabitGrid");
       APP.utils.safeCall("renderHabits");
       APP.todos.render();
       APP.lifeScore.render();
+      APP.weeklyPerformance.render();
     }
 
     if (page === "goalsHabits") APP.utils.safeCall("renderGoals");
@@ -143,21 +160,43 @@ APP.clock = {
 };
 
 /* ------------------------------------------------
-   TODOS (keeps global addTodo/toggleTodo/deleteTodo working)
+   TODOS + DAILY SNAPSHOT HISTORY
 ------------------------------------------------ */
 APP.todos = {
   key: "todos",
+  historyKey: "todoHistory",
   list: [],
+  history: {},
+
   load() {
     try {
       APP.todos.list = JSON.parse(localStorage.getItem(APP.todos.key)) || [];
     } catch {
       APP.todos.list = [];
     }
+
+    try {
+      APP.todos.history = JSON.parse(localStorage.getItem(APP.todos.historyKey)) || {};
+    } catch {
+      APP.todos.history = {};
+    }
   },
+
   save() {
     localStorage.setItem(APP.todos.key, JSON.stringify(APP.todos.list));
+    APP.todos.saveTodaySnapshot();
   },
+
+  saveTodaySnapshot() {
+    const day = APP.utils.dayKey();
+    const total = APP.todos.list.length;
+    const done = APP.todos.list.filter(t => t.done).length;
+    const percent = total ? Math.round((done / total) * 100) : 0;
+
+    APP.todos.history[day] = { done, total, percent, updatedAt: new Date().toISOString() };
+    localStorage.setItem(APP.todos.historyKey, JSON.stringify(APP.todos.history));
+  },
+
   add() {
     const input = document.getElementById("todoInput");
     if (!input || !input.value.trim()) return;
@@ -167,21 +206,27 @@ APP.todos = {
     APP.todos.save();
     APP.todos.render();
     APP.lifeScore.render();
+    APP.weeklyPerformance.render();
   },
+
   toggle(index) {
     if (!APP.todos.list[index]) return;
     APP.todos.list[index].done = !APP.todos.list[index].done;
     APP.todos.save();
     APP.todos.render();
     APP.lifeScore.render();
+    APP.weeklyPerformance.render();
   },
+
   remove(index) {
     if (index < 0 || index >= APP.todos.list.length) return;
     APP.todos.list.splice(index, 1);
     APP.todos.save();
     APP.todos.render();
     APP.lifeScore.render();
+    APP.weeklyPerformance.render();
   },
+
   render() {
     const list = document.getElementById("todoList");
     if (!list) return;
@@ -216,28 +261,16 @@ APP.todos = {
 };
 
 // ✅ Keep your existing global functions
-let todos = []; // maintained for backward compatibility (lifeScore uses APP.todos now)
+let todos = []; // backward compatibility (some code may reference it)
 
-function addTodo() {
-  return APP.todos.add();
-}
-function toggleTodo(index) {
-  return APP.todos.toggle(index);
-}
-function deleteTodo(index) {
-  return APP.todos.remove(index);
-}
-function saveTodos() {
-  // kept so nothing breaks if something else calls it
-  return APP.todos.save();
-}
-function renderTodos() {
-  // kept so nothing breaks if something else calls it
-  return APP.todos.render();
-}
+function addTodo() { return APP.todos.add(); }
+function toggleTodo(index) { return APP.todos.toggle(index); }
+function deleteTodo(index) { return APP.todos.remove(index); }
+function saveTodos() { return APP.todos.save(); }
+function renderTodos() { return APP.todos.render(); }
 
 /* ------------------------------------------------
-   LIFE SCORE (keeps global renderLifeScore working)
+   LIFE SCORE
 ------------------------------------------------ */
 APP.lifeScore = {
   animateNumber(el, start, end, duration = 800) {
@@ -286,7 +319,7 @@ APP.lifeScore = {
       energyScore = Math.round((energy / 10) * 25);
     } catch {}
 
-    // TODO SCORE (use APP.todos source of truth)
+    // TODO SCORE
     const totalTodos = APP.todos.list.length;
     const completedTodos = APP.todos.list.filter(t => t.done).length;
     const todoScore = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 20);
@@ -302,16 +335,9 @@ APP.lifeScore = {
 
     let status = "Slipping";
     let color = "red";
-    if (totalScore >= 80) {
-      status = "Dominating";
-      color = "green";
-    } else if (totalScore >= 60) {
-      status = "Solid";
-      color = "yellow";
-    } else if (totalScore >= 40) {
-      status = "Recovering";
-      color = "yellow";
-    }
+    if (totalScore >= 80) { status = "Dominating"; color = "green"; }
+    else if (totalScore >= 60) { status = "Solid"; color = "yellow"; }
+    else if (totalScore >= 40) { status = "Recovering"; color = "yellow"; }
 
     const glowClass =
       color === "green" ? "life-glow-green" :
@@ -358,6 +384,173 @@ function renderLifeScore() {
 }
 
 /* ------------------------------------------------
+   WEEKLY PERFORMANCE (NEW)
+   - Habits % (0-100)
+   - Energy scaled to % (energy*10)
+   - Tasks % (from daily todoHistory snapshots)
+------------------------------------------------ */
+APP.weeklyPerformance = {
+  chart: null,
+
+  ensureCard() {
+    const id = "weeklyPerformanceCard";
+    let card = document.getElementById(id);
+
+    const dashboard = document.getElementById("dashboardPage");
+    if (!dashboard) return null;
+
+    if (!card) {
+      card = document.createElement("div");
+      card.id = id;
+      card.className = "habit-section";
+
+      // place it right under Life Score if possible
+      const life = document.getElementById("lifeScoreCard");
+      if (life && life.nextSibling) dashboard.insertBefore(card, life.nextSibling);
+      else dashboard.prepend(card);
+    }
+
+    card.innerHTML = `
+      <div class="section-title">📈 Weekly Performance</div>
+      <div style="color:#9CA3AF; font-size:0.9rem; margin-bottom:10px;">
+        Habits %, Energy (scaled), Tasks %
+      </div>
+      <div style="width:100%; height:260px;">
+        <canvas id="weeklyPerformanceCanvas" height="260"></canvas>
+      </div>
+    `;
+
+    return card;
+  },
+
+  getHabitsPercent(dayKey) {
+    // dayKey is YYYY-MM-DD
+    try {
+      if (typeof getDayCompletion === "function") {
+        const data = getDayCompletion(dayKey);
+        return typeof data?.percent === "number" ? data.percent : null;
+      }
+    } catch {}
+    return null;
+  },
+
+  getEnergyScaled(dayKey) {
+    // moodData stores energy 1-10; scale to 0-100
+    try {
+      const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+      const energy = moodData?.[dayKey]?.energy;
+      if (typeof energy === "number") return Math.round(energy * 10);
+    } catch {}
+    return null;
+  },
+
+  getTasksPercent(dayKey) {
+    try {
+      const hist = APP.todos.history || {};
+      const entry = hist[dayKey];
+      if (entry && typeof entry.percent === "number") return entry.percent;
+    } catch {}
+    return null;
+  },
+
+  render() {
+    const card = APP.weeklyPerformance.ensureCard();
+    if (!card) return;
+
+    const canvas = document.getElementById("weeklyPerformanceCanvas");
+    if (!canvas) return;
+
+    if (typeof Chart === "undefined") {
+      // Chart.js not loaded — fail gracefully
+      console.warn("[Kings Protocol] Chart.js not found for Weekly Performance.");
+      return;
+    }
+
+    // destroy previous
+    if (APP.weeklyPerformance.chart) {
+      try { APP.weeklyPerformance.chart.destroy(); } catch {}
+      APP.weeklyPerformance.chart = null;
+    }
+
+    const days = APP.utils.pastDays(7).map(d => APP.utils.dayKey(d));
+    const labels = days.map(k => {
+      const dt = new Date(k + "T00:00:00");
+      return dt.toLocaleDateString("en-US", { weekday: "short" });
+    });
+
+    const habits = days.map(k => APP.weeklyPerformance.getHabitsPercent(k));
+    const energy = days.map(k => APP.weeklyPerformance.getEnergyScaled(k));
+    const tasks = days.map(k => APP.weeklyPerformance.getTasksPercent(k));
+
+    const ctx = canvas.getContext("2d");
+    APP.weeklyPerformance.chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Habits %",
+            data: habits,
+            tension: 0.35,
+            spanGaps: true,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          },
+          {
+            label: "Energy (x10)",
+            data: energy,
+            tension: 0.35,
+            spanGaps: true,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          },
+          {
+            label: "Tasks %",
+            data: tasks,
+            tension: 0.35,
+            spanGaps: true,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: "rgba(255,255,255,0.8)" } },
+          tooltip: {
+            callbacks: {
+              afterBody: (items) => {
+                const idx = items?.[0]?.dataIndex ?? 0;
+                const k = days[idx];
+                return [`Date: ${k}`];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: "rgba(255,255,255,0.65)" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          },
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { stepSize: 20, color: "rgba(255,255,255,0.65)" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          }
+        }
+      }
+    });
+  }
+};
+
+/* ------------------------------------------------
    BOOT (single, stable init)
 ------------------------------------------------ */
 APP.boot = {
@@ -366,14 +559,11 @@ APP.boot = {
     if (APP.boot.started) return;
     APP.boot.started = true;
 
-    // init clock
     APP.clock.start();
 
-    // load todos first (life score depends on it)
+    // load todos + history first (weekly chart + life score depend on it)
     APP.todos.load();
-
-    // keep backward compatibility variable updated
-    todos = APP.todos.list;
+    todos = APP.todos.list; // backward compatibility
 
     // module init (safe)
     if (typeof initHabits === "function") initHabits();
@@ -388,9 +578,10 @@ APP.boot = {
     const moodEl = document.getElementById("moodTracker");
     if (moodEl && typeof renderMoodTracker === "function") renderMoodTracker();
 
-    // render todos + life score on load
+    // render todos + scores + chart
     APP.todos.render();
     APP.lifeScore.render();
+    APP.weeklyPerformance.render();
   }
 };
 
