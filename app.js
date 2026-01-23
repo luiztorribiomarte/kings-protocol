@@ -36,6 +36,7 @@ function showPage(page) {
     if (typeof renderTodos === "function") renderTodos();
     if (typeof renderLifeScore === "function") renderLifeScore();
     if (typeof renderInsights === "function") renderInsights();
+    if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
 
   } else if (page === "goalsHabits") {
     document.getElementById("goalsHabitsPage").classList.add("active");
@@ -109,6 +110,7 @@ function addTodo() {
   renderTodos();
   renderLifeScore();
   renderInsights();
+  renderWeeklyGraph();
 }
 
 function toggleTodo(index) {
@@ -117,6 +119,7 @@ function toggleTodo(index) {
   renderTodos();
   renderLifeScore();
   renderInsights();
+  renderWeeklyGraph();
 }
 
 function deleteTodo(index) {
@@ -125,6 +128,7 @@ function deleteTodo(index) {
   renderTodos();
   renderLifeScore();
   renderInsights();
+  renderWeeklyGraph();
 }
 
 function saveTodos() {
@@ -268,11 +272,11 @@ function renderLifeScore() {
 }
 
 // ===============================
-// ANALYTICAL INSIGHT ENGINE (NEW)
+// ANALYTICAL INSIGHT ENGINE
 // ===============================
 function getLastNDays(n) {
   const days = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     days.push(d.toISOString().split("T")[0]);
@@ -299,7 +303,7 @@ function renderInsights() {
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
 
   const last7 = getLastNDays(7);
-  const prev7 = getLastNDays(14).slice(7);
+  const prev7 = getLastNDays(14).slice(0, 7);
 
   const habitPercents = days =>
     days.map(d => typeof getDayCompletion === "function" ? getDayCompletion(d).percent || 0 : 0);
@@ -307,15 +311,12 @@ function renderInsights() {
   const energyValues = days =>
     days.map(d => moodData[d]?.energy || 0);
 
-  const todoRates = days => {
-    if (!todos.length) return [0];
-    const done = todos.filter(t => t.done).length;
-    return [Math.round((done / todos.length) * 100)];
-  };
-
   const habitChange = avg(habitPercents(last7)) - avg(habitPercents(prev7));
   const energyChange = avg(energyValues(last7)) - avg(energyValues(prev7));
-  const todoEfficiency = todoRates(last7)[0];
+
+  const totalTodos = todos.length;
+  const completedTodos = todos.filter(t => t.done).length;
+  const todoEfficiency = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 100);
 
   let trend = "Stable";
   if (habitChange > 5 || energyChange > 0.5) trend = "Improving";
@@ -330,6 +331,82 @@ function renderInsights() {
       Trend: <strong>${trend}</strong>
     </div>
   `;
+}
+
+// ===============================
+// WEEKLY PERFORMANCE GRAPH (NEW)
+// ===============================
+let weeklyChart = null;
+
+function renderWeeklyGraph() {
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  let card = document.getElementById("weeklyGraphCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "weeklyGraphCard";
+    card.className = "habit-section";
+    dashboard.insertBefore(card, dashboard.children[2]);
+  }
+
+  card.innerHTML = `
+    <div class="section-title">📈 Weekly Performance</div>
+    <canvas id="weeklyChartCanvas" height="140"></canvas>
+  `;
+
+  const ctx = document.getElementById("weeklyChartCanvas");
+  if (!ctx || typeof Chart === "undefined") return;
+
+  const days = getLastNDays(7);
+  const labels = days.map(d => {
+    const date = new Date(d);
+    return date.toLocaleDateString("en-US", { weekday: "short" });
+  });
+
+  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+
+  const habitData = days.map(d =>
+    typeof getDayCompletion === "function" ? getDayCompletion(d).percent || 0 : 0
+  );
+
+  const energyData = days.map(d => (moodData[d]?.energy || 0) * 10); // scaled to %
+  const todoData = days.map(() => {
+    const total = todos.length;
+    const done = todos.filter(t => t.done).length;
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+  });
+
+  const lifeScoreData = habitData.map((h, i) => {
+    const e = energyData[i] / 4;
+    const t = todoData[i] / 5;
+    return Math.min(100, Math.round(h * 0.5 + e + t));
+  });
+
+  if (weeklyChart) weeklyChart.destroy();
+
+  weeklyChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Habits %", data: habitData, borderWidth: 2, tension: 0.3 },
+        { label: "Energy", data: energyData, borderWidth: 2, tension: 0.3 },
+        { label: "Tasks %", data: todoData, borderWidth: 2, tension: 0.3 },
+        { label: "Life Score", data: lifeScoreData, borderWidth: 3, tension: 0.35 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#E5E7EB" } }
+      },
+      scales: {
+        x: { ticks: { color: "#9CA3AF" } },
+        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" } }
+      }
+    }
+  });
 }
 
 // ===============================
@@ -351,4 +428,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTodos();
   renderLifeScore();
   renderInsights();
+  renderWeeklyGraph();
 });
