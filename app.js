@@ -603,6 +603,93 @@ function renderDNAProfile() {
     ${buildBar("Volatility", 100 - volatility, volatilityHint)}
   `;
 }
+// ===============================
+// JOURNAL ENGINE (SHADOW WORK)
+// ===============================
+const shadowQuestions = [
+  "What emotion did I avoid today?",
+  "What triggered me recently and why?",
+  "What am I afraid to admit to myself?",
+  "What patterns keep repeating in my life?",
+  "What do I secretly want but suppress?",
+  "When was the last time I felt powerless?",
+  "What belief is holding me back?",
+  "Who do I resent and why?",
+  "What part of myself do I reject?",
+  "What would I do if I had zero fear?"
+];
+
+let journalEntries = JSON.parse(localStorage.getItem("journalEntries")) || [];
+
+function getRandomShadowQuestion() {
+  return shadowQuestions[Math.floor(Math.random() * shadowQuestions.length)];
+}
+
+function saveJournalEntries() {
+  localStorage.setItem("journalEntries", JSON.stringify(journalEntries));
+}
+
+function addJournalEntry() {
+  const input = document.getElementById("journalInput");
+  if (!input || !input.value.trim()) return;
+
+  const entry = {
+    text: input.value.trim(),
+    date: new Date().toISOString()
+  };
+
+  journalEntries.unshift(entry);
+  input.value = "";
+  saveJournalEntries();
+  renderJournal();
+}
+
+function renderJournal() {
+  const container = document.getElementById("journalPage");
+  if (!container) return;
+
+  const question = getRandomShadowQuestion();
+
+  let entriesHTML = "";
+
+  if (journalEntries.length === 0) {
+    entriesHTML = `<div style="color:#9CA3AF;">No journal entries yet.</div>`;
+  } else {
+    entriesHTML = journalEntries.map(e => `
+      <div style="margin-bottom:12px; padding:12px; border-radius:12px; background:rgba(255,255,255,0.05);">
+        <div style="font-size:0.85rem; color:#9CA3AF;">
+          ${new Date(e.date).toLocaleString()}
+        </div>
+        <div style="margin-top:6px; color:#E5E7EB;">
+          ${e.text}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  container.innerHTML = `
+    <div class="habit-section">
+      <div class="section-title">🧠 Shadow Work Prompt</div>
+      <div style="margin-bottom:12px; color:#E5E7EB; font-weight:700;">
+        ${question}
+      </div>
+
+      <textarea id="journalInput"
+        placeholder="Write your thoughts..."
+        style="width:100%; min-height:80px; border-radius:12px; padding:12px; background:rgba(255,255,255,0.05); color:white; border:none; outline:none;"></textarea>
+
+      <button onclick="addJournalEntry()"
+        style="margin-top:10px; padding:10px 16px; border-radius:999px; border:none; background:linear-gradient(135deg,#6366f1,#ec4899); color:white; font-weight:700; cursor:pointer;">
+        Save Entry
+      </button>
+    </div>
+
+    <div class="habit-section" style="margin-top:16px;">
+      <div class="section-title">📖 Past Entries</div>
+      ${entriesHTML}
+    </div>
+  `;
+}
 
 // ===============================
 // INITIAL LOAD
