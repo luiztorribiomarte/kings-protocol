@@ -1,6 +1,6 @@
 // ===============================
-// JOURNAL PLUS SYSTEM (MODULAR)
-// DOES NOT TOUCH app.js
+// JOURNAL PLUS SYSTEM v2 (FORCED OVERRIDE)
+// DOES NOT MODIFY app.js
 // ===============================
 
 window.journalPlus = window.journalPlus || {};
@@ -33,7 +33,7 @@ journalPlus.saveEntries = function (mode, entries) {
 };
 
 // ===============================
-// EMOTION DETECTION (KEYWORD ENGINE)
+// EMOTION DETECTION ENGINE
 // ===============================
 journalPlus.emotionKeywords = {
   anger: ["angry", "mad", "rage", "hate", "furious"],
@@ -62,20 +62,47 @@ journalPlus.detectEmotions = function (text) {
 };
 
 // ===============================
-// DOM RENDER
+// MIND PATTERN ENGINE
+// ===============================
+journalPlus.getMindPattern = function () {
+  const tagCount = {};
+
+  journalPlus.modes.forEach(m => {
+    const entries = journalPlus.getEntries(m.id);
+    entries.forEach(e => {
+      e.tags.forEach(tag => {
+        tagCount[tag] = (tagCount[tag] || 0) + 1;
+      });
+    });
+  });
+
+  let dominant = "neutral";
+  let max = 0;
+
+  for (const tag in tagCount) {
+    if (tagCount[tag] > max) {
+      max = tagCount[tag];
+      dominant = tag;
+    }
+  }
+
+  return `Dominant mental pattern: ${dominant.toUpperCase()}`;
+};
+
+// ===============================
+// UI RENDER
 // ===============================
 journalPlus.render = function () {
   const page = document.getElementById("journalPage");
   if (!page) return;
 
-  let container = document.getElementById("journalPlusContainer");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "journalPlusContainer";
-    container.className = "habit-section";
-    page.innerHTML = "";
-    page.appendChild(container);
-  }
+  // FORCE CLEAR old journal UI
+  page.innerHTML = "";
+
+  const container = document.createElement("div");
+  container.id = "journalPlusContainer";
+  container.className = "habit-section";
+  page.appendChild(container);
 
   const modeTabs = journalPlus.modes.map(m => `
     <button onclick="journalPlus.switchMode('${m.id}')"
@@ -83,7 +110,9 @@ journalPlus.render = function () {
         padding:8px 12px;
         border-radius:10px;
         border:1px solid rgba(255,255,255,0.15);
-        background:${journalPlus.currentMode === m.id ? 'linear-gradient(135deg,#6366f1,#ec4899)' : 'rgba(255,255,255,0.05)'};
+        background:${journalPlus.currentMode === m.id 
+          ? 'linear-gradient(135deg,#6366f1,#ec4899)' 
+          : 'rgba(255,255,255,0.05)'};
         color:white;
         cursor:pointer;
         font-weight:700;
@@ -152,7 +181,7 @@ journalPlus.render = function () {
       `).join("") || `<div style="color:#9CA3AF;">No entries yet.</div>`}
     </div>
 
-    <div id="mindPatternPanel" style="
+    <div style="
       margin-top:16px;
       padding:12px;
       border-radius:12px;
@@ -199,45 +228,20 @@ journalPlus.saveEntry = function () {
 };
 
 // ===============================
-// MIND PATTERN ENGINE
+// HARD OVERRIDE OF renderJournal()
 // ===============================
-journalPlus.getMindPattern = function () {
-  const allModes = journalPlus.modes.map(m => m.id);
-  const tagCount = {};
+(function forceJournalOverride() {
+  window.renderJournal = function () {
+    journalPlus.render();
+  };
 
-  allModes.forEach(mode => {
-    const entries = journalPlus.getEntries(mode);
-    entries.forEach(e => {
-      e.tags.forEach(tag => {
-        tagCount[tag] = (tagCount[tag] || 0) + 1;
-      });
-    });
-  });
-
-  let dominant = "neutral";
-  let max = 0;
-
-  for (const tag in tagCount) {
-    if (tagCount[tag] > max) {
-      max = tagCount[tag];
-      dominant = tag;
-    }
-  }
-
-  return `Dominant mental pattern: ${dominant.toUpperCase()}`;
-};
-
-// ===============================
-// AUTO HOOK INTO YOUR APP
-// ===============================
-(function attachJournalPlus() {
   const originalShowPage = window.showPage;
 
   if (typeof originalShowPage === "function") {
     window.showPage = function (page) {
       originalShowPage(page);
       if (page === "journal") {
-        journalPlus.render();
+        setTimeout(() => journalPlus.render(), 0);
       }
     };
   }
