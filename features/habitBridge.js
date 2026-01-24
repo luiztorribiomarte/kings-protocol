@@ -1,8 +1,3 @@
-// ===============================
-// HABIT BRIDGE (SINGLE SOURCE OF TRUTH)
-// This file unifies ALL habit logic without touching core code.
-// ===============================
-
 (function () {
   console.log("Habit Bridge Engine loaded.");
 
@@ -10,12 +5,10 @@
     return new Date().toISOString().split("T")[0];
   }
 
-  // Detect habit storage automatically
   function getHabitsList() {
     let habits =
       JSON.parse(localStorage.getItem("habits")) ||
       JSON.parse(localStorage.getItem("habitsList")) ||
-      JSON.parse(localStorage.getItem("habitData")) ||
       [];
 
     if (!Array.isArray(habits)) habits = [];
@@ -25,33 +18,16 @@
   function getHabitCompletions() {
     let data =
       JSON.parse(localStorage.getItem("habitCompletions")) ||
-      JSON.parse(localStorage.getItem("habitData")) ||
       {};
 
     if (typeof data !== "object" || data === null) data = {};
     return data;
   }
 
-  function calculateTodayHabitPercent() {
-    const habits = getHabitsList();
-    const completions = getHabitCompletions();
-    const today = getTodayKey();
-
-    if (!habits.length) return 0;
-
-    const todayData = completions[today] || {};
-    let completed = 0;
-
-    habits.forEach(h => {
-      if (todayData[h.id] === true || todayData[h.name] === true) {
-        completed++;
-      }
-    });
-
-    return Math.round((completed / habits.length) * 100);
+  function normalizeHabitName(h) {
+    return (h.name || h.title || h.id || "").toString().toLowerCase().trim();
   }
 
-  // GLOBAL function used by Life Score, DNA, Insights, etc.
   window.getDayCompletion = function (dateKey) {
     const habits = getHabitsList();
     const completions = getHabitCompletions();
@@ -62,9 +38,13 @@
     let completed = 0;
 
     habits.forEach(h => {
-      if (dayData[h.id] === true || dayData[h.name] === true) {
-        completed++;
-      }
+      const name = normalizeHabitName(h);
+
+      Object.keys(dayData).forEach(k => {
+        if (k.toLowerCase().trim() === name && dayData[k] === true) {
+          completed++;
+        }
+      });
     });
 
     const percent = Math.round((completed / habits.length) * 100);
@@ -76,11 +56,11 @@
     };
   };
 
-  // Debug panel (optional but powerful)
   window.debugHabits = function () {
-    console.log("Habits List:", getHabitsList());
-    console.log("Habit Completions:", getHabitCompletions());
-    console.log("Today %:", calculateTodayHabitPercent());
+    const today = getTodayKey();
+    console.log("Habits:", getHabitsList());
+    console.log("Completions:", getHabitCompletions());
+    console.log("Today:", window.getDayCompletion(today));
   };
 
 })();
