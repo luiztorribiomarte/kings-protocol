@@ -784,3 +784,72 @@ document.addEventListener("DOMContentLoaded", () => {
   try { renderWeeklyGraph(); } catch {}
   try { renderDNAProfile(); } catch {}
 });
+// ===============================
+// 🔒 HABIT SYNC ENGINE (SAFE PATCH)
+// This does NOT change your habit system.
+// It only standardizes how analytics read habit data.
+// ===============================
+
+window.__getHabitsSafe = function () {
+  try {
+    const raw = JSON.parse(localStorage.getItem("habitsData") || "{}");
+    return typeof raw === "object" && raw ? raw : {};
+  } catch {
+    return {};
+  }
+};
+
+window.__getHabitListSafe = function () {
+  try {
+    const raw = JSON.parse(localStorage.getItem("habitsList") || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+};
+
+// unified habit completion reader (used by analytics)
+window.getDayCompletion = function (dateKey) {
+  const habits = window.__getHabitsSafe();
+  const habitList = window.__getHabitListSafe();
+
+  if (!habitList.length) {
+    return { percent: 0, completed: 0, total: 0 };
+  }
+
+  const day = habits[dateKey] || {};
+  let completed = 0;
+
+  habitList.forEach(h => {
+    if (day[h] === true) completed++;
+  });
+
+  const total = habitList.length;
+  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  return { percent, completed, total };
+};
+
+// ===============================
+// 🔄 FORCE DASHBOARD MODULES TO RESYNC
+// ===============================
+window.__syncDashboardHabits = function () {
+  try { renderLifeScore(); } catch {}
+  try { renderInsights(); } catch {}
+  try { renderWeeklyGraph(); } catch {}
+  try { renderDNAProfile(); } catch {}
+};
+
+// whenever habits change, resync analytics
+const originalRenderHabits = window.renderHabits;
+if (typeof originalRenderHabits === "function") {
+  window.renderHabits = function () {
+    originalRenderHabits();
+    window.__syncDashboardHabits();
+  };
+}
+
+// also resync on page load
+document.addEventListener("DOMContentLoaded", () => {
+  window.__syncDashboardHabits();
+});
