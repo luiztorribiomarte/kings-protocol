@@ -853,3 +853,11 @@ if (typeof originalRenderHabits === "function") {
 document.addEventListener("DOMContentLoaded", () => {
   window.__syncDashboardHabits();
 });
+// ===============================
+// HABIT BRIDGE OVERRIDE (SAFE)
+// ===============================
+if (window.getUnifiedHabitPercent) {
+  window.getDayCompletion = function (dateKey) {
+    return window.getUnifiedHabitPercent(dateKey);
+  };
+}
