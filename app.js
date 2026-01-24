@@ -28,6 +28,7 @@ function showPage(page) {
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderTodos === "function") renderTodos();
     renderLifeScore();
+    renderDNAProfile(); // ✅ NEW: DNA refresh on dashboard
   }
 
   if (page === "journal") {
@@ -71,6 +72,7 @@ function addTodo() {
   saveTodos();
   renderTodos();
   renderLifeScore();
+  renderDNAProfile(); // ✅ sync DNA
 }
 
 function toggleTodo(index) {
@@ -78,6 +80,7 @@ function toggleTodo(index) {
   saveTodos();
   renderTodos();
   renderLifeScore();
+  renderDNAProfile(); // ✅ sync DNA
 }
 
 function deleteTodo(index) {
@@ -85,6 +88,7 @@ function deleteTodo(index) {
   saveTodos();
   renderTodos();
   renderLifeScore();
+  renderDNAProfile(); // ✅ sync DNA
 }
 
 function renderTodos() {
@@ -113,7 +117,7 @@ function renderTodos() {
 }
 
 // ===============================
-// LIFE SCORE ENGINE (FULL SYNC)
+// LIFE SCORE ENGINE (already synced)
 // ===============================
 function renderLifeScore() {
   const dashboard = document.getElementById("dashboardPage");
@@ -127,7 +131,6 @@ function renderLifeScore() {
     dashboard.prepend(card);
   }
 
-  // ✅ HABITS (REAL DATA)
   let habitPercent = 0;
   let habitDone = 0;
   let habitTotal = 0;
@@ -141,7 +144,6 @@ function renderLifeScore() {
 
   const habitScore = Math.round((habitPercent / 100) * 50);
 
-  // ENERGY (mood)
   let energyScore = 0;
   try {
     const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
@@ -149,11 +151,9 @@ function renderLifeScore() {
     energyScore = Math.round(((moodData[todayKey]?.energy || 5) / 10) * 25);
   } catch {}
 
-  // TASKS
   const completedTodos = todos.filter(t => t.done).length;
   const todoScore = todos.length === 0 ? 0 : Math.round((completedTodos / todos.length) * 20);
 
-  // STREAK
   let streakBonus = Math.min(5, parseInt(localStorage.getItem("currentStreak") || "0"));
 
   const totalScore = habitScore + energyScore + todoScore + streakBonus;
@@ -189,7 +189,75 @@ function renderLifeScore() {
 }
 
 // ===============================
-// JOURNAL SYSTEM
+// 🧬 PRODUCTIVITY DNA (REAL HABIT DATA UPGRADE)
+// ===============================
+function avg(arr) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+}
+
+function stdDev(arr) {
+  if (arr.length <= 1) return 0;
+  const mean = avg(arr);
+  return Math.sqrt(avg(arr.map(x => (x - mean) ** 2)));
+}
+
+function getLastNDays(n) {
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split("T")[0]);
+  }
+  return days;
+}
+
+function getHabitPercentForDay(dateStr) {
+  if (typeof getDayCompletion === "function") {
+    return getDayCompletion(dateStr).percent || 0;
+  }
+  return 0;
+}
+
+function renderDNAProfile() {
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  let card = document.getElementById("dnaCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "dnaCard";
+    card.className = "habit-section";
+    dashboard.appendChild(card);
+  }
+
+  const days = getLastNDays(14);
+  const habitPercents = days.map(getHabitPercentForDay);
+
+  const habitAvg = avg(habitPercents);
+  const habitStd = stdDev(habitPercents);
+
+  const completedTodos = todos.filter(t => t.done).length;
+  const taskEfficiency = todos.length === 0 ? 0 : (completedTodos / todos.length) * 100;
+
+  const streak = parseInt(localStorage.getItem("currentStreak") || "0");
+
+  const discipline = Math.round(habitAvg * 0.7 + Math.min(streak * 5, 100) * 0.3);
+  const consistency = Math.round(100 - habitStd * 1.2);
+  const execution = Math.round(taskEfficiency * 0.6 + habitAvg * 0.4);
+
+  card.innerHTML = `
+    <div class="section-title">🧬 Productivity DNA</div>
+    <div style="line-height:1.6;">
+      Discipline: <strong>${discipline}</strong><br>
+      Consistency: <strong>${consistency}</strong><br>
+      Execution: <strong>${execution}</strong><br>
+      Habit Avg (14d): ${habitAvg.toFixed(1)}%
+    </div>
+  `;
+}
+
+// ===============================
+// JOURNAL SYSTEM (unchanged)
 // ===============================
 window.shadowQuestions = window.shadowQuestions || [
   "What emotion did I avoid today?",
@@ -248,9 +316,10 @@ function saveJournalEntry() {
 document.addEventListener("DOMContentLoaded", () => {
   showPage("dashboard");
 
-  if (typeof initHabits === "function") initHabits();
+  if (typeof initHabitsData === "function") initHabitsData();
   if (typeof initMoodData === "function") initMoodData();
 
   renderTodos();
   renderLifeScore();
+  renderDNAProfile();
 });
