@@ -1,66 +1,49 @@
-(function () {
-  console.log("Habit Bridge Engine loaded.");
+// ===============================
+// HABIT BRIDGE ENGINE
+// SINGLE SOURCE OF TRUTH FOR HABITS
+// ===============================
 
-  function getTodayKey() {
-    return new Date().toISOString().split("T")[0];
-  }
+// Get habits list
+function getHabitsList() {
+  return JSON.parse(localStorage.getItem("habitsList") || "[]");
+}
 
-  function getHabitsList() {
-    let habits =
-      JSON.parse(localStorage.getItem("habits")) ||
-      JSON.parse(localStorage.getItem("habitsList")) ||
-      [];
+// Get habit completions
+function getHabitCompletions() {
+  return JSON.parse(localStorage.getItem("habitCompletions") || "{}");
+}
 
-    if (!Array.isArray(habits)) habits = [];
-    return habits;
-  }
+// Save completions
+function saveHabitCompletions(data) {
+  localStorage.setItem("habitCompletions", JSON.stringify(data));
+}
 
-  function getHabitCompletions() {
-    let data =
-      JSON.parse(localStorage.getItem("habitCompletions")) ||
-      {};
+// Get today's habit stats
+function getTodayHabitStats() {
+  const habits = getHabitsList();
+  const completions = getHabitCompletions();
+  const today = new Date().toISOString().split("T")[0];
 
-    if (typeof data !== "object" || data === null) data = {};
-    return data;
-  }
+  if (!habits.length) return { percent: 0, done: 0, total: 0 };
 
-  function normalizeHabitName(h) {
-    return (h.name || h.title || h.id || "").toString().toLowerCase().trim();
-  }
+  const todayData = completions[today] || {};
+  const done = habits.filter(h => todayData[h.id]).length;
+  const total = habits.length;
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
 
-  window.getDayCompletion = function (dateKey) {
-    const habits = getHabitsList();
-    const completions = getHabitCompletions();
+  return { percent, done, total };
+}
 
-    if (!habits.length) return { percent: 0, completed: 0, total: 0 };
+// GLOBAL API (used everywhere)
+window.getDayCompletion = function () {
+  return getTodayHabitStats();
+};
 
-    const dayData = completions[dateKey] || {};
-    let completed = 0;
+// Debug tool
+window.debugHabits = function () {
+  console.log("Habits List:", getHabitsList());
+  console.log("Completions:", getHabitCompletions());
+  console.log("Today Stats:", getTodayHabitStats());
+};
 
-    habits.forEach(h => {
-      const name = normalizeHabitName(h);
-
-      Object.keys(dayData).forEach(k => {
-        if (k.toLowerCase().trim() === name && dayData[k] === true) {
-          completed++;
-        }
-      });
-    });
-
-    const percent = Math.round((completed / habits.length) * 100);
-
-    return {
-      percent,
-      completed,
-      total: habits.length
-    };
-  };
-
-  window.debugHabits = function () {
-    const today = getTodayKey();
-    console.log("Habits:", getHabitsList());
-    console.log("Completions:", getHabitCompletions());
-    console.log("Today:", window.getDayCompletion(today));
-  };
-
-})();
+console.log("Habit Bridge Engine loaded.");
