@@ -28,7 +28,8 @@ function showPage(page) {
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderTodos === "function") renderTodos();
     renderLifeScore();
-    renderDNAProfile(); // ✅ NEW: DNA refresh on dashboard
+    renderDNAProfile();
+    renderWeeklyGraph(); // ✅ REAL DATA GRAPH
   }
 
   if (page === "journal") {
@@ -72,7 +73,8 @@ function addTodo() {
   saveTodos();
   renderTodos();
   renderLifeScore();
-  renderDNAProfile(); // ✅ sync DNA
+  renderDNAProfile();
+  renderWeeklyGraph();
 }
 
 function toggleTodo(index) {
@@ -80,7 +82,8 @@ function toggleTodo(index) {
   saveTodos();
   renderTodos();
   renderLifeScore();
-  renderDNAProfile(); // ✅ sync DNA
+  renderDNAProfile();
+  renderWeeklyGraph();
 }
 
 function deleteTodo(index) {
@@ -88,7 +91,8 @@ function deleteTodo(index) {
   saveTodos();
   renderTodos();
   renderLifeScore();
-  renderDNAProfile(); // ✅ sync DNA
+  renderDNAProfile();
+  renderWeeklyGraph();
 }
 
 function renderTodos() {
@@ -117,7 +121,7 @@ function renderTodos() {
 }
 
 // ===============================
-// LIFE SCORE ENGINE (already synced)
+// LIFE SCORE ENGINE
 // ===============================
 function renderLifeScore() {
   const dashboard = document.getElementById("dashboardPage");
@@ -189,7 +193,7 @@ function renderLifeScore() {
 }
 
 // ===============================
-// 🧬 PRODUCTIVITY DNA (REAL HABIT DATA UPGRADE)
+// 🧬 PRODUCTIVITY DNA
 // ===============================
 function avg(arr) {
   return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -254,6 +258,71 @@ function renderDNAProfile() {
       Habit Avg (14d): ${habitAvg.toFixed(1)}%
     </div>
   `;
+}
+
+// ===============================
+// 📈 WEEKLY GRAPH (REAL HABIT DATA)
+// ===============================
+let weeklyChart = null;
+
+function renderWeeklyGraph() {
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  let card = document.getElementById("weeklyGraphCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "weeklyGraphCard";
+    card.className = "habit-section";
+    dashboard.appendChild(card);
+  }
+
+  card.innerHTML = `
+    <div class="section-title">📈 Weekly Performance</div>
+    <canvas id="weeklyChartCanvas" height="140"></canvas>
+  `;
+
+  const canvas = document.getElementById("weeklyChartCanvas");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const days = getLastNDays(7);
+  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { weekday: "short" }));
+
+  const habitData = days.map(getHabitPercentForDay);
+
+  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+  const energyData = days.map(d => (moodData[d]?.energy || 0) * 10);
+
+  const todoData = days.map(() => {
+    const total = todos.length;
+    const done = todos.filter(t => t.done).length;
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+  });
+
+  if (weeklyChart) {
+    weeklyChart.destroy();
+    weeklyChart = null;
+  }
+
+  weeklyChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Habits %", data: habitData, borderWidth: 2, tension: 0.3 },
+        { label: "Energy", data: energyData, borderWidth: 2, tension: 0.3 },
+        { label: "Tasks %", data: todoData, borderWidth: 2, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#E5E7EB" } } },
+      scales: {
+        x: { ticks: { color: "#9CA3AF" } },
+        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" } }
+      }
+    }
+  });
 }
 
 // ===============================
@@ -322,4 +391,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTodos();
   renderLifeScore();
   renderDNAProfile();
+  renderWeeklyGraph();
 });
