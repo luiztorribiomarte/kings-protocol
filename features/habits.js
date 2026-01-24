@@ -1,11 +1,13 @@
 // ============================================
-// HABITS MODULE (updated)
-// Fixes: updateStats is not defined
-// Adds: click any habit name (left column) to open a line chart (7 / 30 / all time)
+// HABITS GLOBAL STATE (IMPORTANT FIX)
 // ============================================
 
-let habits = [];
-let habitCompletions = {}; // { "YYYY-MM-DD": { habitId: true, ... } }
+window.habits = window.habits || [];
+window.habitCompletions = window.habitCompletions || {};
+
+let habits = window.habits;
+let habitCompletions = window.habitCompletions;
+
 
 function initHabitsData() {
   // Habits list
