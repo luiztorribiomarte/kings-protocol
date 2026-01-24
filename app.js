@@ -28,8 +28,8 @@ function showPage(page) {
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderTodos === "function") renderTodos();
     renderLifeScore();
+    renderWeeklyGraph(); // ✅ now placed under Life Score
     renderDNAProfile();
-    renderWeeklyGraph(); // ✅ REAL DATA GRAPH
   }
 
   if (page === "journal") {
@@ -193,17 +193,9 @@ function renderLifeScore() {
 }
 
 // ===============================
-// 🧬 PRODUCTIVITY DNA
+// 📈 WEEKLY GRAPH (PLACED UNDER LIFE SCORE)
 // ===============================
-function avg(arr) {
-  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-}
-
-function stdDev(arr) {
-  if (arr.length <= 1) return 0;
-  const mean = avg(arr);
-  return Math.sqrt(avg(arr.map(x => (x - mean) ** 2)));
-}
+let weeklyChart = null;
 
 function getLastNDays(n) {
   const days = [];
@@ -222,49 +214,6 @@ function getHabitPercentForDay(dateStr) {
   return 0;
 }
 
-function renderDNAProfile() {
-  const dashboard = document.getElementById("dashboardPage");
-  if (!dashboard) return;
-
-  let card = document.getElementById("dnaCard");
-  if (!card) {
-    card = document.createElement("div");
-    card.id = "dnaCard";
-    card.className = "habit-section";
-    dashboard.appendChild(card);
-  }
-
-  const days = getLastNDays(14);
-  const habitPercents = days.map(getHabitPercentForDay);
-
-  const habitAvg = avg(habitPercents);
-  const habitStd = stdDev(habitPercents);
-
-  const completedTodos = todos.filter(t => t.done).length;
-  const taskEfficiency = todos.length === 0 ? 0 : (completedTodos / todos.length) * 100;
-
-  const streak = parseInt(localStorage.getItem("currentStreak") || "0");
-
-  const discipline = Math.round(habitAvg * 0.7 + Math.min(streak * 5, 100) * 0.3);
-  const consistency = Math.round(100 - habitStd * 1.2);
-  const execution = Math.round(taskEfficiency * 0.6 + habitAvg * 0.4);
-
-  card.innerHTML = `
-    <div class="section-title">🧬 Productivity DNA</div>
-    <div style="line-height:1.6;">
-      Discipline: <strong>${discipline}</strong><br>
-      Consistency: <strong>${consistency}</strong><br>
-      Execution: <strong>${execution}</strong><br>
-      Habit Avg (14d): ${habitAvg.toFixed(1)}%
-    </div>
-  `;
-}
-
-// ===============================
-// 📈 WEEKLY GRAPH (REAL HABIT DATA)
-// ===============================
-let weeklyChart = null;
-
 function renderWeeklyGraph() {
   const dashboard = document.getElementById("dashboardPage");
   if (!dashboard) return;
@@ -274,7 +223,16 @@ function renderWeeklyGraph() {
     card = document.createElement("div");
     card.id = "weeklyGraphCard";
     card.className = "habit-section";
-    dashboard.appendChild(card);
+
+    // ✅ Insert directly after Life Score
+    const lifeScoreCard = document.getElementById("lifeScoreCard");
+    if (lifeScoreCard && lifeScoreCard.nextSibling) {
+      dashboard.insertBefore(card, lifeScoreCard.nextSibling);
+    } else if (lifeScoreCard) {
+      dashboard.appendChild(card);
+    } else {
+      dashboard.appendChild(card);
+    }
   }
 
   card.innerHTML = `
@@ -326,57 +284,54 @@ function renderWeeklyGraph() {
 }
 
 // ===============================
-// JOURNAL SYSTEM (unchanged)
+// 🧬 DNA PROFILE (unchanged)
 // ===============================
-window.shadowQuestions = window.shadowQuestions || [
-  "What emotion did I avoid today?",
-  "What triggered me recently and why?",
-  "What am I afraid to admit to myself?",
-  "What patterns keep repeating in my life?",
-  "What do I secretly want but suppress?",
-  "When was the last time I felt powerless?",
-  "What belief is holding me back?",
-  "Who do I resent and why?",
-  "What part of myself do I reject?",
-  "What would I do if I had zero fear?"
-];
-
-function getRandomShadowQuestion() {
-  return window.shadowQuestions[Math.floor(Math.random() * window.shadowQuestions.length)];
+function avg(arr) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 }
 
-function renderJournal() {
-  const page = document.getElementById("journalPage");
-  if (!page) return;
+function stdDev(arr) {
+  if (arr.length <= 1) return 0;
+  const mean = avg(arr);
+  return Math.sqrt(avg(arr.map(x => (x - mean) ** 2)));
+}
 
-  let container = document.getElementById("journalContainer");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "journalContainer";
-    container.className = "habit-section";
-    page.appendChild(container);
+function renderDNAProfile() {
+  const dashboard = document.getElementById("dashboardPage");
+  if (!dashboard) return;
+
+  let card = document.getElementById("dnaCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "dnaCard";
+    card.className = "habit-section";
+    dashboard.appendChild(card);
   }
 
-  const question = getRandomShadowQuestion();
+  const days = getLastNDays(14);
+  const habitPercents = days.map(getHabitPercentForDay);
 
-  container.innerHTML = `
-    <div class="section-title">🧠 Shadow Work Journal</div>
-    <div style="margin-bottom:10px;">${question}</div>
-    <textarea id="journalInput" placeholder="Write your thoughts..." style="width:100%;height:120px;"></textarea>
-    <button onclick="saveJournalEntry()">Save Entry</button>
+  const habitAvg = avg(habitPercents);
+  const habitStd = stdDev(habitPercents);
+
+  const completedTodos = todos.filter(t => t.done).length;
+  const taskEfficiency = todos.length === 0 ? 0 : (completedTodos / todos.length) * 100;
+
+  const streak = parseInt(localStorage.getItem("currentStreak") || "0");
+
+  const discipline = Math.round(habitAvg * 0.7 + Math.min(streak * 5, 100) * 0.3);
+  const consistency = Math.round(100 - habitStd * 1.2);
+  const execution = Math.round(taskEfficiency * 0.6 + habitAvg * 0.4);
+
+  card.innerHTML = `
+    <div class="section-title">🧬 Productivity DNA</div>
+    <div style="line-height:1.6;">
+      Discipline: <strong>${discipline}</strong><br>
+      Consistency: <strong>${consistency}</strong><br>
+      Execution: <strong>${execution}</strong><br>
+      Habit Avg (14d): ${habitAvg.toFixed(1)}%
+    </div>
   `;
-}
-
-function saveJournalEntry() {
-  const text = document.getElementById("journalInput").value.trim();
-  if (!text) return;
-
-  const entries = JSON.parse(localStorage.getItem("journalEntries") || "[]");
-  entries.push({ date: new Date().toISOString(), text });
-  localStorage.setItem("journalEntries", JSON.stringify(entries));
-
-  alert("Journal saved.");
-  renderJournal();
 }
 
 // ===============================
@@ -390,6 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderTodos();
   renderLifeScore();
-  renderDNAProfile();
   renderWeeklyGraph();
+  renderDNAProfile();
 });
