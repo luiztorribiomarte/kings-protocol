@@ -1,20 +1,32 @@
+// ============================================
+// HABITS MODULE — SAFE + CORE COMPATIBLE
+// DOES NOT REMOVE EXISTING FEATURES
+// ============================================
+
 window.habits = window.habits || [];
 window.habitCompletions = window.habitCompletions || {};
 
 let habits = window.habits;
 let habitCompletions = window.habitCompletions;
 
+// ---------- INIT ----------
 function initHabitsData() {
   const savedHabits = localStorage.getItem("habits");
   if (savedHabits) {
-    try { habits = JSON.parse(savedHabits) || []; }
-    catch { habits = []; }
+    try {
+      habits = JSON.parse(savedHabits) || [];
+    } catch {
+      habits = [];
+    }
   }
 
   const savedCompletions = localStorage.getItem("habitCompletions");
   if (savedCompletions) {
-    try { habitCompletions = JSON.parse(savedCompletions) || {}; }
-    catch { habitCompletions = {}; }
+    try {
+      habitCompletions = JSON.parse(savedCompletions) || {};
+    } catch {
+      habitCompletions = {};
+    }
   }
 
   if (!Array.isArray(habits) || habits.length === 0) {
@@ -38,6 +50,7 @@ function initHabitsData() {
   window.habitCompletions = habitCompletions;
 }
 
+// ---------- SAVE ----------
 function saveHabits() {
   localStorage.setItem("habits", JSON.stringify(habits));
 }
@@ -46,6 +59,7 @@ function saveHabitCompletions() {
   localStorage.setItem("habitCompletions", JSON.stringify(habitCompletions));
 }
 
+// ---------- DATE HELPERS ----------
 function getDateString(date = new Date()) {
   return date.toISOString().split("T")[0];
 }
@@ -66,6 +80,7 @@ function getWeekDates(date = new Date()) {
   return days;
 }
 
+// ---------- CORE LOGIC ----------
 function isComplete(habitId, dateStr) {
   return !!(habitCompletions[dateStr] && habitCompletions[dateStr][habitId]);
 }
@@ -76,13 +91,17 @@ function toggleHabit(habitId, dateStr) {
 
   saveHabitCompletions();
   renderHabits();
-  updateStats();
 
   if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
 }
 
+// ---------- BRIDGE FUNCTION ----------
 function getDayCompletion(dateStr = getDateString()) {
-  if (!habits.length) return { percent: 0, done: 0, total: 0 };
+  if (!habits.length) {
+    return { percent: 0, done: 0, total: 0 };
+  }
 
   let done = 0;
   habits.forEach(h => {
@@ -100,6 +119,7 @@ function getDayCompletionPercent(dateStr) {
   return data.percent / 100;
 }
 
+// ---------- UI ----------
 function renderHabits() {
   const grid = document.getElementById("habitGrid");
   if (!grid) return;
@@ -111,9 +131,9 @@ function renderHabits() {
     <table class="habit-table" style="width:100%; border-collapse: collapse;">
       <thead>
         <tr>
-          <th style="text-align:left; padding:14px;">Habit</th>
+          <th style="text-align:left; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">Habit</th>
           ${weekDates.map((d,i)=>`
-            <th style="text-align:center; padding:14px;">
+            <th style="text-align:center; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">
               ${dayNames[i]}<br>${d.getDate()}
             </th>
           `).join("")}
@@ -122,7 +142,9 @@ function renderHabits() {
       <tbody>
         ${habits.map(h=>`
           <tr>
-            <td style="padding:14px;">${h.icon} ${escapeHtml(h.name)}</td>
+            <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px;">
+              ${h.icon} ${escapeHtml(h.name)}
+            </td>
             ${weekDates.map(d=>{
               const dateStr = getDateString(d);
               const done = isComplete(h.id,dateStr);
@@ -142,6 +164,7 @@ function renderHabits() {
   updateStats();
 }
 
+// ---------- STATS ----------
 function updateStats() {
   const daysAt80El = document.getElementById("daysAt80");
   const weeklyCompletionEl = document.getElementById("weeklyCompletion");
@@ -153,7 +176,6 @@ function updateStats() {
   const daysAt80 = dayPercents.filter(p => p >= 0.8).length;
   const weeklyAvg = dayPercents.reduce((a,b)=>a+b,0)/(dayPercents.length||1);
   const weeklyPercent = Math.round(weeklyAvg*100);
-
   const streak = calculateCurrentStreak();
 
   if (daysAt80El) daysAt80El.textContent = `${daysAt80}/7`;
@@ -177,6 +199,7 @@ function calculateCurrentStreak() {
   return streak;
 }
 
+// ---------- HELPERS ----------
 function escapeHtml(str) {
   return String(str||"")
     .replaceAll("&","&amp;")
@@ -184,12 +207,26 @@ function escapeHtml(str) {
     .replaceAll(">","&gt;");
 }
 
-// CORE REGISTRATION
-App.features.habits = {
-  init: initHabitsData,
-  render: renderHabits
-};
+// ---------- GUARANTEED BOOT ----------
+(function bootHabits() {
+  try {
+    initHabitsData();
+    renderHabits();
+  } catch (e) {
+    console.error("Habits failed to load:", e);
+  }
+})();
 
-App.on("dashboard", () => {
-  renderHabits();
-});
+// ---------- CORE REGISTRATION ----------
+if (window.App) {
+  App.features.habits = {
+    init: initHabitsData,
+    render: renderHabits
+  };
+
+  App.on("dashboard", () => {
+    renderHabits();
+  });
+}
+
+console.log("Habits module loaded");
