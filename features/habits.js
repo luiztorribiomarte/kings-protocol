@@ -1,34 +1,20 @@
-// ============================================
-// HABITS GLOBAL STATE (DO NOT BREAK)
-// ============================================
-
 window.habits = window.habits || [];
 window.habitCompletions = window.habitCompletions || {};
 
 let habits = window.habits;
 let habitCompletions = window.habitCompletions;
 
-// ============================================
-// INIT
-// ============================================
-
 function initHabitsData() {
   const savedHabits = localStorage.getItem("habits");
   if (savedHabits) {
-    try {
-      habits = JSON.parse(savedHabits) || [];
-    } catch {
-      habits = [];
-    }
+    try { habits = JSON.parse(savedHabits) || []; }
+    catch { habits = []; }
   }
 
   const savedCompletions = localStorage.getItem("habitCompletions");
   if (savedCompletions) {
-    try {
-      habitCompletions = JSON.parse(savedCompletions) || {};
-    } catch {
-      habitCompletions = {};
-    }
+    try { habitCompletions = JSON.parse(savedCompletions) || {}; }
+    catch { habitCompletions = {}; }
   }
 
   if (!Array.isArray(habits) || habits.length === 0) {
@@ -60,10 +46,6 @@ function saveHabitCompletions() {
   localStorage.setItem("habitCompletions", JSON.stringify(habitCompletions));
 }
 
-// ============================================
-// DATE HELPERS
-// ============================================
-
 function getDateString(date = new Date()) {
   return date.toISOString().split("T")[0];
 }
@@ -84,10 +66,6 @@ function getWeekDates(date = new Date()) {
   return days;
 }
 
-// ============================================
-// CORE LOGIC
-// ============================================
-
 function isComplete(habitId, dateStr) {
   return !!(habitCompletions[dateStr] && habitCompletions[dateStr][habitId]);
 }
@@ -100,19 +78,11 @@ function toggleHabit(habitId, dateStr) {
   renderHabits();
   updateStats();
 
-  // 🔥 SYNC DASHBOARD + LIFE SCORE + DNA
   if (typeof renderLifeScore === "function") renderLifeScore();
 }
 
-// ============================================
-// 🔥 IMPORTANT BRIDGE FUNCTION (FIXES 0% BUG)
-// Dashboard + DNA expect this function.
-// ============================================
-
 function getDayCompletion(dateStr = getDateString()) {
-  if (!habits.length) {
-    return { percent: 0, done: 0, total: 0 };
-  }
+  if (!habits.length) return { percent: 0, done: 0, total: 0 };
 
   let done = 0;
   habits.forEach(h => {
@@ -125,15 +95,10 @@ function getDayCompletion(dateStr = getDateString()) {
   return { percent, done, total };
 }
 
-// keep your old function (do NOT delete)
 function getDayCompletionPercent(dateStr) {
   const data = getDayCompletion(dateStr);
   return data.percent / 100;
 }
-
-// ============================================
-// RENDER HABITS UI (UNCHANGED)
-// ============================================
 
 function renderHabits() {
   const grid = document.getElementById("habitGrid");
@@ -146,9 +111,9 @@ function renderHabits() {
     <table class="habit-table" style="width:100%; border-collapse: collapse;">
       <thead>
         <tr>
-          <th style="text-align:left; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">Habit</th>
+          <th style="text-align:left; padding:14px;">Habit</th>
           ${weekDates.map((d,i)=>`
-            <th style="text-align:center; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">
+            <th style="text-align:center; padding:14px;">
               ${dayNames[i]}<br>${d.getDate()}
             </th>
           `).join("")}
@@ -157,9 +122,7 @@ function renderHabits() {
       <tbody>
         ${habits.map(h=>`
           <tr>
-            <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px;">
-              ${h.icon} ${escapeHtml(h.name)}
-            </td>
+            <td style="padding:14px;">${h.icon} ${escapeHtml(h.name)}</td>
             ${weekDates.map(d=>{
               const dateStr = getDateString(d);
               const done = isComplete(h.id,dateStr);
@@ -179,17 +142,12 @@ function renderHabits() {
   updateStats();
 }
 
-// ============================================
-// STATS (UNCHANGED)
-// ============================================
-
 function updateStats() {
   const daysAt80El = document.getElementById("daysAt80");
   const weeklyCompletionEl = document.getElementById("weeklyCompletion");
   const currentStreakEl = document.getElementById("currentStreak");
 
   const weekDates = getWeekDates(new Date());
-
   const dayPercents = weekDates.map(d => getDayCompletionPercent(getDateString(d)));
 
   const daysAt80 = dayPercents.filter(p => p >= 0.8).length;
@@ -219,10 +177,6 @@ function calculateCurrentStreak() {
   return streak;
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
 function escapeHtml(str) {
   return String(str||"")
     .replaceAll("&","&amp;")
@@ -230,11 +184,12 @@ function escapeHtml(str) {
     .replaceAll(">","&gt;");
 }
 
-// ============================================
-// AUTO INIT
-// ============================================
+// CORE REGISTRATION
+App.features.habits = {
+  init: initHabitsData,
+  render: renderHabits
+};
 
-(function bootHabits() {
-  initHabitsData();
-  if (document.getElementById("habitGrid")) renderHabits();
-})();
+App.on("dashboard", () => {
+  renderHabits();
+});
