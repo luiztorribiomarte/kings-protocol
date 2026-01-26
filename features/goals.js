@@ -305,3 +305,12 @@ function escapeHtml(str) {
   initGoalsData();
   renderGoals();
 })();
+// CORE REGISTRATION
+App.features.goals = {
+  init: initGoalsData,
+  render: renderGoals
+};
+
+App.on("goals", () => {
+  renderGoals();
+});
