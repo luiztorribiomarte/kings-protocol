@@ -1,6 +1,6 @@
 // ============================================
-// LIFE ENGINE 6.0 — LIFE SCORE + DNA + UNIFIED PERFORMANCE GRAPH
-// SAFE UPGRADE — DOES NOT BREAK FEATURES
+// LIFE ENGINE 6.1 — FIXED + COMPATIBLE + UPGRADED
+// DOES NOT BREAK EXISTING FEATURES
 // ============================================
 
 // ---------- Helpers ----------
@@ -237,6 +237,11 @@ function renderDNAPanel() {
   `;
 }
 
+// ✅ COMPATIBILITY FIX (DO NOT REMOVE)
+function renderDNAProfile() {
+  renderDNAPanel();
+}
+
 // ---------- UNIFIED PERFORMANCE GRAPH ----------
 let performanceChartInstance = null;
 
@@ -332,4 +337,4 @@ function renderWeeklyGraph() {
   `;
 }
 
-console.log("Life Engine 6.0 loaded");
+console.log("Life Engine 6.1 loaded");
