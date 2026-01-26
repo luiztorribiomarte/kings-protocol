@@ -1,5 +1,5 @@
 // ============================================
-// LIFE ENGINE 4.0 — LIFE SCORE + WEEKLY GRAPH + DNA
+// LIFE ENGINE 5.0 — LIFE SCORE + WEEKLY GRAPH + DNA PANEL
 // SAFE UPGRADE — DOES NOT BREAK FEATURES
 // ============================================
 
@@ -131,6 +131,7 @@ function renderLifeScore() {
       display:flex;
       gap:18px;
       align-items:center;
+      flex-wrap:wrap;
     ">
 
       <div style="position:relative; width:130px; height:130px;">
@@ -161,7 +162,7 @@ function renderLifeScore() {
         </div>
       </div>
 
-      <div style="flex:1;">
+      <div style="flex:1; min-width:200px;">
         <div style="font-size:1.1rem; font-weight:900; color:${color};">
           ${label}
         </div>
@@ -173,11 +174,58 @@ function renderLifeScore() {
           Streak Bonus: +${data.breakdown.streakBonus}
         </div>
       </div>
+
+      <div id="dnaPanel" style="flex:1; min-width:220px;"></div>
+    </div>
+  `;
+
+  renderDNAPanel();
+}
+
+// ---------- PRODUCTIVITY DNA ----------
+function calculateDNA() {
+  const days = getLastDays(14);
+  const habitVals = days.map(d => getHabitPercent(d));
+  const avgHabit = Math.round(habitVals.reduce((a,b)=>a+b,0)/14);
+
+  const variance = Math.round(
+    habitVals.reduce((a,b)=>a+Math.abs(b-avgHabit),0)/14
+  );
+
+  const discipline = Math.min(100, avgHabit + getStreakBonus());
+  const consistency = Math.max(0, 100 - variance);
+  const execution = Math.round((avgHabit + getTaskPercent()) / 2);
+  const avg14 = avgHabit;
+
+  return { discipline, consistency, execution, avg14 };
+}
+
+function renderDNAPanel() {
+  const el = document.getElementById("dnaPanel");
+  if (!el) return;
+
+  const dna = calculateDNA();
+
+  el.innerHTML = `
+    <div style="
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.04);
+    ">
+      <div style="font-weight:900; margin-bottom:8px;">🧬 Productivity DNA</div>
+
+      <div style="font-size:0.9rem; color:#E5E7EB; line-height:1.7;">
+        Discipline: <b>${dna.discipline}</b><br>
+        Consistency: <b>${dna.consistency}</b><br>
+        Execution: <b>${dna.execution}</b><br>
+        14-Day Avg: <b>${dna.avg14}%</b>
+      </div>
     </div>
   `;
 }
 
-// ---------- WEEKLY PERFORMANCE CHART ----------
+// ---------- WEEKLY PERFORMANCE ----------
 let weeklyChartInstance = null;
 
 function openWeeklyPerformanceChart() {
@@ -207,9 +255,7 @@ function renderWeeklyChart() {
   const energyData = days.map(d => getEnergyScore(d));
   const taskData = days.map(d => getTaskPercentForDay(d));
 
-  if (weeklyChartInstance) {
-    weeklyChartInstance.destroy();
-  }
+  if (weeklyChartInstance) weeklyChartInstance.destroy();
 
   weeklyChartInstance = new Chart(canvas, {
     type: "line",
@@ -234,7 +280,6 @@ function renderWeeklyChart() {
   });
 }
 
-// ---------- WEEKLY SUMMARY ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
@@ -254,24 +299,4 @@ function renderWeeklyGraph() {
   `;
 }
 
-// ---------- PRODUCTIVITY DNA ----------
-function renderDNAProfile() {
-  const el = document.getElementById("currentStreak");
-  if (!el) return;
-
-  const days = getLastDays(14);
-  const habitVals = days.map(d => getHabitPercent(d));
-  const avgHabit = Math.round(habitVals.reduce((a,b)=>a+b,0)/14);
-
-  const variance = Math.round(
-    habitVals.reduce((a,b)=>a+Math.abs(b-avgHabit),0)/14
-  );
-
-  const discipline = Math.min(100, avgHabit + getStreakBonus());
-  const consistency = Math.max(0, 100 - variance);
-  const execution = Math.round((avgHabit + getTaskPercent()) / 2);
-
-  el.textContent = Math.round((discipline + consistency + execution) / 3);
-}
-
-console.log("Life Engine 4.0 loaded");
+console.log("Life Engine 5.0 loaded");
