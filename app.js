@@ -1,8 +1,4 @@
 // ===============================
-// KP APP CORE (UPGRADED)
-// ===============================
-
-// ===============================
 // PAGE NAVIGATION
 // ===============================
 function showPage(page) {
@@ -34,27 +30,15 @@ function showPage(page) {
     renderLifeScore();
     renderWeeklyGraph();
     renderDNAProfile();
-
-    App.emit("dashboard");
-  }
-
-  if (page === "goalsHabits") {
-    if (typeof renderGoals === "function") renderGoals();
-    App.emit("goals");
   }
 
   if (page === "journal") {
-    if (typeof renderJournal === "function") renderJournal();
-    App.emit("journal");
-  }
-
-  if (page === "workout") {
-    App.emit("workout");
+    renderJournal();
   }
 }
 
 // ===============================
-// GLOBAL MODAL SYSTEM
+// MODAL SYSTEM
 // ===============================
 function openModal(html) {
   const modal = document.getElementById("modal");
@@ -93,11 +77,41 @@ setInterval(updateTime, 1000);
 updateTime();
 
 // ===============================
+// 🧠 TASK HISTORY SYSTEM (NEW CORE)
+// ===============================
+function getTodayKey() {
+  return new Date().toISOString().split("T")[0];
+}
+
+let todos = JSON.parse(localStorage.getItem("todos")) || [];
+let todoHistory = JSON.parse(localStorage.getItem("todoHistory")) || {};
+let lastTodoDate = localStorage.getItem("lastTodoDate");
+
+// 🔥 DAILY RESET + SAVE HISTORY
+function checkDailyTaskReset() {
+  const today = getTodayKey();
+
+  if (lastTodoDate && lastTodoDate !== today) {
+    // Save yesterday's completion %
+    if (todos.length > 0) {
+      const done = todos.filter(t => t.done).length;
+      const percent = Math.round((done / todos.length) * 100);
+      todoHistory[lastTodoDate] = percent;
+      localStorage.setItem("todoHistory", JSON.stringify(todoHistory));
+    }
+
+    // Clear tasks for new day
+    todos = [];
+    localStorage.setItem("todos", JSON.stringify(todos));
+  }
+
+  lastTodoDate = today;
+  localStorage.setItem("lastTodoDate", today);
+}
+
+// ===============================
 // TODO SYSTEM
 // ===============================
-App.state.todos = JSON.parse(localStorage.getItem("todos")) || [];
-const todos = App.state.todos;
-
 function saveTodos() {
   localStorage.setItem("todos", JSON.stringify(todos));
 }
@@ -139,7 +153,7 @@ function renderTodos() {
 
   list.innerHTML = "";
   if (!todos.length) {
-    list.innerHTML = `<div style="color:#9CA3AF;">No tasks yet.</div>`;
+    list.innerHTML = `<div style="color:#9CA3AF;">No tasks yet today.</div>`;
     return;
   }
 
@@ -159,19 +173,18 @@ function renderTodos() {
 }
 
 // ===============================
-// BOOT SYSTEM (SINGLE AUTHORITY)
+// BOOT
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
+  checkDailyTaskReset(); // 🔥 important
+
   showPage("dashboard");
 
   if (typeof initHabitsData === "function") initHabitsData();
   if (typeof initMoodData === "function") initMoodData();
-  if (typeof initGoalsData === "function") initGoalsData();
 
   renderTodos();
   renderLifeScore();
   renderWeeklyGraph();
   renderDNAProfile();
-
-  App.emit("ready");
 });
