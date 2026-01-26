@@ -598,3 +598,13 @@ function renderMoodTracker() {
     if (e.key === "moodData") safeRender();
   });
 })();
+// CORE REGISTRATION
+App.features.mood = {
+  init: initMoodData,
+  render: renderMoodTracker
+};
+
+App.on("dashboard", () => {
+  initMoodData();
+  renderMoodTracker();
+});
