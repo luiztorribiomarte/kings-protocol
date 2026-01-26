@@ -1,7 +1,6 @@
 // ============================================
-// LIFE ENGINE 3.0 — VISUAL + POWERFUL + SAFE
-// Uses existing habits, mood, tasks, streak
-// DOES NOT REMOVE ANY FEATURES
+// LIFE ENGINE 4.0 — LIFE SCORE + WEEKLY GRAPH + DNA
+// SAFE UPGRADE — DOES NOT BREAK FEATURES
 // ============================================
 
 // ---------- Helpers ----------
@@ -42,14 +41,21 @@ function getEnergyScore(dateKey = todayKey()) {
   return 0;
 }
 
-function getTaskPercent() {
+function getTaskPercentForDay(dateKey = todayKey()) {
   try {
+    const history = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+    if (history[dateKey]) return history[dateKey];
+
     const todos = JSON.parse(localStorage.getItem("todos") || "[]");
     if (!todos.length) return 0;
     const done = todos.filter(t => t.done).length;
     return Math.round((done / todos.length) * 100);
   } catch {}
   return 0;
+}
+
+function getTaskPercent() {
+  return getTaskPercentForDay(todayKey());
 }
 
 function getStreakBonus() {
@@ -62,7 +68,7 @@ function getStreakBonus() {
     else break;
   }
 
-  return Math.min(streak * 2, 15); // capped bonus
+  return Math.min(streak * 2, 15);
 }
 
 // ---------- LIFE SCORE ----------
@@ -89,7 +95,7 @@ function calculateLifeScore() {
   };
 }
 
-// ---------- UI ----------
+// ---------- LIFE SCORE UI ----------
 function renderLifeScore() {
   const el = document.getElementById("dailyStatus");
   if (!el) return;
@@ -171,7 +177,64 @@ function renderLifeScore() {
   `;
 }
 
-// ---------- WEEKLY PERFORMANCE ----------
+// ---------- WEEKLY PERFORMANCE CHART ----------
+let weeklyChartInstance = null;
+
+function openWeeklyPerformanceChart() {
+  if (typeof openModal !== "function") return alert("Modal system not found.");
+
+  openModal(`
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div style="font-weight:900; font-size:1.1rem;">Weekly Performance</div>
+    </div>
+    <canvas id="weeklyChartCanvas" height="160"></canvas>
+  `);
+
+  setTimeout(renderWeeklyChart, 50);
+}
+
+function renderWeeklyChart() {
+  const canvas = document.getElementById("weeklyChartCanvas");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const days = getLastDays(7).reverse();
+
+  const labels = days.map(d =>
+    new Date(d).toLocaleDateString("en-US", { weekday: "short" })
+  );
+
+  const habitData = days.map(d => getHabitPercent(d));
+  const energyData = days.map(d => getEnergyScore(d));
+  const taskData = days.map(d => getTaskPercentForDay(d));
+
+  if (weeklyChartInstance) {
+    weeklyChartInstance.destroy();
+  }
+
+  weeklyChartInstance = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Habits %", data: habitData, tension: 0.3 },
+        { label: "Energy %", data: energyData, tension: 0.3 },
+        { label: "Tasks %", data: taskData, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#E5E7EB" } }
+      },
+      scales: {
+        x: { ticks: { color: "#9CA3AF" } },
+        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" } }
+      }
+    }
+  });
+}
+
+// ---------- WEEKLY SUMMARY ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
@@ -180,11 +243,15 @@ function renderWeeklyGraph() {
 
   const habitAvg = Math.round(days.reduce((a,d)=>a+getHabitPercent(d),0)/7);
   const energyAvg = Math.round(days.reduce((a,d)=>a+getEnergyScore(d),0)/7);
-  const taskAvg = getTaskPercent();
+  const taskAvg = Math.round(days.reduce((a,d)=>a+getTaskPercentForDay(d),0)/7);
 
   const overall = Math.round((habitAvg + energyAvg + taskAvg) / 3);
 
-  el.textContent = overall + "%";
+  el.innerHTML = `
+    <span style="cursor:pointer;" onclick="openWeeklyPerformanceChart()">
+      ${overall}%
+    </span>
+  `;
 }
 
 // ---------- PRODUCTIVITY DNA ----------
@@ -193,7 +260,6 @@ function renderDNAProfile() {
   if (!el) return;
 
   const days = getLastDays(14);
-
   const habitVals = days.map(d => getHabitPercent(d));
   const avgHabit = Math.round(habitVals.reduce((a,b)=>a+b,0)/14);
 
@@ -208,4 +274,4 @@ function renderDNAProfile() {
   el.textContent = Math.round((discipline + consistency + execution) / 3);
 }
 
-console.log("Life Engine 3.0 loaded");
+console.log("Life Engine 4.0 loaded");
