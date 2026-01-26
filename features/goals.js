@@ -1,5 +1,5 @@
 // ============================================
-// GOALS MODULE — DRAGGABLE CATEGORY BOARD
+// GOALS MODULE — DRAGGABLE CATEGORY BOARD (UPGRADED SAFE VERSION)
 // ============================================
 
 let goals = [];
@@ -32,8 +32,11 @@ function initGoalsData() {
     saveCategories();
   }
 
+  // ✅ Upgrade old goals safely
   goals.forEach(g => {
     if (!g.category) g.category = "money";
+    if (!g.status) g.status = "active"; // active | completed | hold | failed
+    if (typeof g.progress !== "number") g.progress = 0; // 0–100
   });
 }
 
@@ -66,7 +69,10 @@ function renderCategoryGrid(container) {
     <div class="goals-grid">
       ${ordered.map(cat => {
         const catGoals = goals.filter(g => g.category === cat.id);
-        const percent = catGoals.length ? Math.min(100, catGoals.length * 20) : 0;
+
+        const avgProgress = catGoals.length
+          ? Math.round(catGoals.reduce((a, g) => a + (g.progress || 0), 0) / catGoals.length)
+          : 0;
 
         return `
           <div class="category-tile"
@@ -88,7 +94,11 @@ function renderCategoryGrid(container) {
               <div class="category-meta">${catGoals.length} goals</div>
 
               <div class="category-progress">
-                <div class="category-progress-bar" style="width:${percent}%"></div>
+                <div class="category-progress-bar" style="width:${avgProgress}%"></div>
+              </div>
+
+              <div style="margin-top:6px; font-size:0.8rem; color:#9CA3AF;">
+                ${avgProgress}% progress
               </div>
             </div>
           </div>
@@ -127,7 +137,7 @@ function onDrop(targetId) {
   renderGoals();
 }
 
-/* ---------- Category Menu (IMAGE VIA URL) ---------- */
+/* ---------- Category Menu ---------- */
 function openCategoryMenu(categoryId) {
   const cat = categories.find(c => c.id === categoryId);
 
@@ -158,7 +168,6 @@ function saveCategoryImageUrl(categoryId) {
   if (!input) return;
 
   const url = input.value.trim();
-
   const cat = categories.find(c => c.id === categoryId);
   if (cat) {
     cat.image = url;
@@ -191,17 +200,38 @@ function renderGoalsInCategory(container, categoryId) {
              No goals in this category yet.
            </div>`
         : filtered.map(goal => `
-            <div class="goal-card">
-              <div style="display:flex; justify-content:space-between;">
-                <div>
+            <div class="goal-card" style="padding:14px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; gap:12px;">
+                <div style="flex:1;">
                   <div style="font-weight:700;">${escapeHtml(goal.title)}</div>
                   ${goal.description
                     ? `<div style="color:#9CA3AF; margin-top:6px;">
                          ${escapeHtml(goal.description)}
                        </div>`
                     : ""}
+                  
+                  <div style="margin-top:8px; font-size:0.8rem; color:#9CA3AF;">
+                    Status: 
+                    <select onchange="updateGoalStatus('${goal.id}', this.value)">
+                      ${["active","completed","hold","failed"].map(s => `
+                        <option value="${s}" ${goal.status === s ? "selected" : ""}>${s}</option>
+                      `).join("")}
+                    </select>
+                  </div>
+
+                  <div style="margin-top:8px;">
+                    <div style="font-size:0.75rem; color:#9CA3AF;">Progress: ${goal.progress}%</div>
+                    <div style="height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden;">
+                      <div style="height:100%; width:${goal.progress}%; background:linear-gradient(135deg,#6366F1,#EC4899);"></div>
+                    </div>
+                    <input type="range" min="0" max="100" value="${goal.progress}"
+                      oninput="updateGoalProgress('${goal.id}', this.value)" style="width:100%; margin-top:6px;">
+                  </div>
                 </div>
-                <button onclick="deleteGoal('${goal.id}')">Delete</button>
+
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <button onclick="deleteGoal('${goal.id}')">Delete</button>
+                </div>
               </div>
             </div>
           `).join("")
@@ -274,12 +304,30 @@ function saveNewGoal(categoryId) {
     title,
     description: desc,
     category: categoryId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    status: "active",
+    progress: 0
   });
 
   saveGoals();
   closeModal();
   renderGoals();
+}
+
+/* ---------- Goal Updates ---------- */
+function updateGoalStatus(id, status) {
+  const g = goals.find(g => g.id === id);
+  if (!g) return;
+  g.status = status;
+  saveGoals();
+  renderGoals();
+}
+
+function updateGoalProgress(id, value) {
+  const g = goals.find(g => g.id === id);
+  if (!g) return;
+  g.progress = Number(value);
+  saveGoals();
 }
 
 /* ---------- Delete ---------- */
@@ -305,6 +353,7 @@ function escapeHtml(str) {
   initGoalsData();
   renderGoals();
 })();
+
 // CORE REGISTRATION
 App.features.goals = {
   init: initGoalsData,
