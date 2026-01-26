@@ -1,5 +1,5 @@
 // ============================================
-// HABITS MODULE — SAFE + CORE COMPATIBLE
+// HABITS MODULE — FULL SYSTEM + CHARTS + CRUD
 // DOES NOT REMOVE EXISTING FEATURES
 // ============================================
 
@@ -13,20 +13,14 @@ let habitCompletions = window.habitCompletions;
 function initHabitsData() {
   const savedHabits = localStorage.getItem("habits");
   if (savedHabits) {
-    try {
-      habits = JSON.parse(savedHabits) || [];
-    } catch {
-      habits = [];
-    }
+    try { habits = JSON.parse(savedHabits) || []; }
+    catch { habits = []; }
   }
 
   const savedCompletions = localStorage.getItem("habitCompletions");
   if (savedCompletions) {
-    try {
-      habitCompletions = JSON.parse(savedCompletions) || {};
-    } catch {
-      habitCompletions = {};
-    }
+    try { habitCompletions = JSON.parse(savedCompletions) || {}; }
+    catch { habitCompletions = {}; }
   }
 
   if (!Array.isArray(habits) || habits.length === 0) {
@@ -64,6 +58,16 @@ function getDateString(date = new Date()) {
   return date.toISOString().split("T")[0];
 }
 
+function getLastDays(n) {
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(getDateString(d));
+  }
+  return days;
+}
+
 function getWeekDates(date = new Date()) {
   const d = new Date(date);
   const day = d.getDay();
@@ -97,16 +101,12 @@ function toggleHabit(habitId, dateStr) {
   if (typeof renderDNAProfile === "function") renderDNAProfile();
 }
 
-// ---------- BRIDGE FUNCTION ----------
+// ---------- BRIDGE ----------
 function getDayCompletion(dateStr = getDateString()) {
-  if (!habits.length) {
-    return { percent: 0, done: 0, total: 0 };
-  }
+  if (!habits.length) return { percent: 0, done: 0, total: 0 };
 
   let done = 0;
-  habits.forEach(h => {
-    if (isComplete(h.id, dateStr)) done++;
-  });
+  habits.forEach(h => { if (isComplete(h.id, dateStr)) done++; });
 
   const total = habits.length;
   const percent = Math.round((done / total) * 100);
@@ -115,8 +115,7 @@ function getDayCompletion(dateStr = getDateString()) {
 }
 
 function getDayCompletionPercent(dateStr) {
-  const data = getDayCompletion(dateStr);
-  return data.percent / 100;
+  return getDayCompletion(dateStr).percent / 100;
 }
 
 // ---------- UI ----------
@@ -128,6 +127,13 @@ function renderHabits() {
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div style="font-weight:800;">Daily Habits - This Week</div>
+      <button onclick="openHabitManager()" style="padding:6px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer;">
+        ⚙ Manage Habits
+      </button>
+    </div>
+
     <table class="habit-table" style="width:100%; border-collapse: collapse;">
       <thead>
         <tr>
@@ -142,7 +148,7 @@ function renderHabits() {
       <tbody>
         ${habits.map(h=>`
           <tr>
-            <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px;">
+            <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px; font-weight:600;">
               ${h.icon} ${escapeHtml(h.name)}
             </td>
             ${weekDates.map(d=>{
@@ -199,6 +205,113 @@ function calculateCurrentStreak() {
   return streak;
 }
 
+// ---------- HABIT MANAGER (ADD / DELETE) ----------
+function openHabitManager() {
+  openModal(`
+    <h2>Manage Habits</h2>
+
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="newHabitName" placeholder="Habit name" class="form-input" />
+      <input id="newHabitIcon" placeholder="Emoji (optional)" class="form-input" style="width:80px;" />
+      <button class="form-submit" onclick="addHabit()">Add</button>
+    </div>
+
+    <div style="max-height:300px; overflow:auto;">
+      ${habits.map(h => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
+          <div>${h.icon} ${escapeHtml(h.name)}</div>
+          <button onclick="deleteHabit('${h.id}')" style="color:#EF4444; background:none; border:none; cursor:pointer;">Delete</button>
+        </div>
+      `).join("")}
+    </div>
+  `);
+}
+
+function addHabit() {
+  const name = document.getElementById("newHabitName").value.trim();
+  const icon = document.getElementById("newHabitIcon").value.trim() || "✨";
+  if (!name) return alert("Habit name required");
+
+  habits.push({
+    id: "h_" + Date.now(),
+    name,
+    icon
+  });
+
+  saveHabits();
+  closeModal();
+  renderHabits();
+}
+
+function deleteHabit(id) {
+  if (!confirm("Delete this habit?")) return;
+  habits = habits.filter(h => h.id !== id);
+  saveHabits();
+  closeModal();
+  renderHabits();
+}
+
+// ---------- HABIT CHART ----------
+function openHabitChart(habitId) {
+  const habit = habits.find(h => h.id === habitId);
+  if (!habit) return;
+
+  openModal(`
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-weight:800;">${habit.icon} ${escapeHtml(habit.name)}</div>
+      <select id="habitChartRange" style="padding:6px 10px; border-radius:10px; background:rgba(255,255,255,0.08); color:white;">
+        <option value="7">7 days</option>
+        <option value="30">30 days</option>
+        <option value="all">All time</option>
+      </select>
+    </div>
+    <canvas id="habitChartCanvas" height="200" style="margin-top:14px;"></canvas>
+  `);
+
+  document.getElementById("habitChartRange").onchange = () => renderHabitChart(habitId);
+  renderHabitChart(habitId);
+}
+
+let habitChartInstance = null;
+
+function renderHabitChart(habitId) {
+  const canvas = document.getElementById("habitChartCanvas");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const range = document.getElementById("habitChartRange").value;
+  let days = [];
+
+  if (range === "all") {
+    days = Object.keys(habitCompletions).sort();
+  } else {
+    days = getLastDays(parseInt(range));
+  }
+
+  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+  const data = days.map(d => isComplete(habitId, d) ? 100 : 0);
+
+  if (habitChartInstance) habitChartInstance.destroy();
+
+  habitChartInstance = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Completion %",
+        data,
+        tension: 0.3,
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { min: 0, max: 100 }
+      }
+    }
+  });
+}
+
 // ---------- HELPERS ----------
 function escapeHtml(str) {
   return String(str||"")
@@ -207,13 +320,13 @@ function escapeHtml(str) {
     .replaceAll(">","&gt;");
 }
 
-// ---------- GUARANTEED BOOT ----------
+// ---------- BOOT ----------
 (function bootHabits() {
   try {
     initHabitsData();
     renderHabits();
   } catch (e) {
-    console.error("Habits failed to load:", e);
+    console.error("Habits failed:", e);
   }
 })();
 
@@ -224,9 +337,7 @@ if (window.App) {
     render: renderHabits
   };
 
-  App.on("dashboard", () => {
-    renderHabits();
-  });
+  App.on("dashboard", () => renderHabits());
 }
 
-console.log("Habits module loaded");
+console.log("Habits system upgraded");
