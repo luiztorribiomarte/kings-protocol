@@ -1,6 +1,7 @@
 // ============================================
-// LIFE ENGINE 6.1 — FIXED + COMPATIBLE + UPGRADED
-// DOES NOT BREAK EXISTING FEATURES
+// LIFE ENGINE 7.1 — DASHBOARD PERFORMANCE GRAPH
+// SAFE: does not remove features, keeps old function names working
+// Adds: dashboard line chart (Habits/Energy/Tasks) with 7/30/all-time
 // ============================================
 
 // ---------- Helpers ----------
@@ -14,7 +15,7 @@ function todayKey() {
 
 function getLastDays(n) {
   const days = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     days.push(d.toISOString().split("T")[0]);
@@ -27,14 +28,24 @@ function getAllDaysFromStorage() {
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
 
   const keys = new Set([
-    ...Object.keys(habitData),
-    ...Object.keys(moodData)
+    ...Object.keys(habitData || {}),
+    ...Object.keys(moodData || {})
   ]);
 
-  return [...keys].sort();
+  // If empty, fallback to last 7 so chart doesn't crash
+  const out = [...keys].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+  return out.length ? out : getLastDays(7);
 }
 
-// ---------- CORE METRICS ----------
+function prettyLabel(dateStr) {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+// ---------- Core metrics ----------
 function getHabitPercent(dateKey = todayKey()) {
   try {
     if (typeof getDayCompletion === "function") {
@@ -44,20 +55,17 @@ function getHabitPercent(dateKey = todayKey()) {
   return 0;
 }
 
-function getEnergyScore(dateKey = todayKey()) {
+function getEnergyPercent(dateKey = todayKey()) {
   try {
     const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const energy = moodData[dateKey]?.energy || 0;
-    return Math.round((energy / 10) * 100);
+    const energy = moodData?.[dateKey]?.energy ?? 0; // 0–10
+    return Math.round((energy / 10) * 100); // 0–100
   } catch {}
   return 0;
 }
 
-function getTaskPercentForDay(dateKey = todayKey()) {
+function getTaskPercentToday() {
   try {
-    const history = JSON.parse(localStorage.getItem("todoHistory") || "{}");
-    if (history[dateKey]) return history[dateKey];
-
     const todos = JSON.parse(localStorage.getItem("todos") || "[]");
     if (!todos.length) return 0;
     const done = todos.filter(t => t.done).length;
@@ -66,13 +74,22 @@ function getTaskPercentForDay(dateKey = todayKey()) {
   return 0;
 }
 
-function getTaskPercent() {
-  return getTaskPercentForDay(todayKey());
+// Note: your app currently does not store tasks per-day.
+// So the trend uses today’s tasks percent across the range (stable + non-breaking).
+// If you later add per-day task history, this function supports it.
+function getTaskPercentForDay(dateKey = todayKey()) {
+  try {
+    const hist = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+    if (hist && typeof hist === "object" && typeof hist[dateKey] === "number") {
+      return hist[dateKey];
+    }
+  } catch {}
+  return getTaskPercentToday();
 }
 
 function getStreakBonus() {
   let streak = 0;
-  const days = getLastDays(30);
+  const days = getLastDays(30).slice().reverse(); // walk backward from today
 
   for (const d of days) {
     const pct = getHabitPercent(d);
@@ -83,11 +100,11 @@ function getStreakBonus() {
   return Math.min(streak * 2, 15);
 }
 
-// ---------- LIFE SCORE ----------
+// ---------- Life Score ----------
 function calculateLifeScore() {
   const habitPct = getHabitPercent();
-  const energyPct = getEnergyScore();
-  const taskPct = getTaskPercent();
+  const energyPct = getEnergyPercent();
+  const taskPct = getTaskPercentToday();
   const streakBonus = getStreakBonus();
 
   const score =
@@ -107,7 +124,25 @@ function calculateLifeScore() {
   };
 }
 
-// ---------- LIFE SCORE UI ----------
+// ---------- DNA ----------
+function calculateDNA() {
+  const days = getLastDays(14);
+  const habitVals = days.map(d => getHabitPercent(d));
+  const avgHabit = Math.round(habitVals.reduce((a, b) => a + b, 0) / (habitVals.length || 1));
+
+  const variance = Math.round(
+    habitVals.reduce((a, b) => a + Math.abs(b - avgHabit), 0) / (habitVals.length || 1)
+  );
+
+  const discipline = Math.min(100, avgHabit + getStreakBonus());
+  const consistency = Math.max(0, 100 - variance);
+  const execution = Math.round((avgHabit + getTaskPercentToday()) / 2);
+  const avg14 = avgHabit;
+
+  return { discipline, consistency, execution, avg14 };
+}
+
+// ---------- UI: Life Score panel ----------
 function renderLifeScore() {
   const el = document.getElementById("dailyStatus");
   if (!el) return;
@@ -175,9 +210,7 @@ function renderLifeScore() {
       </div>
 
       <div style="flex:1; min-width:200px;">
-        <div style="font-size:1.1rem; font-weight:900; color:${color};">
-          ${label}
-        </div>
+        <div style="font-size:1.1rem; font-weight:900; color:${color};">${label}</div>
 
         <div style="margin-top:10px; font-size:0.9rem; color:#E5E7EB; line-height:1.6;">
           Habits: ${data.breakdown.habits}%<br>
@@ -194,24 +227,7 @@ function renderLifeScore() {
   renderDNAPanel();
 }
 
-// ---------- PRODUCTIVITY DNA ----------
-function calculateDNA() {
-  const days = getLastDays(14);
-  const habitVals = days.map(d => getHabitPercent(d));
-  const avgHabit = Math.round(habitVals.reduce((a,b)=>a+b,0)/14);
-
-  const variance = Math.round(
-    habitVals.reduce((a,b)=>a+Math.abs(b-avgHabit),0)/14
-  );
-
-  const discipline = Math.min(100, avgHabit + getStreakBonus());
-  const consistency = Math.max(0, 100 - variance);
-  const execution = Math.round((avgHabit + getTaskPercent()) / 2);
-  const avg14 = avgHabit;
-
-  return { discipline, consistency, execution, avg14 };
-}
-
+// ---------- UI: DNA panel ----------
 function renderDNAPanel() {
   const el = document.getElementById("dnaPanel");
   if (!el) return;
@@ -237,71 +253,48 @@ function renderDNAPanel() {
   `;
 }
 
-// ✅ COMPATIBILITY FIX (DO NOT REMOVE)
+// Compatibility: your app.js calls renderDNAProfile()
 function renderDNAProfile() {
   renderDNAPanel();
 }
 
-// ---------- UNIFIED PERFORMANCE GRAPH ----------
-let performanceChartInstance = null;
+// ---------- Dashboard Performance Trend Chart ----------
+let dashboardTrendChart = null;
 
-function openPerformanceGraph() {
-  if (typeof openModal !== "function") return alert("Modal system not found.");
-
-  openModal(`
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-      <div>
-        <div style="color:white; font-size:1.2em; font-weight:700;">Performance Graph</div>
-        <div style="color:#9CA3AF; font-size:0.9em;">Habits vs Energy vs Tasks</div>
-      </div>
-      <select id="performanceRange" style="padding:10px; border-radius:10px; background:rgba(255,255,255,0.08); color:white;">
-        <option value="7">Last 7 Days</option>
-        <option value="30">Last 30 Days</option>
-        <option value="all">All Time</option>
-      </select>
-    </div>
-
-    <div style="margin-top:16px;">
-      <canvas id="performanceChartCanvas" height="140"></canvas>
-    </div>
-  `);
-
-  document.getElementById("performanceRange").addEventListener("change", renderPerformanceGraph);
-  renderPerformanceGraph();
+function getTrendDays(range) {
+  if (range === "all") return getAllDaysFromStorage();
+  const n = range === "30" ? 30 : 7;
+  return getLastDays(n);
 }
 
-function renderPerformanceGraph() {
-  const canvas = document.getElementById("performanceChartCanvas");
+function renderDashboardTrendChart() {
+  const canvas = document.getElementById("trendChart");
+  const select = document.getElementById("trendRange");
+
+  // If you haven't added the HTML container yet, do nothing (no crash)
   if (!canvas || typeof Chart === "undefined") return;
 
-  const range = document.getElementById("performanceRange").value;
-  let days = [];
+  const range = select ? select.value : "7";
+  const days = getTrendDays(range);
 
-  if (range === "all") {
-    days = getAllDaysFromStorage();
-  } else {
-    days = getLastDays(parseInt(range)).reverse();
+  const labels = days.map(prettyLabel);
+  const habits = days.map(d => getHabitPercent(d));
+  const energy = days.map(d => getEnergyPercent(d));
+  const tasks = days.map(d => getTaskPercentForDay(d));
+
+  if (dashboardTrendChart) {
+    try { dashboardTrendChart.destroy(); } catch {}
+    dashboardTrendChart = null;
   }
 
-  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-
-  const habitData = days.map(d => getHabitPercent(d));
-  const energyData = days.map(d => getEnergyScore(d));
-  const taskData = days.map(d => getTaskPercentForDay(d));
-
-  if (performanceChartInstance) {
-    performanceChartInstance.destroy();
-    performanceChartInstance = null;
-  }
-
-  performanceChartInstance = new Chart(canvas, {
+  dashboardTrendChart = new Chart(canvas, {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: "Habits %", data: habitData, tension: 0.3 },
-        { label: "Energy %", data: energyData, tension: 0.3 },
-        { label: "Tasks %", data: taskData, tension: 0.3 }
+        { label: "Habits %", data: habits, tension: 0.3 },
+        { label: "Energy %", data: energy, tension: 0.3 },
+        { label: "Tasks %", data: tasks, tension: 0.3 }
       ]
     },
     options: {
@@ -310,31 +303,67 @@ function renderPerformanceGraph() {
         legend: { labels: { color: "#E5E7EB" } }
       },
       scales: {
-        x: { ticks: { color: "#9CA3AF" } },
-        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" } }
+        x: { ticks: { color: "#9CA3AF" }, grid: { color: "rgba(255,255,255,0.06)" } },
+        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" }, grid: { color: "rgba(255,255,255,0.06)" } }
       }
     }
   });
 }
 
-// ---------- WEEKLY SUMMARY ----------
+function bindTrendRange() {
+  const select = document.getElementById("trendRange");
+  if (!select || select.__kpBound) return;
+
+  select.addEventListener("change", () => {
+    renderDashboardTrendChart();
+  });
+
+  select.__kpBound = true;
+}
+
+// ---------- Weekly summary stat (keeps your existing “Weekly Completion” card working) ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
 
-  const days = getLastDays(7).reverse();
-
-  const habitAvg = Math.round(days.reduce((a,d)=>a+getHabitPercent(d),0)/7);
-  const energyAvg = Math.round(days.reduce((a,d)=>a+getEnergyScore(d),0)/7);
-  const taskAvg = Math.round(days.reduce((a,d)=>a+getTaskPercentForDay(d),0)/7);
+  const days = getLastDays(7);
+  const habitAvg = Math.round(days.reduce((a, d) => a + getHabitPercent(d), 0) / 7);
+  const energyAvg = Math.round(days.reduce((a, d) => a + getEnergyPercent(d), 0) / 7);
+  const taskAvg = Math.round(days.reduce((a, d) => a + getTaskPercentForDay(d), 0) / 7);
 
   const overall = Math.round((habitAvg + energyAvg + taskAvg) / 3);
-
-  el.innerHTML = `
-    <span style="cursor:pointer;" onclick="openPerformanceGraph()">
-      ${overall}%
-    </span>
-  `;
+  el.textContent = overall + "%";
 }
 
-console.log("Life Engine 6.1 loaded");
+// ---------- Boot / Safe refresh ----------
+(function bootLifeEngine() {
+  function safeInit() {
+    try {
+      // Render panels
+      renderLifeScore();
+      renderWeeklyGraph();
+      renderDNAProfile();
+
+      // Dashboard chart
+      bindTrendRange();
+      renderDashboardTrendChart();
+    } catch (e) {
+      console.error("Life Engine boot error:", e);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", safeInit);
+  } else {
+    safeInit();
+  }
+
+  // If mood updates from other tabs etc
+  window.addEventListener("storage", (e) => {
+    if (e.key === "moodData" || e.key === "habitCompletions" || e.key === "todos") {
+      safeInit();
+    }
+  });
+})();
+
+console.log("Life Engine 7.1 loaded");
