@@ -1,5 +1,5 @@
 // ============================================
-// LIFE ENGINE 5.0 — LIFE SCORE + WEEKLY GRAPH + DNA PANEL
+// LIFE ENGINE 6.0 — LIFE SCORE + DNA + UNIFIED PERFORMANCE GRAPH
 // SAFE UPGRADE — DOES NOT BREAK FEATURES
 // ============================================
 
@@ -20,6 +20,18 @@ function getLastDays(n) {
     days.push(d.toISOString().split("T")[0]);
   }
   return days;
+}
+
+function getAllDaysFromStorage() {
+  const habitData = JSON.parse(localStorage.getItem("habitCompletions") || "{}");
+  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+
+  const keys = new Set([
+    ...Object.keys(habitData),
+    ...Object.keys(moodData)
+  ]);
+
+  return [...keys].sort();
 }
 
 // ---------- CORE METRICS ----------
@@ -213,51 +225,71 @@ function renderDNAPanel() {
       border:1px solid rgba(255,255,255,0.12);
       background:rgba(255,255,255,0.04);
     ">
-      <div style="font-weight:900; margin-bottom:8px;">🧬 Productivity DNA</div>
+      <div style="font-weight:900; margin-bottom:8px;">Productivity DNA</div>
 
       <div style="font-size:0.9rem; color:#E5E7EB; line-height:1.7;">
-        Discipline: <b>${dna.discipline}</b><br>
-        Consistency: <b>${dna.consistency}</b><br>
-        Execution: <b>${dna.execution}</b><br>
-        14-Day Avg: <b>${dna.avg14}%</b>
+        Discipline: ${dna.discipline}<br>
+        Consistency: ${dna.consistency}<br>
+        Execution: ${dna.execution}<br>
+        14-Day Avg: ${dna.avg14}%
       </div>
     </div>
   `;
 }
 
-// ---------- WEEKLY PERFORMANCE ----------
-let weeklyChartInstance = null;
+// ---------- UNIFIED PERFORMANCE GRAPH ----------
+let performanceChartInstance = null;
 
-function openWeeklyPerformanceChart() {
+function openPerformanceGraph() {
   if (typeof openModal !== "function") return alert("Modal system not found.");
 
   openModal(`
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div style="font-weight:900; font-size:1.1rem;">Weekly Performance</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div>
+        <div style="color:white; font-size:1.2em; font-weight:700;">Performance Graph</div>
+        <div style="color:#9CA3AF; font-size:0.9em;">Habits vs Energy vs Tasks</div>
+      </div>
+      <select id="performanceRange" style="padding:10px; border-radius:10px; background:rgba(255,255,255,0.08); color:white;">
+        <option value="7">Last 7 Days</option>
+        <option value="30">Last 30 Days</option>
+        <option value="all">All Time</option>
+      </select>
     </div>
-    <canvas id="weeklyChartCanvas" height="160"></canvas>
+
+    <div style="margin-top:16px;">
+      <canvas id="performanceChartCanvas" height="140"></canvas>
+    </div>
   `);
 
-  setTimeout(renderWeeklyChart, 50);
+  document.getElementById("performanceRange").addEventListener("change", renderPerformanceGraph);
+  renderPerformanceGraph();
 }
 
-function renderWeeklyChart() {
-  const canvas = document.getElementById("weeklyChartCanvas");
+function renderPerformanceGraph() {
+  const canvas = document.getElementById("performanceChartCanvas");
   if (!canvas || typeof Chart === "undefined") return;
 
-  const days = getLastDays(7).reverse();
+  const range = document.getElementById("performanceRange").value;
+  let days = [];
 
-  const labels = days.map(d =>
-    new Date(d).toLocaleDateString("en-US", { weekday: "short" })
-  );
+  if (range === "all") {
+    days = getAllDaysFromStorage();
+  } else {
+    days = getLastDays(parseInt(range)).reverse();
+  }
+
+  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
 
   const habitData = days.map(d => getHabitPercent(d));
   const energyData = days.map(d => getEnergyScore(d));
   const taskData = days.map(d => getTaskPercentForDay(d));
 
-  if (weeklyChartInstance) weeklyChartInstance.destroy();
+  if (performanceChartInstance) {
+    performanceChartInstance.destroy();
+    performanceChartInstance = null;
+  }
 
-  weeklyChartInstance = new Chart(canvas, {
+  performanceChartInstance = new Chart(canvas, {
     type: "line",
     data: {
       labels,
@@ -280,6 +312,7 @@ function renderWeeklyChart() {
   });
 }
 
+// ---------- WEEKLY SUMMARY ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
@@ -293,10 +326,10 @@ function renderWeeklyGraph() {
   const overall = Math.round((habitAvg + energyAvg + taskAvg) / 3);
 
   el.innerHTML = `
-    <span style="cursor:pointer;" onclick="openWeeklyPerformanceChart()">
+    <span style="cursor:pointer;" onclick="openPerformanceGraph()">
       ${overall}%
     </span>
   `;
 }
 
-console.log("Life Engine 5.0 loaded");
+console.log("Life Engine 6.0 loaded");
