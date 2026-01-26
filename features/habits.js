@@ -1,162 +1,187 @@
 // ============================================
-// HABITS MODULE — FULL SYSTEM + CHARTS + CRUD
-// DOES NOT REMOVE EXISTING FEATURES
+// HABITS CORE SYSTEM — PARTIAL + WEIGHTED + STREAK INTELLIGENCE
+// (FULL UPGRADE, BACKWARD COMPATIBLE)
 // ============================================
 
-window.habits = window.habits || [];
-window.habitCompletions = window.habitCompletions || {};
+let habitsList = [];
+let habitData = {}; // { dateKey: { habitId: value(0-100) } }
 
-let habits = window.habits;
-let habitCompletions = window.habitCompletions;
-
-// ---------- INIT ----------
-function initHabitsData() {
-  const savedHabits = localStorage.getItem("habits");
-  if (savedHabits) {
-    try { habits = JSON.parse(savedHabits) || []; }
-    catch { habits = []; }
-  }
-
-  const savedCompletions = localStorage.getItem("habitCompletions");
-  if (savedCompletions) {
-    try { habitCompletions = JSON.parse(savedCompletions) || {}; }
-    catch { habitCompletions = {}; }
-  }
-
-  if (!Array.isArray(habits) || habits.length === 0) {
-    habits = [
-      { id: "wake", name: "Wake Up At 7 AM", icon: "⏰" },
-      { id: "sun", name: "Morning Sunlight", icon: "☀️" },
-      { id: "skin", name: "Skincare", icon: "🧴" },
-      { id: "med", name: "Meditation", icon: "🧘" },
-      { id: "journal", name: "Journal/Reflect", icon: "📝" },
-      { id: "workout", name: "Work Out", icon: "💪" },
-      { id: "read", name: "Read 10 Pages", icon: "📚" },
-      { id: "yt", name: "YouTube Work (2hrs)", icon: "🎬" },
-      { id: "noporn", name: "No Porn", icon: "🚫" },
-      { id: "noweed", name: "No Weed", icon: "🌿" },
-      { id: "mobility", name: "Nightly Mobility", icon: "🧘‍♂️" }
-    ];
-    saveHabits();
-  }
-
-  window.habits = habits;
-  window.habitCompletions = habitCompletions;
+// ---------- Utilities ----------
+function getDayKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-// ---------- SAVE ----------
-function saveHabits() {
-  localStorage.setItem("habits", JSON.stringify(habits));
-}
-
-function saveHabitCompletions() {
-  localStorage.setItem("habitCompletions", JSON.stringify(habitCompletions));
-}
-
-// ---------- DATE HELPERS ----------
-function getDateString(date = new Date()) {
-  return date.toISOString().split("T")[0];
-}
-
-function getLastDays(n) {
-  const days = [];
+function getPastDays(n = 7) {
+  const out = [];
+  const now = new Date();
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(getDateString(d));
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    out.push(d);
   }
-  return days;
+  return out;
 }
 
-function getWeekDates(date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const start = new Date(d);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - day);
-
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const x = new Date(start);
-    x.setDate(start.getDate() + i);
-    days.push(x);
+// ---------- Load / Save ----------
+function loadHabits() {
+  try {
+    habitsList = JSON.parse(localStorage.getItem("habitsList")) || [];
+  } catch {
+    habitsList = [];
   }
-  return days;
+
+  try {
+    habitData = JSON.parse(localStorage.getItem("habitData")) || {};
+  } catch {
+    habitData = {};
+  }
+
+  // Backward compatibility upgrade
+  habitsList = habitsList.map(h => {
+    if (typeof h === "string") {
+      return {
+        id: "h_" + Math.random().toString(36).slice(2),
+        name: h,
+        weight: 1
+      };
+    }
+    return {
+      id: h.id || "h_" + Math.random().toString(36).slice(2),
+      name: h.name || "Habit",
+      weight: typeof h.weight === "number" ? h.weight : 1
+    };
+  });
+
+  saveHabits();
 }
 
-// ---------- CORE LOGIC ----------
-function isComplete(habitId, dateStr) {
-  return !!(habitCompletions[dateStr] && habitCompletions[dateStr][habitId]);
+function saveHabits() {
+  localStorage.setItem("habitsList", JSON.stringify(habitsList));
+  localStorage.setItem("habitData", JSON.stringify(habitData));
 }
 
-function toggleHabit(habitId, dateStr) {
-  if (!habitCompletions[dateStr]) habitCompletions[dateStr] = {};
-  habitCompletions[dateStr][habitId] = !habitCompletions[dateStr][habitId];
+// ---------- Core Logic ----------
+function setHabitValue(habitId, value) {
+  const key = getDayKey();
+  if (!habitData[key]) habitData[key] = {};
 
-  saveHabitCompletions();
-  renderHabits();
-
+  habitData[key][habitId] = Math.max(0, Math.min(100, value));
+  saveHabits();
+  renderHabitGrid();
   if (typeof renderLifeScore === "function") renderLifeScore();
-  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
-  if (typeof renderDNAProfile === "function") renderDNAProfile();
 }
 
-// ---------- BRIDGE ----------
-function getDayCompletion(dateStr = getDateString()) {
-  if (!habits.length) return { percent: 0, done: 0, total: 0 };
+function toggleHabit(habitId) {
+  const key = getDayKey();
+  if (!habitData[key]) habitData[key] = {};
 
-  let done = 0;
-  habits.forEach(h => { if (isComplete(h.id, dateStr)) done++; });
+  const current = habitData[key][habitId] || 0;
+  habitData[key][habitId] = current > 0 ? 0 : 100;
 
-  const total = habits.length;
-  const percent = Math.round((done / total) * 100);
+  saveHabits();
+  renderHabitGrid();
+  if (typeof renderLifeScore === "function") renderLifeScore();
+}
+
+// ---------- Metrics ----------
+function getDayCompletion(dayKey = getDayKey()) {
+  const day = habitData[dayKey] || {};
+  if (!habitsList.length) return { percent: 0, done: 0, total: 0 };
+
+  let totalWeight = 0;
+  let score = 0;
+
+  habitsList.forEach(h => {
+    const v = day[h.id] ?? 0;
+    totalWeight += h.weight;
+    score += (v / 100) * h.weight;
+  });
+
+  const percent = totalWeight ? Math.round((score / totalWeight) * 100) : 0;
+
+  const done = habitsList.filter(h => (day[h.id] ?? 0) >= 100).length;
+  const total = habitsList.length;
 
   return { percent, done, total };
 }
 
-function getDayCompletionPercent(dateStr) {
-  return getDayCompletion(dateStr).percent / 100;
+// ---------- Streak Intelligence ----------
+function getHabitStreak() {
+  let streak = 0;
+  let strength = 0;
+
+  const days = getPastDays(30).reverse();
+
+  for (const d of days) {
+    const key = getDayKey(d);
+    const { percent } = getDayCompletion(key);
+
+    if (percent >= 80) {
+      streak++;
+      strength += percent;
+    } else {
+      break;
+    }
+  }
+
+  const avgStrength = streak ? Math.round(strength / streak) : 0;
+
+  return {
+    streak,
+    strength: avgStrength
+  };
 }
 
-// ---------- UI ----------
-function renderHabits() {
-  const grid = document.getElementById("habitGrid");
-  if (!grid) return;
+// ---------- Render Habit Grid ----------
+function renderHabitGrid() {
+  const container = document.getElementById("habitGrid");
+  if (!container) return;
 
-  const weekDates = getWeekDates(new Date());
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const days = getPastDays(7);
+  const todayKey = getDayKey();
 
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div style="font-weight:800;">Daily Habits - This Week</div>
-      <button onclick="openHabitManager()" style="padding:6px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer;">
-        ⚙ Manage Habits
-      </button>
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="font-weight:800;">Habits</div>
+      <button onclick="openHabitManager()" style="padding:6px 10px; border-radius:8px;">⚙️ Manage</button>
     </div>
 
-    <table class="habit-table" style="width:100%; border-collapse: collapse;">
+    <table style="width:100%; border-collapse:collapse;">
       <thead>
         <tr>
-          <th style="text-align:left; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">Habit</th>
-          ${weekDates.map((d,i)=>`
-            <th style="text-align:center; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">
-              ${dayNames[i]}<br>${d.getDate()}
-            </th>
-          `).join("")}
+          <th style="text-align:left;">Habit</th>
+          ${days.map(d => {
+            const k = getDayKey(d);
+            return `<th>${d.toLocaleDateString("en-US", { weekday: "short" })}</th>`;
+          }).join("")}
         </tr>
       </thead>
       <tbody>
-        ${habits.map(h=>`
+        ${habitsList.map(h => `
           <tr>
-            <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px; font-weight:600;">
-              ${h.icon} ${escapeHtml(h.name)}
+            <td 
+              onclick="openHabitChart('${h.id}')"
+              style="cursor:pointer; font-weight:700;">
+              ${h.name}
             </td>
-            ${weekDates.map(d=>{
-              const dateStr = getDateString(d);
-              const done = isComplete(h.id,dateStr);
+
+            ${days.map(d => {
+              const k = getDayKey(d);
+              const v = habitData[k]?.[h.id] ?? 0;
+              const isToday = k === todayKey;
+
               return `
-                <td onclick="toggleHabit('${h.id}','${dateStr}')" style="text-align:center; cursor:pointer;">
-                  ${done ? "✅" : "○"}
+                <td onclick="toggleHabit('${h.id}')"
+                    style="
+                      text-align:center;
+                      cursor:pointer;
+                      background:${v >= 100 ? 'rgba(34,197,94,0.3)' : v > 0 ? 'rgba(59,130,246,0.25)' : 'transparent'};
+                      border:${isToday ? '2px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)'};
+                    ">
+                  ${v ? v + "%" : ""}
                 </td>
               `;
             }).join("")}
@@ -165,179 +190,94 @@ function renderHabits() {
       </tbody>
     </table>
   `;
-
-  grid.innerHTML = html;
-  updateStats();
 }
 
-// ---------- STATS ----------
-function updateStats() {
-  const daysAt80El = document.getElementById("daysAt80");
-  const weeklyCompletionEl = document.getElementById("weeklyCompletion");
-  const currentStreakEl = document.getElementById("currentStreak");
-
-  const weekDates = getWeekDates(new Date());
-  const dayPercents = weekDates.map(d => getDayCompletionPercent(getDateString(d)));
-
-  const daysAt80 = dayPercents.filter(p => p >= 0.8).length;
-  const weeklyAvg = dayPercents.reduce((a,b)=>a+b,0)/(dayPercents.length||1);
-  const weeklyPercent = Math.round(weeklyAvg*100);
-  const streak = calculateCurrentStreak();
-
-  if (daysAt80El) daysAt80El.textContent = `${daysAt80}/7`;
-  if (weeklyCompletionEl) weeklyCompletionEl.textContent = `${weeklyPercent}%`;
-  if (currentStreakEl) currentStreakEl.textContent = streak;
-}
-
-function calculateCurrentStreak() {
-  let streak = 0;
-  let cursor = new Date();
-
-  while (true) {
-    const dateStr = getDateString(cursor);
-    const pct = getDayCompletionPercent(dateStr);
-    if (pct >= 0.8) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    } else break;
-  }
-
-  return streak;
-}
-
-// ---------- HABIT MANAGER (ADD / DELETE) ----------
+// ---------- Habit Manager ----------
 function openHabitManager() {
-  openModal(`
+  const html = `
     <h2>Manage Habits</h2>
 
-    <div style="display:flex; gap:8px; margin-bottom:12px;">
-      <input id="newHabitName" placeholder="Habit name" class="form-input" />
-      <input id="newHabitIcon" placeholder="Emoji (optional)" class="form-input" style="width:80px;" />
-      <button class="form-submit" onclick="addHabit()">Add</button>
+    <div style="margin-bottom:12px;">
+      <input id="newHabitName" placeholder="New habit name" style="padding:8px; width:70%;" />
+      <button onclick="addHabit()">Add</button>
     </div>
 
-    <div style="max-height:300px; overflow:auto;">
-      ${habits.map(h => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
-          <div>${h.icon} ${escapeHtml(h.name)}</div>
-          <button onclick="deleteHabit('${h.id}')" style="color:#EF4444; background:none; border:none; cursor:pointer;">Delete</button>
-        </div>
-      `).join("")}
-    </div>
-  `);
+    ${habitsList.map(h => `
+      <div style="display:flex; justify-content:space-between; margin:6px 0;">
+        <div>${h.name} (weight: ${h.weight})</div>
+        <button onclick="deleteHabit('${h.id}')">❌</button>
+      </div>
+    `).join("")}
+  `;
+
+  openModal(html);
 }
 
 function addHabit() {
-  const name = document.getElementById("newHabitName").value.trim();
-  const icon = document.getElementById("newHabitIcon").value.trim() || "✨";
-  if (!name) return alert("Habit name required");
+  const input = document.getElementById("newHabitName");
+  if (!input.value.trim()) return;
 
-  habits.push({
+  habitsList.push({
     id: "h_" + Date.now(),
-    name,
-    icon
+    name: input.value.trim(),
+    weight: 1
   });
 
   saveHabits();
   closeModal();
-  renderHabits();
+  renderHabitGrid();
 }
 
 function deleteHabit(id) {
-  if (!confirm("Delete this habit?")) return;
-  habits = habits.filter(h => h.id !== id);
+  habitsList = habitsList.filter(h => h.id !== id);
+
+  Object.keys(habitData).forEach(day => {
+    delete habitData[day][id];
+  });
+
   saveHabits();
-  closeModal();
-  renderHabits();
+  renderHabitGrid();
+  openHabitManager();
 }
 
-// ---------- HABIT CHART ----------
+// ---------- Habit Chart ----------
 function openHabitChart(habitId) {
-  const habit = habits.find(h => h.id === habitId);
+  const habit = habitsList.find(h => h.id === habitId);
   if (!habit) return;
 
+  const days = getPastDays(30);
+  const labels = days.map(d => d.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+  const values = days.map(d => habitData[getDayKey(d)]?.[habitId] ?? 0);
+
   openModal(`
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="font-weight:800;">${habit.icon} ${escapeHtml(habit.name)}</div>
-      <select id="habitChartRange" style="padding:6px 10px; border-radius:10px; background:rgba(255,255,255,0.08); color:white;">
-        <option value="7">7 days</option>
-        <option value="30">30 days</option>
-        <option value="all">All time</option>
-      </select>
-    </div>
-    <canvas id="habitChartCanvas" height="200" style="margin-top:14px;"></canvas>
+    <h2>${habit.name} — History</h2>
+    <canvas id="habitChartCanvas" height="300"></canvas>
   `);
 
-  document.getElementById("habitChartRange").onchange = () => renderHabitChart(habitId);
-  renderHabitChart(habitId);
-}
-
-let habitChartInstance = null;
-
-function renderHabitChart(habitId) {
-  const canvas = document.getElementById("habitChartCanvas");
-  if (!canvas || typeof Chart === "undefined") return;
-
-  const range = document.getElementById("habitChartRange").value;
-  let days = [];
-
-  if (range === "all") {
-    days = Object.keys(habitCompletions).sort();
-  } else {
-    days = getLastDays(parseInt(range));
-  }
-
-  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-  const data = days.map(d => isComplete(habitId, d) ? 100 : 0);
-
-  if (habitChartInstance) habitChartInstance.destroy();
-
-  habitChartInstance = new Chart(canvas, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: "Completion %",
-        data,
-        tension: 0.3,
-        borderWidth: 3
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: { min: 0, max: 100 }
+  setTimeout(() => {
+    const ctx = document.getElementById("habitChartCanvas").getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Completion %",
+          data: values,
+          tension: 0.35,
+          borderWidth: 3
+        }]
+      },
+      options: {
+        scales: {
+          y: { min: 0, max: 100 }
+        }
       }
-    }
-  });
+    });
+  }, 0);
 }
 
-// ---------- HELPERS ----------
-function escapeHtml(str) {
-  return String(str||"")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;");
-}
-
-// ---------- BOOT ----------
+// ---------- Boot ----------
 (function bootHabits() {
-  try {
-    initHabitsData();
-    renderHabits();
-  } catch (e) {
-    console.error("Habits failed:", e);
-  }
+  loadHabits();
+  renderHabitGrid();
 })();
-
-// ---------- CORE REGISTRATION ----------
-if (window.App) {
-  App.features.habits = {
-    init: initHabitsData,
-    render: renderHabits
-  };
-
-  App.on("dashboard", () => renderHabits());
-}
-
-console.log("Habits system upgraded");
