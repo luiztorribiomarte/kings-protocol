@@ -13,8 +13,8 @@
 
   // 🔥 ADD YOUR YOUTUBE INFO HERE (later)
   const YOUTUBE_CONFIG = {
-    apiKey: "",        // <-- paste API key here later
-    channelId: ""      // <-- paste channel ID here later
+    apiKey: "AIzaSyB0DZGhMJ_X1P_nzczN4e-hc1xB5hOc7rw",        // <-- paste API key here later
+    channelId: "UCKUFonoh8azQwjXnh2ViqHQ"      // <-- paste channel ID here later
   };
 
   const STAGES = [
