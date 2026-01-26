@@ -1,4 +1,8 @@
 // ===============================
+// KP APP CORE (UPGRADED)
+// ===============================
+
+// ===============================
 // PAGE NAVIGATION
 // ===============================
 function showPage(page) {
@@ -30,22 +34,34 @@ function showPage(page) {
     renderLifeScore();
     renderWeeklyGraph();
     renderDNAProfile();
+
+    App.emit("dashboard");
+  }
+
+  if (page === "goalsHabits") {
+    if (typeof renderGoals === "function") renderGoals();
+    App.emit("goals");
   }
 
   if (page === "journal") {
-    renderJournal();
+    if (typeof renderJournal === "function") renderJournal();
+    App.emit("journal");
+  }
+
+  if (page === "workout") {
+    App.emit("workout");
   }
 }
 
 // ===============================
-// 🪟 GLOBAL MODAL SYSTEM (FIX)
+// GLOBAL MODAL SYSTEM
 // ===============================
 function openModal(html) {
   const modal = document.getElementById("modal");
   const modalBody = document.getElementById("modalBody");
 
   if (!modal || !modalBody) {
-    alert("Modal system not found. Make sure modal exists in HTML.");
+    alert("Modal system not found.");
     return;
   }
 
@@ -56,87 +72,6 @@ function openModal(html) {
 function closeModal() {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "none";
-}
-
-// ===============================
-// 📊 MOOD + PERFORMANCE CHART (7 / 30 / ALL TIME)
-// ===============================
-let moodChartInstance = null;
-
-function openMoodChart() {
-  openModal(`
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-      <div>
-        <div style="color:white; font-size:1.2em; font-weight:700;">Mood & Performance</div>
-        <div style="color:#9CA3AF; font-size:0.9em;">Energy vs Habits vs Tasks</div>
-      </div>
-      <select id="moodChartRange" style="padding:10px; border-radius:10px; background:rgba(255,255,255,0.08); color:white;">
-        <option value="7">Last 7 Days</option>
-        <option value="30">Last 30 Days</option>
-        <option value="all">All Time</option>
-      </select>
-    </div>
-
-    <div style="margin-top:16px;">
-      <canvas id="moodChartCanvas" height="140"></canvas>
-    </div>
-  `);
-
-  document.getElementById("moodChartRange").addEventListener("change", renderMoodChart);
-  renderMoodChart();
-}
-
-function renderMoodChart() {
-  const canvas = document.getElementById("moodChartCanvas");
-  if (!canvas || typeof Chart === "undefined") return;
-
-  const range = document.getElementById("moodChartRange").value;
-  let days = [];
-
-  if (range === "all") {
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    days = Object.keys(moodData).sort();
-  } else {
-    days = getLastNDays(parseInt(range));
-  }
-
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-
-  const labels = days.map(d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-
-  const energy = days.map(d => (moodData[d]?.energy || 0) * 10);
-  const habits = days.map(getHabitPercentForDay);
-
-  const tasks = days.map(() => {
-    const total = todos.length;
-    const done = todos.filter(t => t.done).length;
-    return total === 0 ? 0 : Math.round((done / total) * 100);
-  });
-
-  if (moodChartInstance) {
-    moodChartInstance.destroy();
-    moodChartInstance = null;
-  }
-
-  moodChartInstance = new Chart(canvas, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Energy", data: energy, tension: 0.3 },
-        { label: "Habits %", data: habits, tension: 0.3 },
-        { label: "Tasks %", data: tasks, tension: 0.3 }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: "#E5E7EB" } } },
-      scales: {
-        x: { ticks: { color: "#9CA3AF" } },
-        y: { min: 0, max: 100, ticks: { color: "#9CA3AF" } }
-      }
-    }
-  });
 }
 
 // ===============================
@@ -160,7 +95,8 @@ updateTime();
 // ===============================
 // TODO SYSTEM
 // ===============================
-let todos = JSON.parse(localStorage.getItem("todos")) || [];
+App.state.todos = JSON.parse(localStorage.getItem("todos")) || [];
+const todos = App.state.todos;
 
 function saveTodos() {
   localStorage.setItem("todos", JSON.stringify(todos));
@@ -223,22 +159,19 @@ function renderTodos() {
 }
 
 // ===============================
-// LIFE SCORE ENGINE (UNCHANGED)
-// ===============================
-/* ⬇️ I DID NOT TOUCH YOUR LIFE SCORE / WEEKLY GRAPH / DNA CODE ⬇️ */
-// (your existing code stays exactly the same)
-
-// ===============================
-// BOOT
+// BOOT SYSTEM (SINGLE AUTHORITY)
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
   showPage("dashboard");
 
   if (typeof initHabitsData === "function") initHabitsData();
   if (typeof initMoodData === "function") initMoodData();
+  if (typeof initGoalsData === "function") initGoalsData();
 
   renderTodos();
   renderLifeScore();
   renderWeeklyGraph();
   renderDNAProfile();
+
+  App.emit("ready");
 });
