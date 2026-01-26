@@ -1,115 +1,177 @@
 // ============================================
-// LIFE ENGINE — SAFE RESTORE (NO FEATURES REMOVED)
-// Uses habits + mood + todos without breaking anything
+// LIFE ENGINE 2.0 — CLEAN + POWERFUL + SAFE
+// Uses habits + mood + tasks + streak
+// Does NOT remove any existing features
 // ============================================
 
 // ---------- Helpers ----------
-function safeNumber(n) {
+function safeNum(n) {
   return typeof n === "number" && !isNaN(n) ? n : 0;
 }
 
-function getTodayKey() {
+function todayKey() {
   return new Date().toISOString().split("T")[0];
 }
 
+function getLastDays(n) {
+  const days = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split("T")[0]);
+  }
+  return days;
+}
+
+// ---------- CORE METRICS ----------
+function getHabitPercent(dateKey = todayKey()) {
+  try {
+    if (typeof getDayCompletion === "function") {
+      return safeNum(getDayCompletion(dateKey).percent);
+    }
+  } catch {}
+  return 0;
+}
+
+function getEnergyScore(dateKey = todayKey()) {
+  try {
+    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+    const energy = moodData[dateKey]?.energy || 0;
+    return Math.round((energy / 10) * 100); // normalize to %
+  } catch {}
+  return 0;
+}
+
+function getTaskPercent() {
+  try {
+    const todos = JSON.parse(localStorage.getItem("todos") || "[]");
+    if (!todos.length) return 0;
+    const done = todos.filter(t => t.done).length;
+    return Math.round((done / todos.length) * 100);
+  } catch {}
+  return 0;
+}
+
+function getStreakBonus() {
+  let streak = 0;
+  const days = getLastDays(30);
+
+  for (const d of days) {
+    const pct = getHabitPercent(d);
+    if (pct >= 80) streak++;
+    else break;
+  }
+
+  // bonus capped at +15 points
+  return Math.min(streak * 2, 15);
+}
+
 // ---------- LIFE SCORE ----------
+function calculateLifeScore() {
+  const habitPct = getHabitPercent();
+  const energyPct = getEnergyScore();
+  const taskPct = getTaskPercent();
+  const streakBonus = getStreakBonus();
+
+  // weights (balanced system)
+  const score =
+    habitPct * 0.5 +     // habits = 50%
+    energyPct * 0.25 +   // energy = 25%
+    taskPct * 0.25 +     // tasks = 25%
+    streakBonus;         // streak bonus
+
+  return {
+    score: Math.min(100, Math.round(score)),
+    breakdown: {
+      habits: habitPct,
+      energy: energyPct,
+      tasks: taskPct,
+      streakBonus
+    }
+  };
+}
+
+// ---------- UI: LIFE SCORE PANEL ----------
 function renderLifeScore() {
   const el = document.getElementById("dailyStatus");
   if (!el) return;
 
-  let habitPercent = 0;
-  let moodScore = 0;
-  let taskPercent = 0;
+  const data = calculateLifeScore();
+  const score = data.score;
 
-  // HABITS
-  try {
-    if (typeof getDayCompletion === "function") {
-      const data = getDayCompletion(getTodayKey());
-      habitPercent = safeNumber(data.percent);
-    }
-  } catch {}
+  let label = "Slipping";
+  let color = "#EF4444";
 
-  // MOOD / ENERGY
-  try {
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const today = moodData[getTodayKey()];
-    if (today && today.energy) {
-      moodScore = safeNumber(today.energy) * 10; // convert 1–10 → %
-    }
-  } catch {}
-
-  // TASKS (TODOS)
-  try {
-    const todos = JSON.parse(localStorage.getItem("todos") || "[]");
-    if (todos.length > 0) {
-      const done = todos.filter(t => t.done).length;
-      taskPercent = Math.round((done / todos.length) * 100);
-    }
-  } catch {}
-
-  // FINAL LIFE SCORE (balanced)
-  const lifeScore = Math.round(
-    habitPercent * 0.5 +
-    moodScore * 0.3 +
-    taskPercent * 0.2
-  );
-
-  let label = "⚠️ Low Day";
-  if (lifeScore >= 80) label = "🔥 Elite Day";
-  else if (lifeScore >= 60) label = "💪 Strong Day";
-  else if (lifeScore >= 40) label = "🙂 Average Day";
+  if (score >= 80) {
+    label = "Dominating";
+    color = "#22C55E";
+  } else if (score >= 60) {
+    label = "Solid";
+    color = "#A78BFA";
+  } else if (score >= 40) {
+    label = "Recovering";
+    color = "#F59E0B";
+  }
 
   el.innerHTML = `
-    <div style="margin-top:10px; font-weight:700;">
-      Life Score: <span style="color:#A78BFA;">${lifeScore}%</span> — ${label}
+    <div style="margin-top:14px; padding:14px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-weight:800;">Life Score</div>
+        <div style="font-weight:900; color:${color};">${score}%</div>
+      </div>
+
+      <div style="margin-top:6px; font-size:0.9rem; color:${color}; font-weight:700;">
+        Status: ${label}
+      </div>
+
+      <div style="margin-top:10px; font-size:0.85rem; color:#9CA3AF; line-height:1.5;">
+        Habits: ${data.breakdown.habits}%<br>
+        Energy: ${data.breakdown.energy}%<br>
+        Tasks: ${data.breakdown.tasks}%<br>
+        Streak Bonus: +${data.breakdown.streakBonus}
+      </div>
     </div>
   `;
 }
 
-// ---------- WEEKLY GRAPH (SIMPLE VERSION) ----------
+// ---------- WEEKLY PERFORMANCE ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
 
-  let total = 0;
-  let count = 0;
+  const days = getLastDays(7).reverse();
 
-  if (typeof getDayCompletion === "function") {
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      const data = getDayCompletion(key);
-      total += safeNumber(data.percent);
-      count++;
-    }
-  }
+  const habitAvg = Math.round(days.reduce((a,d)=>a+getHabitPercent(d),0)/7);
+  const energyAvg = Math.round(days.reduce((a,d)=>a+getEnergyScore(d),0)/7);
+  const taskAvg = getTaskPercent();
 
-  const avg = count ? Math.round(total / count) : 0;
-  el.textContent = avg + "%";
+  const overall = Math.round((habitAvg + energyAvg + taskAvg) / 3);
+
+  el.textContent = overall + "%";
 }
 
-// ---------- DNA PROFILE ----------
+// ---------- PRODUCTIVITY DNA ----------
 function renderDNAProfile() {
   const el = document.getElementById("currentStreak");
-  if (!el || typeof getDayCompletion !== "function") return;
+  if (!el) return;
 
-  let streak = 0;
+  const days = getLastDays(14);
 
-  for (let i = 0; i < 30; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split("T")[0];
-    const data = getDayCompletion(key);
+  const habitVals = days.map(d => getHabitPercent(d));
+  const avgHabit = Math.round(habitVals.reduce((a,b)=>a+b,0)/14);
 
-    if (data.percent >= 80) streak++;
-    else break;
-  }
+  const variance = Math.round(
+    habitVals.reduce((a,b)=>a+Math.abs(b-avgHabit),0)/14
+  );
 
-  el.textContent = streak;
+  const discipline = Math.min(100, avgHabit + getStreakBonus());
+  const consistency = Math.max(0, 100 - variance);
+  const execution = Math.round((avgHabit + getTaskPercent()) / 2);
+
+  el.textContent = Math.round((discipline + consistency + execution) / 3);
 }
 
-// ---------- REGISTER WITH CORE ----------
+// ---------- CORE REGISTRATION ----------
 if (window.App) {
   App.features.lifeEngine = {
     renderLifeScore,
@@ -124,4 +186,4 @@ if (window.App) {
   });
 }
 
-console.log("Life Engine loaded");
+console.log("Life Engine 2.0 loaded");
