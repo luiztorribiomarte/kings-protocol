@@ -90,6 +90,19 @@
         </div>
 
         <div id="dailyStatus">Checking today’s status…</div>
+<div class="habit-section">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div class="section-title">📈 Performance Trend</div>
+
+    <select id="trendRange" class="form-input" style="width:auto; padding:6px 10px;">
+      <option value="7">7 Days</option>
+      <option value="30">30 Days</option>
+      <option value="all">All Time</option>
+    </select>
+  </div>
+
+  <canvas id="trendChart" height="140"></canvas>
+</div>
 
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
