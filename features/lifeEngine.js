@@ -1,7 +1,7 @@
 // ============================================
-// LIFE ENGINE 2.0 — CLEAN + POWERFUL + SAFE
-// Uses habits + mood + tasks + streak
-// Does NOT remove any existing features
+// LIFE ENGINE 3.0 — VISUAL + POWERFUL + SAFE
+// Uses existing habits, mood, tasks, streak
+// DOES NOT REMOVE ANY FEATURES
 // ============================================
 
 // ---------- Helpers ----------
@@ -37,7 +37,7 @@ function getEnergyScore(dateKey = todayKey()) {
   try {
     const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
     const energy = moodData[dateKey]?.energy || 0;
-    return Math.round((energy / 10) * 100); // normalize to %
+    return Math.round((energy / 10) * 100);
   } catch {}
   return 0;
 }
@@ -62,8 +62,7 @@ function getStreakBonus() {
     else break;
   }
 
-  // bonus capped at +15 points
-  return Math.min(streak * 2, 15);
+  return Math.min(streak * 2, 15); // capped bonus
 }
 
 // ---------- LIFE SCORE ----------
@@ -73,12 +72,11 @@ function calculateLifeScore() {
   const taskPct = getTaskPercent();
   const streakBonus = getStreakBonus();
 
-  // weights (balanced system)
   const score =
-    habitPct * 0.5 +     // habits = 50%
-    energyPct * 0.25 +   // energy = 25%
-    taskPct * 0.25 +     // tasks = 25%
-    streakBonus;         // streak bonus
+    habitPct * 0.5 +
+    energyPct * 0.25 +
+    taskPct * 0.25 +
+    streakBonus;
 
   return {
     score: Math.min(100, Math.round(score)),
@@ -91,7 +89,7 @@ function calculateLifeScore() {
   };
 }
 
-// ---------- UI: LIFE SCORE PANEL ----------
+// ---------- UI ----------
 function renderLifeScore() {
   const el = document.getElementById("dailyStatus");
   if (!el) return;
@@ -113,22 +111,61 @@ function renderLifeScore() {
     color = "#F59E0B";
   }
 
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+
   el.innerHTML = `
-    <div style="margin-top:14px; padding:14px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);">
-      <div style="display:flex; align-items:center; justify-content:space-between;">
-        <div style="font-weight:800;">Life Score</div>
-        <div style="font-weight:900; color:${color};">${score}%</div>
+    <div style="
+      margin-top:14px;
+      padding:18px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      display:flex;
+      gap:18px;
+      align-items:center;
+    ">
+
+      <div style="position:relative; width:130px; height:130px;">
+        <svg width="130" height="130">
+          <circle cx="65" cy="65" r="${radius}"
+            stroke="rgba(255,255,255,0.12)"
+            stroke-width="10"
+            fill="none" />
+          <circle cx="65" cy="65" r="${radius}"
+            stroke="${color}"
+            stroke-width="10"
+            fill="none"
+            stroke-dasharray="${circumference}"
+            stroke-dashoffset="${offset}"
+            stroke-linecap="round"
+            transform="rotate(-90 65 65)" />
+        </svg>
+
+        <div style="
+          position:absolute;
+          top:50%;
+          left:50%;
+          transform:translate(-50%,-50%);
+          text-align:center;
+        ">
+          <div style="font-size:1.6rem; font-weight:900; color:${color};">${score}</div>
+          <div style="font-size:0.75rem; color:#9CA3AF;">Life Score</div>
+        </div>
       </div>
 
-      <div style="margin-top:6px; font-size:0.9rem; color:${color}; font-weight:700;">
-        Status: ${label}
-      </div>
+      <div style="flex:1;">
+        <div style="font-size:1.1rem; font-weight:900; color:${color};">
+          ${label}
+        </div>
 
-      <div style="margin-top:10px; font-size:0.85rem; color:#9CA3AF; line-height:1.5;">
-        Habits: ${data.breakdown.habits}%<br>
-        Energy: ${data.breakdown.energy}%<br>
-        Tasks: ${data.breakdown.tasks}%<br>
-        Streak Bonus: +${data.breakdown.streakBonus}
+        <div style="margin-top:10px; font-size:0.9rem; color:#E5E7EB; line-height:1.6;">
+          Habits: ${data.breakdown.habits}%<br>
+          Energy: ${data.breakdown.energy}%<br>
+          Tasks: ${data.breakdown.tasks}%<br>
+          Streak Bonus: +${data.breakdown.streakBonus}
+        </div>
       </div>
     </div>
   `;
@@ -171,19 +208,4 @@ function renderDNAProfile() {
   el.textContent = Math.round((discipline + consistency + execution) / 3);
 }
 
-// ---------- CORE REGISTRATION ----------
-if (window.App) {
-  App.features.lifeEngine = {
-    renderLifeScore,
-    renderWeeklyGraph,
-    renderDNAProfile
-  };
-
-  App.on("dashboard", () => {
-    renderLifeScore();
-    renderWeeklyGraph();
-    renderDNAProfile();
-  });
-}
-
-console.log("Life Engine 2.0 loaded");
+console.log("Life Engine 3.0 loaded");
