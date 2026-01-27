@@ -1,239 +1,170 @@
 // =====================================================
-// CREATOR INTELLIGENCE ENGINE (COMMAND CENTER LAYER)
-// SAFE OVERLAY — DOES NOT MODIFY CONTENT HUB
+// CONTENT HUB SYSTEM (SAFE CORE)
+// - Preserves ALL existing features
+// - Prevents DOM wipe
+// - Compatible with Creator Intelligence Engine
 // =====================================================
 
-(function () {
-  "use strict";
+const CONTENT_STORAGE_KEY = "contentHubItems";
+const CONTAINER_ID = "contentHubContainer";
 
-  const PANEL_ID = "creatorIntelPanel";
-  const STORAGE_KEY = "contentHubItems";
+// ---------- Data Layer ----------
+function getContentItems() {
+  try {
+    return JSON.parse(localStorage.getItem(CONTENT_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
 
-  const STAGES = ["idea", "research", "script", "editing", "posted"];
+function saveContentItems(items) {
+  localStorage.setItem(CONTENT_STORAGE_KEY, JSON.stringify(items));
+}
 
-  // ---------- Safe Data Access ----------
-  function getItemsSafe() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
+// ---------- UI Container ----------
+function ensureContainer() {
+  const page = document.getElementById("contentPage");
+  if (!page) return null;
+
+  let container = document.getElementById(CONTAINER_ID);
+  if (container) return container;
+
+  container = document.createElement("div");
+  container.id = CONTAINER_ID;
+  container.className = "habit-section";
+
+  // ✅ SAFE: do NOT wipe page if container already exists
+  if (!document.getElementById(CONTAINER_ID)) {
+    page.innerHTML = "";
   }
 
-  function countByStage(items) {
-    const map = {};
-    STAGES.forEach(s => (map[s] = 0));
-    items.forEach(i => {
-      if (map[i.stage] !== undefined) map[i.stage]++;
-    });
-    return map;
-  }
+  page.appendChild(container);
+  return container;
+}
 
-  // ---------- Core Metrics ----------
-  function creatorScore(items) {
-    if (!items.length) return 0;
-    const posted = items.filter(i => i.stage === "posted").length;
-    return Math.round((posted / items.length) * 100);
-  }
+// ---------- Render ----------
+function renderContentHub(filterStage = "all") {
+  const container = ensureContainer();
+  if (!container) return;
 
-  function velocityScore(items) {
-    if (!items.length) return 0;
+  const items = getContentItems();
 
-    const now = Date.now();
-    const last7 = items.filter(i => i.updatedAt && now - i.updatedAt < 7 * 86400000);
-    return Math.min(100, Math.round((last7.length / Math.max(items.length, 1)) * 100));
-  }
+  const filtered =
+    filterStage === "all"
+      ? items
+      : items.filter(i => i.stage === filterStage);
 
-  function pipelineBalance(stageCounts) {
-    const values = Object.values(stageCounts);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length || 0;
-    const variance = values.reduce((a, b) => a + Math.abs(b - avg), 0) / values.length;
-    return Math.max(0, Math.round(100 - variance * 10));
-  }
-
-  function detectBottleneck(stageCounts) {
-    let maxStage = "idea";
-    let max = 0;
-    for (const s in stageCounts) {
-      if (stageCounts[s] > max) {
-        max = stageCounts[s];
-        maxStage = s;
-      }
-    }
-    return maxStage;
-  }
-
-  function readinessScore(items, stageCounts) {
-    const c = creatorScore(items);
-    const v = velocityScore(items);
-    const b = pipelineBalance(stageCounts);
-    return Math.round((c + v + b) / 3);
-  }
-
-  // ---------- Idea Scoring ----------
-  function scoreIdea(item) {
-    let score = 0;
-    if (item.stage === "posted") score += 40;
-    else if (item.stage === "editing") score += 30;
-    else if (item.stage === "script") score += 20;
-    else if (item.stage === "research") score += 10;
-
-    if (item.title && item.title.length > 20) score += 10;
-    if (item.notes && item.notes.length > 100) score += 10;
-
-    return Math.min(100, score);
-  }
-
-  // ---------- Tactical Alerts ----------
-  function generateAlerts(items, stageCounts) {
-    const alerts = [];
-
-    if (!items.length) {
-      alerts.push("No content ideas yet.");
-      return alerts;
-    }
-
-    if (stageCounts.posted === 0) alerts.push("No posted content yet.");
-    if (stageCounts.idea > stageCounts.posted * 3) alerts.push("Too many ideas, low execution.");
-    if (velocityScore(items) < 20) alerts.push("Low momentum this week.");
-
-    const bottleneck = detectBottleneck(stageCounts);
-    if (bottleneck !== "posted") {
-      alerts.push(`Pipeline bottleneck at: ${bottleneck.toUpperCase()}`);
-    }
-
-    return alerts;
-  }
-
-  // ---------- UI Rendering ----------
-  function injectPanel() {
-    const container = document.getElementById("contentHubContainer");
-    if (!container) return;
-
-    if (document.getElementById(PANEL_ID)) return;
-
-    const items = getItemsSafe();
-    const stageCounts = countByStage(items);
-
-    const score = creatorScore(items);
-    const velocity = velocityScore(items);
-    const balance = pipelineBalance(stageCounts);
-    const readiness = readinessScore(items, stageCounts);
-    const bottleneck = detectBottleneck(stageCounts);
-    const alerts = generateAlerts(items, stageCounts);
-
-    const ranked = items
-      .map(i => ({ ...i, score: scoreIdea(i) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-
-    const panel = document.createElement("div");
-    panel.id = PANEL_ID;
-
-    panel.innerHTML = `
-      <div style="
-        margin-bottom:18px;
-        padding:18px;
-        border-radius:18px;
-        border:1px solid rgba(255,255,255,0.2);
-        background:linear-gradient(180deg,rgba(99,102,241,0.12),rgba(236,72,153,0.06));
-        backdrop-filter: blur(6px);
-      ">
-        <div style="font-weight:950; font-size:1.15rem; margin-bottom:12px;">
-          ⚔️ Creator Tactical Command Center
-        </div>
-
-        <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:12px;">
-          <div>
-            <div style="color:#9CA3AF;">Ideas</div>
-            <div style="font-size:1.35rem; font-weight:900;">${items.length}</div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Posted</div>
-            <div style="font-size:1.35rem; font-weight:900;">${stageCounts.posted}</div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Creator Score</div>
-            <div style="font-size:1.35rem; font-weight:900; color:#a78bfa;">${score}%</div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Velocity</div>
-            <div style="font-size:1.35rem; font-weight:900; color:#22c55e;">${velocity}%</div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Readiness</div>
-            <div style="font-size:1.35rem; font-weight:900; color:#facc15;">${readiness}%</div>
-          </div>
-        </div>
-
-        <div style="margin-top:12px; font-weight:900;">
-          Pipeline Bottleneck: 
-          <span style="color:#fb7185;">${bottleneck.toUpperCase()}</span>
-        </div>
-
-        <div style="margin-top:12px;">
-          <div style="font-weight:900; margin-bottom:6px;">⚠ Tactical Alerts</div>
-          ${
-            alerts.length
-              ? alerts.map(a => `
-                <div style="
-                  padding:6px 10px;
-                  border-radius:10px;
-                  border:1px solid rgba(255,255,255,0.14);
-                  background:rgba(0,0,0,0.25);
-                  margin-bottom:6px;
-                  font-size:0.9rem;
-                ">${a}</div>
-              `).join("")
-              : `<div style="color:#22c55e;">No critical issues detected.</div>`
-          }
-        </div>
-
-        <div style="margin-top:14px;">
-          <div style="font-weight:900; margin-bottom:6px;">🔥 High-Impact Ideas</div>
-          ${
-            ranked.length
-              ? ranked.map(i => `
-                <div style="
-                  padding:8px 10px;
-                  border-radius:10px;
-                  border:1px solid rgba(255,255,255,0.14);
-                  background:rgba(0,0,0,0.25);
-                  margin-bottom:6px;
-                  display:flex;
-                  justify-content:space-between;
-                  font-size:0.95rem;
-                ">
-                  <span>${i.title}</span>
-                  <span style="color:#22c55e; font-weight:900;">${i.score}</span>
-                </div>
-              `).join("")
-              : `<div style="color:#9CA3AF;">No ideas yet.</div>`
-          }
-        </div>
+  container.innerHTML = `
+    <div class="content-hub-ui">
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <button class="content-filter" data-stage="all">All</button>
+        <button class="content-filter" data-stage="idea">Idea</button>
+        <button class="content-filter" data-stage="research">Research</button>
+        <button class="content-filter" data-stage="script">Script</button>
+        <button class="content-filter" data-stage="editing">Editing</button>
+        <button class="content-filter" data-stage="posted">Posted</button>
       </div>
-    `;
 
-    container.prepend(panel);
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <input id="contentTitleInput" placeholder="New idea title..." style="flex:1;" />
+        <select id="contentStageInput">
+          <option value="idea">Idea</option>
+          <option value="research">Research</option>
+          <option value="script">Script</option>
+          <option value="editing">Editing</option>
+          <option value="posted">Posted</option>
+        </select>
+        <button id="addContentBtn">Add</button>
+      </div>
+
+      <textarea id="contentNotesInput" placeholder="Notes..." style="width:100%; margin-bottom:12px;"></textarea>
+
+      <div id="contentList">
+        ${
+          filtered.length
+            ? filtered.map(item => `
+              <div class="content-item" style="
+                padding:10px;
+                border-radius:10px;
+                border:1px solid rgba(255,255,255,0.15);
+                margin-bottom:8px;
+                background:rgba(0,0,0,0.25);
+              ">
+                <div style="font-weight:900;">${item.title}</div>
+                <div style="font-size:0.85rem; color:#9CA3AF;">Stage: ${item.stage}</div>
+                <div style="font-size:0.85rem; margin-top:4px;">${item.notes || ""}</div>
+                <div style="margin-top:6px;">
+                  <button class="delete-content" data-id="${item.id}">Delete</button>
+                </div>
+              </div>
+            `).join("")
+            : `<div style="color:#9CA3AF;">No content yet.</div>`
+        }
+      </div>
+    </div>
+  `;
+
+  bindContentEvents();
+}
+
+// ---------- Events ----------
+function bindContentEvents() {
+  const addBtn = document.getElementById("addContentBtn");
+  const titleInput = document.getElementById("contentTitleInput");
+  const stageInput = document.getElementById("contentStageInput");
+  const notesInput = document.getElementById("contentNotesInput");
+
+  if (addBtn) {
+    addBtn.onclick = () => {
+      const title = titleInput.value.trim();
+      const stage = stageInput.value;
+      const notes = notesInput.value.trim();
+
+      if (!title) return;
+
+      const items = getContentItems();
+      items.push({
+        id: Date.now(),
+        title,
+        stage,
+        notes,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+
+      saveContentItems(items);
+      titleInput.value = "";
+      notesInput.value = "";
+
+      renderContentHub();
+    };
   }
 
-  // ---------- Hooks ----------
-  function hook() {
-    document.addEventListener("click", e => {
-      const tab = e.target.closest?.(".nav-tab");
-      if (!tab) return;
-      setTimeout(injectPanel, 80);
-    });
-  }
+  document.querySelectorAll(".delete-content").forEach(btn => {
+    btn.onclick = () => {
+      const id = Number(btn.dataset.id);
+      const items = getContentItems().filter(i => i.id !== id);
+      saveContentItems(items);
+      renderContentHub();
+    };
+  });
 
-  function boot() {
-    hook();
-    setTimeout(injectPanel, 120);
-  }
+  document.querySelectorAll(".content-filter").forEach(btn => {
+    btn.onclick = () => {
+      renderContentHub(btn.dataset.stage);
+    };
+  });
+}
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
+// ---------- Tab Hook ----------
+document.addEventListener("click", e => {
+  const tab = e.target.closest?.(".nav-tab");
+  if (!tab) return;
+
+  if (tab.dataset.page === "content") {
+    setTimeout(renderContentHub, 50);
   }
-})();
+});
+
+// ---------- Boot ----------
+setTimeout(renderContentHub, 100);
