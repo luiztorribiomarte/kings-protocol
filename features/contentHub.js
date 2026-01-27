@@ -1,27 +1,15 @@
 // =====================================================
-// CONTENT HUB CORE + CREATOR COMMAND CENTER + API VAULT
-// + YOUTUBE LIVE STATS DASHBOARD (UPGRADE)
+// CONTENT HUB CORE (SIMPLIFIED CREATOR SYSTEM)
+// Ideas → Posted
+// - Add, Edit, Post, Delete ideas
+// - Compatible with existing upgrades & overlays
+// - Uses same localStorage key: contentHubItems
 // =====================================================
 
 (function () {
   "use strict";
 
-  // ===============================
-  // CONFIG + STORAGE
-  // ===============================
   const STORAGE_KEY = "contentHubItems";
-  const YT_KEY_STORAGE = "kp_youtube_api_key";
-  const YT_CHANNEL_STORAGE = "kp_youtube_channel_id";
-
-  const PANEL_ID = "creatorCommandCenter";
-  const VAULT_ID = "creatorApiVaultPanel";
-  const YT_PANEL_ID = "youtubeStatsPanel";
-
-  const STAGES = ["idea", "research", "script", "editing", "posted"];
-
-  function getContainer() {
-    return document.getElementById("contentContainer");
-  }
 
   function loadItems() {
     try {
@@ -35,338 +23,238 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }
 
+  function uuid() {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+
+  function getContainer() {
+    return document.getElementById("contentContainer");
+  }
+
   // ===============================
-  // API VAULT
+  // RENDER UI
   // ===============================
-  function getYouTubeKey() {
-    return (localStorage.getItem(YT_KEY_STORAGE) || "").trim();
+  function renderContentHub() {
+    const container = getContainer();
+    if (!container) return;
+
+    const items = loadItems();
+
+    const ideas = items.filter(i => i.stage !== "posted");
+    const posted = items.filter(i => i.stage === "posted");
+
+    container.innerHTML = `
+      <div id="contentHubContainer">
+
+        <div class="habit-section">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="section-title">💡 Ideas</div>
+            <button class="form-submit" id="addIdeaBtn">Add Idea</button>
+          </div>
+
+          <div id="ideasList" class="ideas-list">
+            ${
+              ideas.length
+                ? ideas.map(renderIdeaCard).join("")
+                : `<div style="color:#9CA3AF;">No ideas yet.</div>`
+            }
+          </div>
+        </div>
+
+        <div class="habit-section">
+          <div class="section-title">✅ Posted</div>
+
+          <div id="postedList" class="ideas-list">
+            ${
+              posted.length
+                ? posted.map(renderIdeaCard).join("")
+                : `<div style="color:#9CA3AF;">No posted content yet.</div>`
+            }
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    document.getElementById("addIdeaBtn").onclick = openAddIdeaModal;
   }
 
-  function setYouTubeKey(key) {
-    localStorage.setItem(YT_KEY_STORAGE, (key || "").trim());
+  function renderIdeaCard(item) {
+    const stageLabel = item.stage === "posted" ? "POSTED" : "IDEA";
+
+    return `
+      <div class="idea-item" data-id="${item.id}">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div>
+            <div style="font-weight:800;">${escapeHtml(item.title)}</div>
+            <div style="color:#9CA3AF; font-size:0.85rem;">${stageLabel}</div>
+          </div>
+
+          <div style="display:flex; gap:6px;">
+            ${
+              item.stage !== "posted"
+                ? `<button class="form-submit" data-action="post">Post</button>`
+                : ""
+            }
+            <button class="form-cancel" data-action="edit">Edit</button>
+            <button class="form-cancel" data-action="delete" style="color:#ef4444;">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
-  function clearYouTubeKey() {
-    localStorage.removeItem(YT_KEY_STORAGE);
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  function getChannelId() {
-    return (localStorage.getItem(YT_CHANNEL_STORAGE) || "").trim();
-  }
-
-  function setChannelId(id) {
-    localStorage.setItem(YT_CHANNEL_STORAGE, (id || "").trim());
-  }
-
-  function clearChannelId() {
-    localStorage.removeItem(YT_CHANNEL_STORAGE);
-  }
-
-  function openVaultModal() {
-    const html = `
-      <div class="section-title">🔐 YouTube Connection</div>
+  // ===============================
+  // MODALS
+  // ===============================
+  function openAddIdeaModal() {
+    openModal(`
+      <div class="section-title">Add Idea</div>
 
       <div class="form-group">
-        <label>YouTube API Key</label>
-        <input id="kpYouTubeKeyInput" class="form-input" placeholder="Paste API key..." />
+        <label>Title</label>
+        <input id="ideaTitleInput" class="form-input" placeholder="Idea title..." />
       </div>
 
       <div class="form-group">
-        <label>YouTube Channel ID</label>
-        <input id="kpChannelIdInput" class="form-input" placeholder="Paste Channel ID..." />
-        <div style="color:#9CA3AF; font-size:0.85rem; margin-top:6px;">
-          Example: UCxxxxxxxxxxxxxxxxxxxx
-        </div>
+        <label>Notes (optional)</label>
+        <textarea id="ideaNotesInput" class="form-input" rows="4"></textarea>
       </div>
 
       <div class="form-actions">
-        <button class="form-submit" onclick="window.__kpSaveYT()">Save</button>
+        <button class="form-submit" id="saveIdeaBtn">Save</button>
         <button class="form-cancel" onclick="closeModal()">Cancel</button>
       </div>
-    `;
+    `);
 
-    window.__kpSaveYT = function () {
-      const key = document.getElementById("kpYouTubeKeyInput").value.trim();
-      const id = document.getElementById("kpChannelIdInput").value.trim();
-
-      if (key) setYouTubeKey(key);
-      if (id) setChannelId(id);
-
-      closeModal();
-      renderContentHub();
-    };
-
-    openModal(html);
+    document.getElementById("saveIdeaBtn").onclick = saveNewIdea;
   }
 
-  function renderApiVault(container) {
-    const existing = document.getElementById(VAULT_ID);
-    if (existing) existing.remove();
+  function openEditIdeaModal(item) {
+    openModal(`
+      <div class="section-title">Edit Idea</div>
 
-    const hasKey = !!getYouTubeKey();
-    const hasChannel = !!getChannelId();
-
-    const panel = document.createElement("div");
-    panel.id = VAULT_ID;
-    panel.className = "habit-section";
-
-    panel.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div>
-          <div class="section-title">🔐 API Vault</div>
-          <div style="color:#9CA3AF; font-size:0.9rem;">
-            YouTube API connection stored locally.
-          </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button class="form-submit" id="kpVaultBtn">
-            ${hasKey && hasChannel ? "Update Connection" : "Connect YouTube"}
-          </button>
-          <button class="form-cancel" id="kpVaultRemoveBtn" ${hasKey || hasChannel ? "" : "disabled"} style="${hasKey || hasChannel ? "" : "opacity:.5;"}">
-            Remove
-          </button>
-        </div>
+      <div class="form-group">
+        <label>Title</label>
+        <input id="ideaTitleInput" class="form-input" value="${escapeHtml(item.title)}" />
       </div>
 
-      <div style="margin-top:12px;">
-        <div>Status:
-          <span style="font-weight:900; color:${hasKey && hasChannel ? "#22c55e" : "#f87171"};">
-            ${hasKey && hasChannel ? "Connected" : "Not connected"}
-          </span>
-        </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="ideaNotesInput" class="form-input" rows="4">${escapeHtml(item.notes || "")}</textarea>
       </div>
-    `;
 
-    container.appendChild(panel);
+      <div class="form-actions">
+        <button class="form-submit" id="updateIdeaBtn">Update</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
 
-    panel.querySelector("#kpVaultBtn").onclick = openVaultModal;
-    panel.querySelector("#kpVaultRemoveBtn").onclick = () => {
-      clearYouTubeKey();
-      clearChannelId();
-      renderContentHub();
-    };
+    document.getElementById("updateIdeaBtn").onclick = () => updateIdea(item.id);
   }
 
   // ===============================
-  // YOUTUBE LIVE STATS
+  // ACTIONS
   // ===============================
-  async function fetchYouTubeStats() {
-    const apiKey = getYouTubeKey();
-    const channelId = getChannelId();
-    if (!apiKey || !channelId) return null;
+  function saveNewIdea() {
+    const title = document.getElementById("ideaTitleInput").value.trim();
+    const notes = document.getElementById("ideaNotesInput").value.trim();
 
-    const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`;
+    if (!title) return alert("Title required.");
 
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!data.items || !data.items.length) return null;
-
-      const ch = data.items[0];
-      return {
-        name: ch.snippet.title,
-        subs: ch.statistics.subscriberCount,
-        views: ch.statistics.viewCount,
-        videos: ch.statistics.videoCount,
-        updated: new Date().toLocaleTimeString()
-      };
-    } catch (e) {
-      console.error("YouTube API error:", e);
-      return null;
-    }
-  }
-
-  async function renderYouTubePanel(container) {
-    const existing = document.getElementById(YT_PANEL_ID);
-    if (existing) existing.remove();
-
-    const apiKey = getYouTubeKey();
-    const channelId = getChannelId();
-
-    if (!apiKey || !channelId) return;
-
-    const panel = document.createElement("div");
-    panel.id = YT_PANEL_ID;
-    panel.className = "habit-section";
-
-    panel.innerHTML = `<div class="section-title">📺 YouTube Live Stats</div>
-    <div style="color:#9CA3AF;">Loading live data...</div>`;
-
-    container.appendChild(panel);
-
-    const stats = await fetchYouTubeStats();
-
-    if (!stats) {
-      panel.innerHTML = `
-        <div class="section-title">📺 YouTube Live Stats</div>
-        <div style="color:#f87171;">Unable to load data. Check API key or Channel ID.</div>
-      `;
-      return;
-    }
-
-    panel.innerHTML = `
-      <div class="section-title">📺 YouTube Live Stats</div>
-
-      <div class="content-stats">
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Channel</div>
-          <div style="font-size:1.2rem; font-weight:900;">${stats.name}</div>
-        </div>
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Subscribers</div>
-          <div style="font-size:1.8rem; font-weight:900;">${Number(stats.subs).toLocaleString()}</div>
-        </div>
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Total Views</div>
-          <div style="font-size:1.8rem; font-weight:900;">${Number(stats.views).toLocaleString()}</div>
-        </div>
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Videos</div>
-          <div style="font-size:1.8rem; font-weight:900;">${Number(stats.videos).toLocaleString()}</div>
-        </div>
-      </div>
-
-      <div style="margin-top:10px; color:#9CA3AF; font-size:0.85rem;">
-        Last updated: ${stats.updated}
-      </div>
-
-      <button class="form-submit" style="margin-top:12px;" onclick="window.__kpRefreshYT()">
-        Refresh
-      </button>
-    `;
-
-    window.__kpRefreshYT = () => renderContentHub();
-  }
-
-  // ===============================
-  // CONTENT PIPELINE (unchanged core)
-  // ===============================
-  function addItem(title, notes) {
     const items = loadItems();
-    items.unshift({
-      id: Date.now(),
+
+    items.push({
+      id: uuid(),
       title,
       notes,
       stage: "idea",
       createdAt: Date.now(),
       updatedAt: Date.now()
     });
+
+    saveItems(items);
+    closeModal();
+    renderContentHub();
+  }
+
+  function updateIdea(id) {
+    const title = document.getElementById("ideaTitleInput").value.trim();
+    const notes = document.getElementById("ideaNotesInput").value.trim();
+
+    const items = loadItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    item.title = title;
+    item.notes = notes;
+    item.updatedAt = Date.now();
+
+    saveItems(items);
+    closeModal();
+    renderContentHub();
+  }
+
+  function postIdea(id) {
+    const items = loadItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    item.stage = "posted";
+    item.updatedAt = Date.now();
+
     saveItems(items);
     renderContentHub();
   }
 
-  function renderPipeline(container, items) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "habit-section";
+  function deleteIdea(id) {
+    if (!confirm("Delete this idea?")) return;
 
-    wrapper.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <div class="section-title">🎬 Content Pipeline</div>
-        <button class="form-submit" onclick="window.__kpAddIdea()">Add Idea</button>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(${STAGES.length},1fr); gap:12px;">
-        ${STAGES.map(stage => `
-          <div style="border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:10px;">
-            <div style="font-weight:900; margin-bottom:8px;">${stage.toUpperCase()}</div>
-            ${items.filter(i => i.stage === stage).map(i => `
-              <div class="idea-item">
-                <div style="font-weight:800;">${i.title}</div>
-                <div style="color:#9CA3AF; font-size:0.85rem;">${i.notes || ""}</div>
-              </div>
-            `).join("") || `<div style="color:#9CA3AF;">Empty</div>`}
-          </div>
-        `).join("")}
-      </div>
-    `;
-
-    container.appendChild(wrapper);
-
-    window.__kpAddIdea = function () {
-      openModal(`
-        <div class="section-title">➕ Add Idea</div>
-        <div class="form-group">
-          <label>Title</label>
-          <input id="newIdeaTitle" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label>Notes</label>
-          <textarea id="newIdeaNotes" class="form-input"></textarea>
-        </div>
-        <div class="form-actions">
-          <button class="form-submit" onclick="window.__kpSaveIdea()">Add</button>
-          <button class="form-cancel" onclick="closeModal()">Cancel</button>
-        </div>
-      `);
-
-      window.__kpSaveIdea = function () {
-        const title = document.getElementById("newIdeaTitle").value.trim();
-        const notes = document.getElementById("newIdeaNotes").value.trim();
-        if (!title) return;
-        addItem(title, notes);
-        closeModal();
-      };
-    };
+    const items = loadItems().filter(i => i.id !== id);
+    saveItems(items);
+    renderContentHub();
   }
 
   // ===============================
-  // COMMAND CENTER (unchanged logic)
+  // EVENT DELEGATION (buttons)
   // ===============================
-  function renderCommandCenter(container, items) {
-    const posted = items.filter(i => i.stage === "posted").length;
-    const score = items.length ? Math.round((posted / items.length) * 100) : 0;
+  document.addEventListener("click", e => {
+    const card = e.target.closest(".idea-item");
+    if (!card) return;
 
-    const panel = document.createElement("div");
-    panel.className = "habit-section";
-
-    panel.innerHTML = `
-      <div class="section-title">⚔️ Creator Tactical Command Center</div>
-      <div class="content-stats">
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Ideas</div>
-          <div style="font-size:1.6rem; font-weight:900;">${items.length}</div>
-        </div>
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Posted</div>
-          <div style="font-size:1.6rem; font-weight:900;">${posted}</div>
-        </div>
-        <div class="content-stat-card">
-          <div style="color:#9CA3AF;">Creator Score</div>
-          <div style="font-size:1.6rem; font-weight:900; color:#a78bfa;">${score}%</div>
-        </div>
-      </div>
-    `;
-
-    container.appendChild(panel);
-  }
-
-  // ===============================
-  // MAIN RENDER
-  // ===============================
-  async function renderContentHub() {
-    const container = getContainer();
-    if (!container) return;
-
-    container.innerHTML = "";
+    const id = card.dataset.id;
+    const action = e.target.dataset.action;
+    if (!action) return;
 
     const items = loadItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
 
-    renderApiVault(container);
-    await renderYouTubePanel(container);
-    renderCommandCenter(container, items);
-    renderPipeline(container, items);
-  }
+    if (action === "edit") openEditIdeaModal(item);
+    if (action === "post") postIdea(id);
+    if (action === "delete") deleteIdea(id);
+  });
 
-  function hookNavigation() {
+  // ===============================
+  // BOOT + NAV HOOK
+  // ===============================
+  function hookNav() {
     document.addEventListener("click", e => {
       const tab = e.target.closest?.(".nav-tab");
       if (!tab) return;
-      setTimeout(renderContentHub, 80);
+      setTimeout(renderContentHub, 50);
     });
   }
 
   function boot() {
-    hookNavigation();
+    hookNav();
     setTimeout(renderContentHub, 100);
   }
 
