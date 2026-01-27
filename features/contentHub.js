@@ -1,36 +1,274 @@
 // =====================================================
-// CREATOR COMMAND CENTER (SAFE OVERLAY MODULE)
-// - Does NOT modify existing Content Hub
-// - Injects tactical layer above UI
-// - Adds local API Vault (YouTube API key) stored in localStorage
+// CONTENT HUB CORE + CREATOR COMMAND CENTER + API VAULT
+// SAFE UPGRADE MODULE
+// - Adds real Content Hub (ideas + pipeline)
+// - Keeps overlay intelligence
+// - Adds API Vault (YouTube API key)
+// - Does NOT break other features
 // =====================================================
 
 (function () {
   "use strict";
 
+  // ===============================
+  // CONFIG + STORAGE
+  // ===============================
+  const STORAGE_KEY = "contentHubItems";
+  const YT_KEY_STORAGE = "kp_youtube_api_key";
   const PANEL_ID = "creatorCommandCenter";
   const VAULT_ID = "creatorApiVaultPanel";
-  const YT_KEY_STORAGE = "kp_youtube_api_key";
 
-  // -----------------------------------------------------
-  // SAFE HELPERS
-  // -----------------------------------------------------
+  const STAGES = ["idea", "research", "script", "editing", "posted"];
+
   function getContainer() {
-    // Supports both legacy + current HTML ids
-    return (
-      document.getElementById("contentHubContainer") ||
-      document.getElementById("contentContainer")
-    );
+    return document.getElementById("contentContainer");
   }
 
-  function getItemsSafe() {
+  function loadItems() {
     try {
-      return JSON.parse(localStorage.getItem("contentHubItems") || "[]");
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     } catch {
       return [];
     }
   }
 
+  function saveItems(items) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }
+
+  // ===============================
+  // API VAULT (LOCAL)
+  // ===============================
+  function getYouTubeKey() {
+    return (localStorage.getItem(YT_KEY_STORAGE) || "").trim();
+  }
+
+  function setYouTubeKey(key) {
+    localStorage.setItem(YT_KEY_STORAGE, (key || "").trim());
+  }
+
+  function clearYouTubeKey() {
+    localStorage.removeItem(YT_KEY_STORAGE);
+  }
+
+  function openVaultModal() {
+    const existing = getYouTubeKey();
+
+    const html = `
+      <div class="section-title">🔐 API Vault</div>
+      <div style="color:#9CA3AF; margin-bottom:14px;">
+        Paste your YouTube API key. It will be stored only on this device.
+      </div>
+
+      <div class="form-group">
+        <label>YouTube API Key</label>
+        <input id="kpYouTubeKeyInput" class="form-input" type="password" placeholder="Paste key..." />
+        <div style="margin-top:8px; color:#9CA3AF; font-size:0.85rem;">
+          ${existing ? "A key is already saved. Pasting a new one will replace it." : "No key saved yet."}
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" onclick="window.__kpSaveYouTubeKey()">Save</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `;
+
+    window.__kpSaveYouTubeKey = function () {
+      const inp = document.getElementById("kpYouTubeKeyInput");
+      const key = (inp?.value || "").trim();
+      if (!key) return;
+      setYouTubeKey(key);
+      closeModal();
+      renderContentHub();
+    };
+
+    openModal(html);
+    setTimeout(() => {
+      const inp = document.getElementById("kpYouTubeKeyInput");
+      if (inp) inp.focus();
+    }, 50);
+  }
+
+  function renderApiVault(container) {
+    const existing = document.getElementById(VAULT_ID);
+    if (existing) existing.remove();
+
+    const hasKey = !!getYouTubeKey();
+
+    const panel = document.createElement("div");
+    panel.id = VAULT_ID;
+
+    panel.innerHTML = `
+      <div class="habit-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div class="section-title">🔐 API Vault</div>
+            <div style="color:#9CA3AF; font-size:0.9rem;">
+              YouTube API key stored locally on this device.
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="form-submit" id="kpVaultBtn">${hasKey ? "Update Key" : "Add Key"}</button>
+            <button class="form-cancel" id="kpVaultRemoveBtn" ${hasKey ? "" : "disabled"} style="${hasKey ? "" : "opacity:.5;"}">
+              Remove
+            </button>
+          </div>
+        </div>
+        <div style="margin-top:12px; color:#d1d5db;">
+          Status:
+          <span style="font-weight:900; color:${hasKey ? "#22c55e" : "#f87171"};">
+            ${hasKey ? "Key saved" : "No key yet"}
+          </span>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(panel);
+
+    panel.querySelector("#kpVaultBtn").onclick = openVaultModal;
+    panel.querySelector("#kpVaultRemoveBtn").onclick = () => {
+      clearYouTubeKey();
+      renderContentHub();
+    };
+  }
+
+  // ===============================
+  // CONTENT HUB CORE
+  // ===============================
+  function addItem(title, notes) {
+    const items = loadItems();
+    items.unshift({
+      id: Date.now(),
+      title: title || "Untitled",
+      notes: notes || "",
+      stage: "idea",
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    saveItems(items);
+    renderContentHub();
+  }
+
+  function updateItem(id, data) {
+    const items = loadItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    Object.assign(item, data);
+    item.updatedAt = Date.now();
+    saveItems(items);
+    renderContentHub();
+  }
+
+  function deleteItem(id) {
+    const items = loadItems().filter(i => i.id !== id);
+    saveItems(items);
+    renderContentHub();
+  }
+
+  function openAddModal() {
+    openModal(`
+      <div class="section-title">➕ Add Content Idea</div>
+
+      <div class="form-group">
+        <label>Title</label>
+        <input id="newIdeaTitle" class="form-input" placeholder="Idea title..." />
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="newIdeaNotes" class="form-input" rows="4" placeholder="Details..."></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" onclick="window.__kpAddIdea()">Add</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
+
+    window.__kpAddIdea = function () {
+      const title = document.getElementById("newIdeaTitle").value.trim();
+      const notes = document.getElementById("newIdeaNotes").value.trim();
+      if (!title) return;
+      addItem(title, notes);
+      closeModal();
+    };
+  }
+
+  function openEditModal(item) {
+    openModal(`
+      <div class="section-title">✏️ Edit Idea</div>
+
+      <div class="form-group">
+        <label>Title</label>
+        <input id="editIdeaTitle" class="form-input" value="${item.title}" />
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="editIdeaNotes" class="form-input" rows="4">${item.notes || ""}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Stage</label>
+        <select id="editIdeaStage" class="form-input">
+          ${STAGES.map(s => `<option value="${s}" ${s === item.stage ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" onclick="window.__kpSaveEdit(${item.id})">Save</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
+
+    window.__kpSaveEdit = function (id) {
+      const title = document.getElementById("editIdeaTitle").value.trim();
+      const notes = document.getElementById("editIdeaNotes").value.trim();
+      const stage = document.getElementById("editIdeaStage").value;
+      updateItem(id, { title, notes, stage });
+      closeModal();
+    };
+  }
+
+  function renderPipeline(container, items) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "habit-section";
+
+    wrapper.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div class="section-title">🎬 Content Pipeline</div>
+        <button class="form-submit" onclick="window.__kpOpenAddIdea()">Add Idea</button>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(${STAGES.length},1fr); gap:12px;">
+        ${STAGES.map(stage => `
+          <div style="border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:10px;">
+            <div style="font-weight:900; margin-bottom:8px; text-transform:capitalize;">${stage}</div>
+            <div>
+              ${items.filter(i => i.stage === stage).map(i => `
+                <div class="idea-item" style="cursor:pointer;" onclick="window.__kpEditIdea(${i.id})">
+                  <div style="font-weight:800;">${i.title}</div>
+                  <div style="color:#9CA3AF; font-size:0.85rem;">${i.notes?.slice(0,60) || ""}</div>
+                </div>
+              `).join("") || `<div style="color:#9CA3AF;">Empty</div>`}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    container.appendChild(wrapper);
+
+    window.__kpOpenAddIdea = openAddModal;
+    window.__kpEditIdea = function (id) {
+      const item = loadItems().find(i => i.id === id);
+      if (item) openEditModal(item);
+    };
+  }
+
+  // ===============================
+  // CREATOR COMMAND CENTER (OVERLAY)
+  // ===============================
   function calculateCreatorScore(items) {
     if (!items.length) return 0;
     const posted = items.filter(i => i.stage === "posted").length;
@@ -38,18 +276,15 @@
   }
 
   function detectBottleneck(items) {
-    const stages = ["idea", "research", "script", "editing", "posted"];
     let maxStage = "idea";
     let maxCount = 0;
-
-    stages.forEach(s => {
+    STAGES.forEach(s => {
       const count = items.filter(i => i.stage === s).length;
       if (count > maxCount) {
         maxCount = count;
         maxStage = s;
       }
     });
-
     return maxStage.toUpperCase();
   }
 
@@ -59,177 +294,11 @@
     if (item.stage === "editing") score += 20;
     if (item.stage === "script") score += 15;
     if (item.notes && item.notes.length > 100) score += 15;
-    if (item.title && item.title.length > 20) score += 10;
+    if (item.title.length > 20) score += 10;
     return Math.min(100, score);
   }
 
-  // -----------------------------------------------------
-  // API VAULT (LOCAL ONLY)
-  // -----------------------------------------------------
-  function getYouTubeKey() {
-    return (localStorage.getItem(YT_KEY_STORAGE) || "").trim();
-  }
-
-  function setYouTubeKey(key) {
-    localStorage.setItem(YT_KEY_STORAGE, (key || "").trim());
-    // Let other modules react if you later wire them
-    if (window.App && typeof App.emit === "function") {
-      App.emit("youtubeKey:changed");
-    }
-  }
-
-  function clearYouTubeKey() {
-    localStorage.removeItem(YT_KEY_STORAGE);
-    if (window.App && typeof App.emit === "function") {
-      App.emit("youtubeKey:changed");
-    }
-  }
-
-  // Uses your existing modal system if present; falls back safely.
-  function openVaultModal() {
-    const existing = getYouTubeKey();
-    const hasModal = typeof window.openModal === "function";
-
-    const html = `
-      <div class="section-title">🔐 API Vault</div>
-      <div style="color:#9CA3AF; margin-bottom:14px;">
-        Paste your YouTube API key here. It will be stored only on this device (localStorage),
-        and will NOT be committed to GitHub.
-      </div>
-
-      <div class="form-group">
-        <label>YouTube API Key</label>
-        <input id="kpYouTubeKeyInput" class="form-input" type="password" placeholder="Paste key..." value="" />
-        ${
-          existing
-            ? `<div style="margin-top:8px; color:#9CA3AF; font-size:0.85rem;">
-                 A key is already saved. Pasting a new one will replace it.
-               </div>`
-            : `<div style="margin-top:8px; color:#9CA3AF; font-size:0.85rem;">
-                 No key saved yet.
-               </div>`
-        }
-      </div>
-
-      <div class="form-actions">
-        <button class="form-submit" onclick="window.__kpSaveYouTubeKey()">Save</button>
-        <button class="form-cancel" onclick="window.closeModal ? closeModal() : (document.getElementById('modal') && (document.getElementById('modal').style.display='none'))">Cancel</button>
-      </div>
-
-      <div style="margin-top:12px; color:#9CA3AF; font-size:0.85rem;">
-        Note: In a frontend-only app, keys can be viewed by someone with access to this browser/devtools.
-        This vault keeps it out of your codebase and off GitHub.
-      </div>
-    `;
-
-    // Expose a safe global handler (so inline onclick can call it)
-    window.__kpSaveYouTubeKey = function () {
-      const inp = document.getElementById("kpYouTubeKeyInput");
-      const key = (inp?.value || "").trim();
-      if (!key) return;
-
-      setYouTubeKey(key);
-
-      if (typeof window.closeModal === "function") window.closeModal();
-      injectApiVault(); // refresh vault UI
-    };
-
-    if (hasModal) {
-      window.openModal(html);
-      setTimeout(() => {
-        const inp = document.getElementById("kpYouTubeKeyInput");
-        if (inp) inp.focus();
-      }, 50);
-    } else {
-      // fallback: basic prompt
-      const k = prompt("Paste your YouTube API key (stored locally):", "");
-      if (k && k.trim()) {
-        setYouTubeKey(k.trim());
-        injectApiVault();
-      }
-    }
-  }
-
-  // -----------------------------------------------------
-  // INJECT API VAULT PANEL
-  // -----------------------------------------------------
-  function injectApiVault() {
-    const container = getContainer();
-    if (!container) return;
-
-    // Avoid duplicate
-    const existingPanel = document.getElementById(VAULT_ID);
-    if (existingPanel) existingPanel.remove();
-
-    const hasKey = !!getYouTubeKey();
-
-    const panel = document.createElement("div");
-    panel.id = VAULT_ID;
-
-    panel.innerHTML = `
-      <div style="
-        margin-bottom:16px;
-        padding:16px;
-        border-radius:16px;
-        border:1px solid rgba(255,255,255,0.18);
-        background:linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03));
-        backdrop-filter: blur(6px);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-          <div>
-            <div style="font-weight:950; font-size:1.05rem; margin-bottom:6px;">
-              🔐 API Vault
-            </div>
-            <div style="color:#9CA3AF; font-size:0.9rem;">
-              YouTube key stored locally on this device.
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="form-submit" type="button" id="kpVaultBtn">
-              ${hasKey ? "Update Key" : "Add Key"}
-            </button>
-            <button class="form-cancel" type="button" id="kpVaultRemoveBtn" ${hasKey ? "" : "disabled"} style="${hasKey ? "" : "opacity:.5; cursor:not-allowed;"}">
-              Remove
-            </button>
-          </div>
-        </div>
-
-        <div style="margin-top:12px; color:#d1d5db;">
-          Status:
-          <span style="font-weight:900; color:${hasKey ? "#22c55e" : "#f87171"};">
-            ${hasKey ? "Key saved" : "No key yet"}
-          </span>
-          ${hasKey ? `<span style="color:#9CA3AF;">(hidden)</span>` : ""}
-        </div>
-      </div>
-    `;
-
-    // Prepend vault panel at the top of content page
-    container.prepend(panel);
-
-    // Wire buttons
-    const btn = panel.querySelector("#kpVaultBtn");
-    const rm = panel.querySelector("#kpVaultRemoveBtn");
-
-    if (btn) btn.addEventListener("click", openVaultModal);
-    if (rm) rm.addEventListener("click", () => {
-      if (!hasKey) return;
-      clearYouTubeKey();
-      injectApiVault();
-    });
-  }
-
-  // -----------------------------------------------------
-  // INJECT COMMAND CENTER
-  // -----------------------------------------------------
-  function injectCommandCenter() {
-    const container = getContainer();
-    if (!container) return;
-
-    if (document.getElementById(PANEL_ID)) return;
-
-    const items = getItemsSafe();
+  function renderCommandCenter(container, items) {
     const creatorScore = calculateCreatorScore(items);
     const bottleneck = detectBottleneck(items);
 
@@ -240,93 +309,66 @@
 
     const panel = document.createElement("div");
     panel.id = PANEL_ID;
+    panel.className = "habit-section";
 
     panel.innerHTML = `
-      <div style="
-        margin-bottom:16px;
-        padding:16px;
-        border-radius:16px;
-        border:1px solid rgba(255,255,255,0.18);
-        background:linear-gradient(180deg,rgba(99,102,241,0.08),rgba(236,72,153,0.05));
-        backdrop-filter: blur(6px);
-      ">
-        <div style="font-weight:950; font-size:1.1rem; margin-bottom:10px;">
-          ⚔️ Creator Tactical Command Center
-        </div>
+      <div class="section-title">⚔️ Creator Tactical Command Center</div>
 
-        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
-          <div>
-            <div style="color:#9CA3AF;">Ideas</div>
-            <div style="font-size:1.3rem; font-weight:900;">${items.length}</div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Posted</div>
-            <div style="font-size:1.3rem; font-weight:900;">
-              ${items.filter(i => i.stage === "posted").length}
-            </div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Creator Score</div>
-            <div style="font-size:1.3rem; font-weight:900; color:#a78bfa;">
-              ${creatorScore}%
-            </div>
-          </div>
-          <div>
-            <div style="color:#9CA3AF;">Bottleneck</div>
-            <div style="font-size:1.1rem; font-weight:900; color:#facc15;">
-              ${bottleneck}
-            </div>
-          </div>
-        </div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px;">
+        <div><div style="color:#9CA3AF;">Ideas</div><div style="font-size:1.3rem; font-weight:900;">${items.length}</div></div>
+        <div><div style="color:#9CA3AF;">Posted</div><div style="font-size:1.3rem; font-weight:900;">${items.filter(i => i.stage === "posted").length}</div></div>
+        <div><div style="color:#9CA3AF;">Creator Score</div><div style="font-size:1.3rem; font-weight:900; color:#a78bfa;">${creatorScore}%</div></div>
+        <div><div style="color:#9CA3AF;">Bottleneck</div><div style="font-size:1.1rem; font-weight:900; color:#facc15;">${bottleneck}</div></div>
+      </div>
 
-        <div style="margin-top:12px;">
-          <div style="font-weight:900; margin-bottom:6px;">🔥 High-Impact Ideas</div>
-          ${
-            ranked.length
-              ? ranked.map(i => `
-                <div style="
-                  padding:8px 10px;
-                  border-radius:10px;
-                  border:1px solid rgba(255,255,255,0.14);
-                  background:rgba(0,0,0,0.25);
-                  margin-bottom:6px;
-                  display:flex;
-                  justify-content:space-between;
-                  gap:10px;
-                ">
-                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">${i.title || "Untitled"}</span>
-                  <span style="color:#22c55e; font-weight:900;">${i.score}</span>
-                </div>
-              `).join("")
-              : `<div style="color:#9CA3AF;">No ideas yet.</div>`
-          }
-        </div>
+      <div>
+        <div style="font-weight:900; margin-bottom:6px;">🔥 High-Impact Ideas</div>
+        ${
+          ranked.length
+            ? ranked.map(i => `
+              <div class="idea-item" style="display:flex; justify-content:space-between;">
+                <span>${i.title}</span>
+                <span style="color:#22c55e; font-weight:900;">${i.score}</span>
+              </div>
+            `).join("")
+            : `<div style="color:#9CA3AF;">No ideas yet.</div>`
+        }
       </div>
     `;
 
-    container.prepend(panel);
+    container.appendChild(panel);
   }
 
-  // -----------------------------------------------------
-  // HOOK + BOOT
-  // -----------------------------------------------------
-  function injectAll() {
-    // Always inject vault first so it’s top-most
-    injectApiVault();
-    injectCommandCenter();
+  // ===============================
+  // MAIN RENDER
+  // ===============================
+  function renderContentHub() {
+    const container = getContainer();
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const items = loadItems();
+
+    renderApiVault(container);
+    renderCommandCenter(container, items);
+    renderPipeline(container, items);
   }
 
-  function hook() {
+  // ===============================
+  // HOOK INTO NAVIGATION
+  // ===============================
+  function hookNavigation() {
     document.addEventListener("click", e => {
       const tab = e.target.closest?.(".nav-tab");
       if (!tab) return;
-      setTimeout(injectAll, 80);
+      setTimeout(renderContentHub, 80);
     });
   }
 
   function boot() {
-    hook();
-    setTimeout(injectAll, 100);
+    hookNavigation();
+    setTimeout(renderContentHub, 100);
   }
 
   if (document.readyState === "loading") {
@@ -334,4 +376,5 @@
   } else {
     boot();
   }
+
 })();
