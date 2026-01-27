@@ -1,8 +1,8 @@
 // =====================================================
-// CONTENT HUB CORE (SIMPLIFIED CREATOR SYSTEM - FIXED)
+// CONTENT HUB CORE (STABLE CREATOR SYSTEM)
 // Ideas → Posted
-// Add, Edit, Post, Delete ideas
-// Works with dynamic UI + KP Core + overlays
+// Add, Edit, Post, Delete ideas (NO POPUPS)
+// Designed to survive KP Core + overlays + re-renders
 // =====================================================
 
 (function () {
@@ -26,10 +26,6 @@
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
-  function getContainer() {
-    return document.getElementById("contentContainer");
-  }
-
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -37,14 +33,17 @@
       .replace(/>/g, "&gt;");
   }
 
+  function getContainer() {
+    return document.getElementById("contentContainer");
+  }
+
   // ===============================
-  // GLOBAL ACTIONS (IMPORTANT FIX)
+  // CORE ACTIONS (GLOBAL + STABLE)
   // ===============================
 
   window.ContentHub = {
     addIdea(title, notes) {
       const items = loadItems();
-
       items.push({
         id: uuid(),
         title,
@@ -53,7 +52,6 @@
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
-
       saveItems(items);
       renderContentHub();
     },
@@ -71,7 +69,6 @@
     },
 
     deleteIdea(id) {
-      if (!confirm("Delete this idea?")) return;
       const items = loadItems().filter(i => i.id !== id);
       saveItems(items);
       renderContentHub();
@@ -81,7 +78,6 @@
       const items = loadItems();
       const item = items.find(i => i.id === id);
       if (!item) return;
-
       openEditIdeaModal(item);
     },
 
@@ -103,12 +99,13 @@
   // ===============================
   // UI RENDER
   // ===============================
+
   function renderContentHub() {
     const container = getContainer();
     if (!container) return;
 
     const items = loadItems();
-    const ideas = items.filter(i => i.stage !== "posted");
+    const ideas = items.filter(i => i.stage === "idea");
     const posted = items.filter(i => i.stage === "posted");
 
     container.innerHTML = `
@@ -117,10 +114,10 @@
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="section-title">💡 Ideas</div>
-            <button class="form-submit" onclick="openAddIdeaModal()">Add Idea</button>
+            <button class="form-submit" id="addIdeaBtn">Add Idea</button>
           </div>
 
-          <div class="ideas-list">
+          <div style="margin-top:10px;">
             ${
               ideas.length
                 ? ideas.map(renderIdeaCard).join("")
@@ -132,7 +129,7 @@
         <div class="habit-section">
           <div class="section-title">✅ Posted</div>
 
-          <div class="ideas-list">
+          <div style="margin-top:10px;">
             ${
               posted.length
                 ? posted.map(renderIdeaCard).join("")
@@ -143,27 +140,29 @@
 
       </div>
     `;
+
+    bindContentEvents();
   }
 
   function renderIdeaCard(item) {
-    const stageLabel = item.stage === "posted" ? "POSTED" : "IDEA";
+    const label = item.stage === "posted" ? "POSTED" : "IDEA";
 
     return `
-      <div class="idea-item" style="margin-top:10px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25);">
+      <div style="margin-top:10px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25);">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
           <div>
             <div style="font-weight:800;">${escapeHtml(item.title)}</div>
-            <div style="color:#9CA3AF; font-size:0.85rem;">${stageLabel}</div>
+            <div style="color:#9CA3AF; font-size:0.85rem;">${label}</div>
           </div>
 
           <div style="display:flex; gap:6px;">
             ${
-              item.stage !== "posted"
-                ? `<button class="form-submit" onclick="ContentHub.postIdea('${item.id}')">Post</button>`
+              item.stage === "idea"
+                ? `<button class="form-submit" data-action="post" data-id="${item.id}">Post</button>`
                 : ""
             }
-            <button class="form-cancel" onclick="ContentHub.editIdea('${item.id}')">Edit</button>
-            <button class="form-cancel" style="color:#ef4444;" onclick="ContentHub.deleteIdea('${item.id}')">Delete</button>
+            <button class="form-cancel" data-action="edit" data-id="${item.id}">Edit</button>
+            <button class="form-cancel" style="color:#ef4444;" data-action="delete" data-id="${item.id}">Delete</button>
           </div>
         </div>
       </div>
@@ -171,9 +170,37 @@
   }
 
   // ===============================
+  // EVENT BINDING (REAL FIX)
+  // ===============================
+
+  function bindContentEvents() {
+    const root = document.getElementById("contentHubContainer");
+    if (!root) return;
+
+    // Add Idea button
+    const addBtn = document.getElementById("addIdeaBtn");
+    if (addBtn) {
+      addBtn.onclick = openAddIdeaModal;
+    }
+
+    // Action buttons (Post / Edit / Delete)
+    root.querySelectorAll("[data-action]").forEach(btn => {
+      btn.onclick = () => {
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+
+        if (action === "post") ContentHub.postIdea(id);
+        if (action === "edit") ContentHub.editIdea(id);
+        if (action === "delete") ContentHub.deleteIdea(id);
+      };
+    });
+  }
+
+  // ===============================
   // MODALS
   // ===============================
-  window.openAddIdeaModal = function () {
+
+  function openAddIdeaModal() {
     openModal(`
       <div class="section-title">Add Idea</div>
 
@@ -183,7 +210,7 @@
       </div>
 
       <div class="form-group">
-        <label>Notes (optional)</label>
+        <label>Notes</label>
         <textarea id="ideaNotesInput" class="form-input" rows="4"></textarea>
       </div>
 
@@ -196,11 +223,11 @@
     document.getElementById("saveIdeaBtn").onclick = () => {
       const title = document.getElementById("ideaTitleInput").value.trim();
       const notes = document.getElementById("ideaNotesInput").value.trim();
-      if (!title) return alert("Title required.");
+      if (!title) return;
       ContentHub.addIdea(title, notes);
       closeModal();
     };
-  };
+  }
 
   function openEditIdeaModal(item) {
     openModal(`
@@ -232,11 +259,12 @@
   // ===============================
   // NAV HOOK
   // ===============================
+
   function hookNav() {
     document.addEventListener("click", e => {
       const tab = e.target.closest?.(".nav-tab");
       if (!tab) return;
-      setTimeout(renderContentHub, 50);
+      setTimeout(renderContentHub, 80);
     });
   }
 
