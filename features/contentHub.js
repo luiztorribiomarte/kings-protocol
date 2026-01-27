@@ -15,7 +15,7 @@
   // ✅ YOUR YOUTUBE CONFIG
   // -----------------------------
   const YOUTUBE_CONFIG = {
-    apiKey: "AIzaSyCekeROhWqG1rOMsVcjt4ioJvDkGuddARA",
+    apiKey: "AIzaSyDe7i_gpT5DgauI9NsYowf8QGgKtyctxjA",
     channelId: "UCKUFonoh8azQwjXnh2ViqHQ",
     pollMs: 5 * 60 * 1000 // 5 minutes
   };
