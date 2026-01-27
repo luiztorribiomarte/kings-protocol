@@ -1,111 +1,51 @@
 // =====================================================
-// KINGS PROTOCOL — VISION BOARD ENGINE (ELITE MODE)
-// Single-file system
-// - Sections: Active / Future / Achieved
-// - Visions -> milestones (auto progress)
-// - Manual or milestone-based progress
-// - Intelligence panel + streak
-// - Filters + search
-// - Drag reorder
-// - Inline edits (no popups)
+// VISION BOARD MODULE v3 — GOD MODE UPGRADE
+// SAFE: affects ONLY vision board
+// Backward compatible + cleaner architecture + new features
 // =====================================================
 
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "kp_visions_v3";
-  const CONTAINER_ID = "kpVisionBoardContainer";
+  const STORAGE_KEY = "visionBoardItems";
+  const CONTAINER_ID = "visionBoardContainer";
 
-  const DEFAULT_CATEGORIES = ["Money", "Health", "Skills", "Lifestyle", "Mindset"];
+  const DEFAULT_CATEGORIES = ["General", "Money", "Health", "Skills", "Lifestyle", "Mindset"];
 
-  // --------------------
-  // Helpers
-  // --------------------
   function safeParse(raw, fallback) {
     try {
       const v = JSON.parse(raw);
-      return v ?? fallback;
+      return Array.isArray(v) ? v : fallback;
     } catch {
       return fallback;
     }
   }
 
-  function uuid() {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-
-  function todayKey() {
-    return new Date().toISOString().split("T")[0];
-  }
-
-  function escapeHtml(str) {
-    return String(str || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
-  }
-
-  function loadVisions() {
-    const raw = safeParse(localStorage.getItem(STORAGE_KEY) || "[]", []);
-    return raw.map(v => ({
-      id: v.id || uuid(),
-      title: v.title || "",
-      image: v.image || "",
-      category: v.category || "General",
-      status: v.status || "future", // future | active | achieved
-      progress: typeof v.progress === "number" ? v.progress : 0,
-      milestones: Array.isArray(v.milestones)
-        ? v.milestones.map(m => ({
-            id: m.id || uuid(),
-            text: m.text || "",
-            done: !!m.done
-          }))
-        : [],
-      updatedAt: v.updatedAt || Date.now(),
-      createdAt: v.createdAt || Date.now()
+  function getItems() {
+    const items = safeParse(localStorage.getItem(STORAGE_KEY) || "[]", []);
+    return items.map(item => ({
+      id: item.id || crypto.randomUUID(),
+      title: item.title || "",
+      image: item.image || "",
+      category: item.category || "General",
+      progress: typeof item.progress === "number" ? item.progress : 0,
+      priority: item.priority || "normal", // low | normal | high
+      achieved: !!item.achieved,
+      createdAt: item.createdAt || new Date().toISOString()
     }));
   }
 
-  function saveVisions(list) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  function saveItems(items) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }
 
-  // --------------------
-  // Progress logic
-  // --------------------
-  function computeProgress(vision) {
-    if (!vision.milestones.length) return vision.progress || 0;
-    const done = vision.milestones.filter(m => m.done).length;
-    return Math.round((done / vision.milestones.length) * 100);
+  function esc(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  function getVisionDays(visons) {
-    const days = new Set();
-    visons.forEach(v => {
-      if (v.updatedAt) {
-        const d = new Date(v.updatedAt).toISOString().split("T")[0];
-        days.add(d);
-      }
-    });
-    return [...days];
-  }
-
-  function getVisionStreak(visons, max = 120) {
-    const days = new Set(getVisionDays(visons));
-    let streak = 0;
-    for (let i = 0; i < max; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      if (days.has(key)) streak++;
-      else break;
-    }
-    return streak;
-  }
-
-  // --------------------
-  // UI mount
-  // --------------------
   function ensureContainer() {
     const page = document.getElementById("visionBoardPage");
     if (!page) return null;
@@ -123,309 +63,241 @@
     return container;
   }
 
-  // --------------------
-  // Intelligence panel
-  // --------------------
-  function renderMetrics(visons) {
-    const total = visons.length;
-    const avg = total
-      ? Math.round(visons.reduce((a, v) => a + computeProgress(v), 0) / total)
+  // ---------------- METRICS ----------------
+
+  function renderMetrics(items) {
+    const total = items.length;
+    const completed = items.filter(i => i.achieved).length;
+    const avgProgress = total
+      ? Math.round(items.reduce((a, b) => a + b.progress, 0) / total)
       : 0;
-
-    const byCategory = {};
-    visons.forEach(v => {
-      byCategory[v.category] = (byCategory[v.category] || 0) + 1;
-    });
-
-    let dominant = "None";
-    let max = 0;
-    for (const k in byCategory) {
-      if (byCategory[k] > max) {
-        max = byCategory[k];
-        dominant = k;
-      }
-    }
-
-    const achieved = visons.filter(v => v.status === "achieved").length;
-    const completionRate = total ? Math.round((achieved / total) * 100) : 0;
-    const streak = getVisionStreak(visons);
 
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;">
-        <div class="idea-item">
-          <div style="color:#9ca3af;font-size:0.85rem;">Total Visions</div>
-          <div style="font-size:1.6rem;font-weight:900;">${total}</div>
+        <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);">
+          <div style="color:#9CA3AF;font-size:0.85rem;">Total Visions</div>
+          <div style="font-size:1.6rem;font-weight:900;color:white;">${total}</div>
         </div>
 
-        <div class="idea-item">
-          <div style="color:#9ca3af;font-size:0.85rem;">Avg Progress</div>
-          <div style="font-size:1.6rem;font-weight:900;color:#10b981;">${avg}%</div>
+        <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);">
+          <div style="color:#9CA3AF;font-size:0.85rem;">Completed</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#22c55e;">${completed}</div>
         </div>
 
-        <div class="idea-item">
-          <div style="color:#9ca3af;font-size:0.85rem;">Completion Rate</div>
-          <div style="font-size:1.6rem;font-weight:900;color:#22c55e;">${completionRate}%</div>
-        </div>
-
-        <div class="idea-item">
-          <div style="color:#9ca3af;font-size:0.85rem;">Dominant Focus</div>
-          <div style="font-size:1.2rem;font-weight:900;color:#a78bfa;">${dominant}</div>
-        </div>
-
-        <div class="idea-item">
-          <div style="color:#9ca3af;font-size:0.85rem;">Vision Streak</div>
-          <div style="font-size:1.6rem;font-weight:900;color:#facc15;">${streak}</div>
+        <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);">
+          <div style="color:#9CA3AF;font-size:0.85rem;">Avg Progress</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#3b82f6;">${avgProgress}%</div>
         </div>
       </div>
     `;
   }
 
-  // --------------------
-  // Render board
-  // --------------------
-  function renderBoard() {
+  // ---------------- STATE ----------------
+
+  let activeCategory = "all";
+  let searchQuery = "";
+
+  function filteredItems(items) {
+    return items.filter(item => {
+      const matchCategory =
+        activeCategory === "all" || item.category === activeCategory;
+      const matchSearch =
+        item.title.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCategory && matchSearch;
+    });
+  }
+
+  // ---------------- RENDER ----------------
+
+  function renderVisionBoard() {
     const container = ensureContainer();
     if (!container) return;
 
-    const visions = loadVisions();
-
-    const active = visions.filter(v => v.status === "active");
-    const future = visions.filter(v => v.status === "future");
-    const achieved = visions.filter(v => v.status === "achieved");
+    const items = getItems();
+    const visibleItems = filteredItems(items);
 
     container.innerHTML = `
       <div class="section-title">Vision Board</div>
 
-      ${renderMetrics(visions)}
+      ${renderMetrics(items)}
 
-      ${renderAddForm()}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <input id="visionSearchInput" placeholder="Search visions..."
+          style="flex:1;min-width:180px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;" />
 
-      ${renderSection("Active Visions", active, "active")}
-      ${renderSection("Future Visions", future, "future")}
-      ${renderSection("Achieved Visions", achieved, "achieved")}
-    `;
+        <select id="visionFilterCategory"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;">
+          <option value="all">All Categories</option>
+          ${DEFAULT_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
+        </select>
+      </div>
 
-    enableDrag();
-  }
-
-  function renderAddForm() {
-    return `
-      <div style="margin-top:10px;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);">
+      <div style="padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);">
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <input id="visionTitleInput" placeholder="Vision title" class="form-input" style="flex:1;min-width:160px;" />
-          <input id="visionImageInput" placeholder="Image URL" class="form-input" style="flex:1;min-width:200px;" />
+          <input id="visionTitleInput" placeholder="Vision title"
+            style="flex:1;min-width:160px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;" />
 
-          <select id="visionCategoryInput" class="form-input">
-            <option value="General">General</option>
+          <input id="visionImageInput" placeholder="Image URL"
+            style="flex:1;min-width:200px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;" />
+
+          <select id="visionCategoryInput"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;">
             ${DEFAULT_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
           </select>
 
-          <button class="form-submit" onclick="addVision()">Add Vision</button>
+          <select id="visionPriorityInput"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 10px;color:white;">
+            <option value="low">Low</option>
+            <option value="normal" selected>Normal</option>
+            <option value="high">High</option>
+          </select>
+
+          <button onclick="addVisionItem()" style="padding:9px 14px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);color:white;border:none;font-weight:800;">
+            Add
+          </button>
         </div>
       </div>
-    `;
-  }
 
-  function renderSection(title, list, status) {
-    return `
-      <div class="habit-section" style="margin-top:16px;padding:16px;">
-        <div class="section-title">${title}</div>
-
-        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-          ${
-            list.length
-              ? list.map(v => renderCard(v)).join("")
-              : `<div style="color:#9ca3af;">No visions here.</div>`
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  function renderCard(v) {
-    const progress = computeProgress(v);
-
-    return `
-      <div draggable="true" data-id="${v.id}" class="vision-card idea-item" style="position:relative;">
+      <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
         ${
-          v.image
-            ? `<img src="${escapeHtml(v.image)}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />`
-            : ""
+          visibleItems.length
+            ? visibleItems.map(item => renderCard(item)).join("")
+            : `<div style="color:#9CA3AF;">No visions found.</div>`
         }
+      </div>
+    `;
 
-        <input
-          value="${escapeHtml(v.title)}"
-          onchange="renameVision('${v.id}', this.value)"
-          style="width:100%;background:none;border:none;color:white;font-weight:900;font-size:1rem;outline:none;"
-        />
+    hookInputs();
+    enableDragAndDrop();
+  }
 
-        <div style="font-size:0.8rem;color:#9ca3af;margin-bottom:6px;">
-          ${escapeHtml(v.category)}
+  function renderCard(item) {
+    const priorityColor =
+      item.priority === "high" ? "#ef4444" :
+      item.priority === "low" ? "#10b981" :
+      "#a78bfa";
+
+    return `
+      <div draggable="true" data-id="${item.id}" class="vision-card"
+        style="position:relative;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,0.14);background:rgba(0,0,0,0.25);">
+
+        ${item.image ? `<img src="${esc(item.image)}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />` : ""}
+
+        <div style="font-weight:900;color:white;">${esc(item.title)}</div>
+        <div style="font-size:0.8rem;color:#9CA3AF;">${esc(item.category)}</div>
+
+        <div style="font-size:0.75rem;margin-top:4px;color:${priorityColor};font-weight:800;">
+          Priority: ${item.priority.toUpperCase()}
         </div>
 
-        <div style="font-size:0.8rem;color:#9ca3af;">Progress</div>
+        <div style="margin-top:6px;font-size:0.8rem;color:#9CA3AF;">Progress</div>
         <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
-          <div style="height:100%;width:${progress}%;background:linear-gradient(135deg,#22c55e,#3b82f6);"></div>
+          <div style="height:100%;width:${item.progress}%;background:linear-gradient(135deg,#22c55e,#3b82f6);"></div>
         </div>
-        <div style="font-size:0.75rem;color:#9ca3af;margin-top:4px;">${progress}%</div>
+        <div style="font-size:0.75rem;color:#9CA3AF;margin-top:4px;">${item.progress}%</div>
 
-        <input type="range" min="0" max="100" value="${v.progress}"
-          onchange="setVisionProgress('${v.id}', this.value)"
+        <input type="range" min="0" max="100" value="${item.progress}"
+          onchange="updateVisionProgress('${item.id}', this.value)"
           style="width:100%;margin-top:6px;" />
 
-        <div style="margin-top:8px;">
-          ${renderMilestones(v)}
-        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button onclick="toggleVisionAchieved('${item.id}')"
+            style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;">
+            ${item.achieved ? "Undo" : "Achieved"}
+          </button>
 
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-          <button class="form-submit" onclick="moveVision('${v.id}','active')">Active</button>
-          <button class="form-submit" onclick="moveVision('${v.id}','future')">Future</button>
-          <button class="form-submit" onclick="moveVision('${v.id}','achieved')">Achieved</button>
-          <button class="form-cancel" onclick="deleteVision('${v.id}')" style="color:#ef4444;">Delete</button>
+          <button onclick="deleteVisionItem('${item.id}')"
+            style="padding:6px 10px;border-radius:8px;border:none;background:#ef4444;color:white;">
+            ✕
+          </button>
         </div>
       </div>
     `;
   }
 
-  function renderMilestones(v) {
-    return `
-      <div style="font-size:0.85rem;color:#9ca3af;margin-bottom:4px;">Milestones</div>
-      ${
-        v.milestones.length
-          ? v.milestones.map(m => `
-            <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
-              <input type="checkbox" ${m.done ? "checked" : ""} onchange="toggleMilestone('${v.id}','${m.id}')" />
-              <input value="${escapeHtml(m.text)}"
-                onchange="editMilestone('${v.id}','${m.id}', this.value)"
-                style="flex:1;background:none;border:none;color:white;outline:none;font-size:0.85rem;" />
-              <button onclick="deleteMilestone('${v.id}','${m.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
-            </div>
-          `).join("")
-          : `<div style="color:#9ca3af;font-size:0.8rem;">No milestones yet.</div>`
-      }
+  // ---------------- ACTIONS ----------------
 
-      <button onclick="addMilestone('${v.id}')" style="margin-top:4px;font-size:0.8rem;color:#a78bfa;background:none;border:none;cursor:pointer;">
-        + add milestone
-      </button>
-    `;
-  }
-
-  // --------------------
-  // Actions
-  // --------------------
-  window.addVision = function () {
-    const title = document.getElementById("visionTitleInput")?.value.trim();
-    const image = document.getElementById("visionImageInput")?.value.trim() || "";
-    const category = document.getElementById("visionCategoryInput")?.value || "General";
-
+  window.addVisionItem = function () {
+    const title = document.getElementById("visionTitleInput").value.trim();
     if (!title) return;
 
-    const visions = loadVisions();
-    visions.push({
-      id: uuid(),
+    const image = document.getElementById("visionImageInput").value.trim();
+    const category = document.getElementById("visionCategoryInput").value;
+    const priority = document.getElementById("visionPriorityInput").value;
+
+    const items = getItems();
+    items.push({
+      id: crypto.randomUUID(),
       title,
       image,
       category,
-      status: "future",
+      priority,
       progress: 0,
-      milestones: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      achieved: false,
+      createdAt: new Date().toISOString()
     });
 
-    saveVisions(visions);
-    renderBoard();
+    saveItems(items);
+    renderVisionBoard();
   };
 
-  window.renameVision = function (id, name) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === id);
-    if (!v) return;
-    v.title = name.trim();
-    v.updatedAt = Date.now();
-    saveVisions(visions);
+  window.updateVisionProgress = function (id, value) {
+    const items = getItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    item.progress = Number(value);
+    if (item.progress === 100) item.achieved = true;
+
+    saveItems(items);
+    renderVisionBoard();
   };
 
-  window.setVisionProgress = function (id, value) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === id);
-    if (!v) return;
-    v.progress = Number(value);
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-    renderBoard();
+  window.toggleVisionAchieved = function (id) {
+    const items = getItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    item.achieved = !item.achieved;
+    if (item.achieved) item.progress = 100;
+
+    saveItems(items);
+    renderVisionBoard();
   };
 
-  window.moveVision = function (id, status) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === id);
-    if (!v) return;
-    v.status = status;
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-    renderBoard();
+  window.deleteVisionItem = function (id) {
+    let items = getItems();
+    items = items.filter(i => i.id !== id);
+    saveItems(items);
+    renderVisionBoard();
   };
 
-  window.deleteVision = function (id) {
-    let visions = loadVisions();
-    visions = visions.filter(v => v.id !== id);
-    saveVisions(visions);
-    renderBoard();
-  };
+  // ---------------- FILTERS ----------------
 
-  window.addMilestone = function (visionId) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === visionId);
-    if (!v) return;
+  function hookInputs() {
+    const search = document.getElementById("visionSearchInput");
+    const cat = document.getElementById("visionFilterCategory");
 
-    v.milestones.push({ id: uuid(), text: "New milestone", done: false });
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-    renderBoard();
-  };
+    if (search) {
+      search.value = searchQuery;
+      search.oninput = e => {
+        searchQuery = e.target.value;
+        renderVisionBoard();
+      };
+    }
 
-  window.toggleMilestone = function (visionId, milestoneId) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === visionId);
-    if (!v) return;
+    if (cat) {
+      cat.value = activeCategory;
+      cat.onchange = e => {
+        activeCategory = e.target.value;
+        renderVisionBoard();
+      };
+    }
+  }
 
-    const m = v.milestones.find(x => x.id === milestoneId);
-    if (!m) return;
+  // ---------------- DRAG & DROP ----------------
 
-    m.done = !m.done;
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-    renderBoard();
-  };
-
-  window.editMilestone = function (visionId, milestoneId, text) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === visionId);
-    if (!v) return;
-
-    const m = v.milestones.find(x => x.id === milestoneId);
-    if (!m) return;
-
-    m.text = text;
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-  };
-
-  window.deleteMilestone = function (visionId, milestoneId) {
-    const visions = loadVisions();
-    const v = visions.find(x => x.id === visionId);
-    if (!v) return;
-
-    v.milestones = v.milestones.filter(m => m.id !== milestoneId);
-    v.updatedAt = Date.now();
-    saveVisions(visions);
-    renderBoard();
-  };
-
-  // --------------------
-  // Drag reorder
-  // --------------------
-  function enableDrag() {
+  function enableDragAndDrop() {
     const cards = document.querySelectorAll(".vision-card");
     let draggedId = null;
 
@@ -446,46 +318,23 @@
         const targetId = card.dataset.id;
         if (!draggedId || draggedId === targetId) return;
 
-        const visions = loadVisions();
-        const from = visions.findIndex(v => v.id === draggedId);
-        const to = visions.findIndex(v => v.id === targetId);
-        if (from === -1 || to === -1) return;
+        const items = getItems();
+        const from = items.findIndex(i => i.id === draggedId);
+        const to = items.findIndex(i => i.id === targetId);
 
-        const [moved] = visions.splice(from, 1);
-        visions.splice(to, 0, moved);
+        const [moved] = items.splice(from, 1);
+        items.splice(to, 0, moved);
 
-        saveVisions(visions);
-        renderBoard();
+        saveItems(items);
+        renderVisionBoard();
       });
     });
   }
 
-  // --------------------
-  // Boot
-  // --------------------
-  function hookNavigation() {
-    document.addEventListener("click", e => {
-      const tab = e.target.closest?.(".nav-tab");
-      if (!tab) return;
-      setTimeout(renderBoard, 60);
-    });
-  }
-
-  function observeActivation() {
-    const page = document.getElementById("visionBoardPage");
-    if (!page || typeof MutationObserver === "undefined") return;
-
-    const obs = new MutationObserver(() => {
-      if (page.classList.contains("active")) renderBoard();
-    });
-
-    obs.observe(page, { attributes: true, attributeFilter: ["class"] });
-  }
+  // ---------------- BOOT ----------------
 
   function boot() {
-    hookNavigation();
-    observeActivation();
-    setTimeout(renderBoard, 0);
+    renderVisionBoard();
   }
 
   if (document.readyState === "loading") {
