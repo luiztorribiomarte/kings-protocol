@@ -1,9 +1,8 @@
 // =====================================================
-// WORKOUTS ELITE SYSTEM (KINGS PROTOCOL)
-// - Books-style UX + elite strength tracking
-// - Workouts → Exercises → Sets
-// - PR system, streaks, XP, insights, charts
-// - Safe mount, no breaking existing features
+// WORKOUT SYSTEM v2 (SETS-FIRST MODEL)
+// - Workouts → Exercises → Individual Sets
+// - Each set has its own weight + reps
+// - No feature removed, only upgraded
 // =====================================================
 
 (function () {
@@ -62,10 +61,6 @@
       .replace(/>/g, "&gt;");
   }
 
-  // ==========================
-  // CORE STATE
-  // ==========================
-
   function loadWorkouts() {
     return loadData(STORAGE_KEY, []);
   }
@@ -106,7 +101,6 @@
       type: type.trim(),
       status: status || "planned",
       exercises: [],
-      sessions: 0,
       createdAt: Date.now(),
       updatedAt: Date.now()
     });
@@ -135,11 +129,11 @@
   Workouts.addExercise = function (workoutId, name) {
     const workouts = loadWorkouts();
     const w = workouts.find(w => w.id === workoutId);
-    if (!w) return;
+    if (!w || !name.trim()) return;
 
     w.exercises.push({
       id: uuid(),
-      name,
+      name: name.trim(),
       sets: []
     });
 
@@ -148,7 +142,7 @@
     renderWorkouts();
   };
 
-  Workouts.logSet = function (workoutId, exerciseId, weight, reps) {
+  Workouts.addSet = function (workoutId, exerciseId, weight, reps) {
     const workouts = loadWorkouts();
     const w = workouts.find(w => w.id === workoutId);
     if (!w) return;
@@ -157,25 +151,25 @@
     if (!ex) return;
 
     const set = {
+      id: uuid(),
       weight: Number(weight),
       reps: Number(reps),
       time: Date.now()
     };
 
     ex.sets.push(set);
-    w.sessions += 1;
     w.updatedAt = Date.now();
-
     saveWorkouts(workouts);
 
-    // HISTORY
+    // HISTORY LOG
     const history = loadHistory();
     history.push({
       day: todayKey(),
       workoutId,
       exercise: ex.name,
       weight: set.weight,
-      reps: set.reps
+      reps: set.reps,
+      sets: 1
     });
     saveHistory(history);
 
@@ -198,51 +192,19 @@
     renderWorkouts();
   };
 
-  // ==========================
-  // STREAK + XP + INSIGHTS
-  // ==========================
-
-  function calculateStreak() {
-    const history = loadHistory();
-    if (!history.length) return 0;
-
-    const days = [...new Set(history.map(h => h.day))].sort((a, b) => b - a);
-    let streak = 0;
-    let expected = todayKey();
-
-    for (let d of days) {
-      if (d === expected) {
-        streak++;
-        expected -= 86400000;
-      } else break;
-    }
-
-    return streak;
-  }
-
-  function calculateXP() {
+  Workouts.deleteSet = function (workoutId, exerciseId, setId) {
     const workouts = loadWorkouts();
-    return workouts.reduce((sum, w) => sum + w.sessions * 15, 0);
-  }
+    const w = workouts.find(w => w.id === workoutId);
+    if (!w) return;
 
-  function generateInsights() {
-    const history = loadHistory();
-    if (!history.length) return "No training data yet.";
+    const ex = w.exercises.find(e => e.id === exerciseId);
+    if (!ex) return;
 
-    const byExercise = {};
-    history.forEach(h => {
-      if (!byExercise[h.exercise]) byExercise[h.exercise] = 0;
-      byExercise[h.exercise]++;
-    });
-
-    const topExercise = Object.entries(byExercise).sort((a, b) => b[1] - a[1])[0];
-
-    const streak = calculateStreak();
-
-    if (streak >= 5) return "🔥 You’re on a serious training streak.";
-    if (topExercise) return `💡 You train "${topExercise[0]}" most often.`;
-    return "Keep logging workouts to unlock insights.";
-  }
+    ex.sets = ex.sets.filter(s => s.id !== setId);
+    w.updatedAt = Date.now();
+    saveWorkouts(workouts);
+    renderWorkouts();
+  };
 
   // ==========================
   // UI RENDER
@@ -258,20 +220,12 @@
     const planned = workouts.filter(w => w.status === "planned");
     const completed = workouts.filter(w => w.status === "completed");
 
-    const streak = calculateStreak();
-    const xp = calculateXP();
-    const insight = generateInsights();
-
     mount.innerHTML = `
       <div class="habit-section">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div class="section-title">💪 Currently Training</div>
           <button class="form-submit" id="addWorkoutBtn">Add Workout</button>
         </div>
-        <div style="margin-top:6px; color:#9CA3AF;">
-          🔥 Streak: <b>${streak}</b> days • ⚡ XP: <b>${xp}</b>
-        </div>
-        <div style="margin-top:6px; color:#a78bfa;">${insight}</div>
         ${current.length ? current.map(renderWorkoutCard).join("") : `<div style="color:#9CA3AF;">No active workouts.</div>`}
       </div>
 
@@ -284,25 +238,9 @@
         <div class="section-title">✅ Completed Workouts</div>
         ${completed.length ? completed.map(renderWorkoutCard).join("") : `<div style="color:#9CA3AF;">No completed workouts.</div>`}
       </div>
-
-      <div class="habit-section">
-        <div class="section-title">🏆 Personal Records</div>
-        ${renderPRs()}
-      </div>
-
-      <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="section-title">📈 Strength Progress</div>
-          <select id="exerciseSelect" class="form-input" style="width:auto;">
-            ${getExerciseOptions()}
-          </select>
-        </div>
-        <canvas id="strengthChart" height="140"></canvas>
-      </div>
     `;
 
     bindEvents();
-    renderChart();
   }
 
   function renderWorkoutCard(workout) {
@@ -332,33 +270,23 @@
 
   function renderExercise(workoutId, ex) {
     return `
-      <div style="margin-top:6px; padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,0.12);">
+      <div style="margin-top:6px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12);">
         <div style="font-weight:700;">${escapeHtml(ex.name)}</div>
-        <div style="display:flex; gap:6px; margin-top:6px;">
+
+        ${ex.sets.map(s => `
+          <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:0.9rem;">
+            <span>${s.weight} lbs × ${s.reps} reps</span>
+            <button data-action="deleteSet" data-w="${workoutId}" data-e="${ex.id}" data-s="${s.id}" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
+          </div>
+        `).join("")}
+
+        <div style="display:flex; gap:6px; margin-top:8px;">
           <input type="number" placeholder="Weight" class="form-input" style="width:80px;" data-w="${workoutId}" data-e="${ex.id}" data-type="weight">
           <input type="number" placeholder="Reps" class="form-input" style="width:70px;" data-w="${workoutId}" data-e="${ex.id}" data-type="reps">
-          <button class="form-submit" data-action="logSet" data-w="${workoutId}" data-e="${ex.id}">Log</button>
+          <button class="form-submit" data-action="addSet" data-w="${workoutId}" data-e="${ex.id}">Add Set</button>
         </div>
       </div>
     `;
-  }
-
-  function renderPRs() {
-    const prs = loadPRs();
-    const entries = Object.values(prs);
-    if (!entries.length) return `<div style="color:#9CA3AF;">No PRs yet.</div>`;
-
-    return entries.map(p => `
-      <div class="idea-item" style="margin-top:6px;">
-        🏆 <b>${escapeHtml(p.exercise)}</b> — ${p.weight} lbs × ${p.reps} reps
-      </div>
-    `).join("");
-  }
-
-  function getExerciseOptions() {
-    const history = loadHistory();
-    const exercises = [...new Set(history.map(h => h.exercise))];
-    return exercises.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   // ==========================
@@ -379,12 +307,17 @@
         if (action === "move") Workouts.moveWorkout(btn.dataset.id, btn.dataset.status);
         if (action === "delete") Workouts.deleteWorkout(btn.dataset.id);
         if (action === "addExercise") openAddExerciseModal(btn.dataset.id);
-        if (action === "logSet") {
+
+        if (action === "addSet") {
           const w = btn.dataset.w;
           const e = btn.dataset.e;
           const weight = mount.querySelector(`[data-w="${w}"][data-e="${e}"][data-type="weight"]`).value;
           const reps = mount.querySelector(`[data-w="${w}"][data-e="${e}"][data-type="reps"]`).value;
-          Workouts.logSet(w, e, weight, reps);
+          Workouts.addSet(w, e, weight, reps);
+        }
+
+        if (action === "deleteSet") {
+          Workouts.deleteSet(btn.dataset.w, btn.dataset.e, btn.dataset.s);
         }
       };
     });
@@ -445,45 +378,6 @@
       Workouts.addExercise(workoutId, document.getElementById("exerciseName").value);
       closeModal();
     };
-  }
-
-  // ==========================
-  // CHART
-  // ==========================
-
-  function renderChart() {
-    const mount = document.getElementById(MOUNT_ID);
-    if (!mount) return;
-
-    const select = mount.querySelector("#exerciseSelect");
-    const canvas = mount.querySelector("#strengthChart");
-    if (!select || !canvas) return;
-
-    const exercise = select.value;
-    const history = loadHistory().filter(h => h.exercise === exercise);
-
-    const labels = history.map(h => new Date(h.day).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
-    const data = history.map(h => h.weight * h.reps);
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(canvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: "Volume (weight × reps)",
-          data,
-          tension: 0.35
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-
-    select.onchange = renderChart;
   }
 
   // ==========================
