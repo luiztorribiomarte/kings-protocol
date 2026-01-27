@@ -1,465 +1,372 @@
 // =====================================================
-// BOOKS MODULE (SAFE ADD-ON)
-// - Does NOT modify app.js
-// - Works independently
-// - Persists in localStorage
+// BOOKS INTELLIGENCE SYSTEM (KP EDITION)
+// - Want to Read → Currently Reading → Read
+// - Progress tracking (pages + daily logs)
+// - Move between sections with buttons
+// - Delete + Edit
+// - Reading progress line chart
+// - Mount-safe (never wipes other modules)
 // =====================================================
 
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "booksLibrary";
-  const CONTAINER_ID = "booksContainer";
+  const STORAGE_KEY = "booksData";
+  const HISTORY_KEY = "booksProgressHistory";
+  const MOUNT_ID = "booksMount";
 
-  function safeParse(raw, fallback) {
+  let chart = null;
+
+  function getContainer() {
+    return document.getElementById("booksContainer");
+  }
+
+  function ensureMount() {
+    const container = getContainer();
+    if (!container) return null;
+
+    let mount = document.getElementById(MOUNT_ID);
+    if (mount) return mount;
+
+    mount = document.createElement("div");
+    mount.id = MOUNT_ID;
+    container.prepend(mount);
+    return mount;
+  }
+
+  function loadBooks() {
     try {
-      const v = JSON.parse(raw);
-      return Array.isArray(v) ? v : fallback;
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     } catch {
-      return fallback;
+      return [];
     }
   }
 
-  function getBooks() {
-    return safeParse(localStorage.getItem(STORAGE_KEY) || "[]", []);
+  function saveBooks(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
 
-  function saveBooks(books) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+  function loadHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHistory(data) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(data));
+  }
+
+  function uuid() {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+
+  function todayKey() {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d.getTime();
   }
 
   function escapeHtml(str) {
     return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;");
   }
 
-  function uid() {
-    return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-  }
+  // ==========================
+  // CORE ACTIONS
+  // ==========================
 
-  function ensureContainer() {
-    const page = document.getElementById("booksPage");
-    if (!page) return null;
+  window.Books = window.Books || {};
 
-    let container = document.getElementById(CONTAINER_ID);
-    if (container) return container;
+  Books.addBook = function(title, author, pages, status) {
+    if (!title.trim()) return;
 
-    container = document.createElement("div");
-    container.id = CONTAINER_ID;
-    container.className = "habit-section";
-
-    page.innerHTML = "";
-    page.appendChild(container);
-
-    return container;
-  }
-
-  function percent(current, total) {
-    if (!total || total <= 0) return 0;
-    return Math.min(100, Math.round((current / total) * 100));
-  }
-
-  function renderBooks() {
-    const container = ensureContainer();
-    if (!container) return;
-
-    const books = getBooks();
-
-    container.innerHTML = `
-      <div class="section-title">📚 Books & Knowledge</div>
-
-      <div style="
-        margin-top:10px;
-        padding:14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.14);
-        background:rgba(255,255,255,0.05);
-      ">
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <input id="bookTitleInput" placeholder="Book title"
-            style="
-              flex:2; min-width:200px;
-              background:rgba(255,255,255,0.05);
-              border:1px solid rgba(255,255,255,0.15);
-              border-radius:10px;
-              padding:8px 10px;
-              color:white;
-              outline:none;
-            " />
-
-          <input id="bookAuthorInput" placeholder="Author"
-            style="
-              flex:1; min-width:140px;
-              background:rgba(255,255,255,0.05);
-              border:1px solid rgba(255,255,255,0.15);
-              border-radius:10px;
-              padding:8px 10px;
-              color:white;
-              outline:none;
-            " />
-
-          <input id="bookPagesInput" type="number" placeholder="Total pages"
-            style="
-              width:130px;
-              background:rgba(255,255,255,0.05);
-              border:1px solid rgba(255,255,255,0.15);
-              border-radius:10px;
-              padding:8px 10px;
-              color:white;
-              outline:none;
-            " />
-
-          <button onclick="addBook()" style="
-            padding:9px 14px;
-            border-radius:10px;
-            background:linear-gradient(135deg,#6366f1,#ec4899);
-            color:white;
-            border:none;
-            cursor:pointer;
-            font-weight:900;
-          ">Add Book</button>
-        </div>
-      </div>
-
-      <div style="margin-top:14px; display:flex; flex-direction:column; gap:12px;">
-        ${
-          books.length
-            ? books
-                .slice()
-                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                .map(book => renderBookCard(book))
-                .join("")
-            : `<div style="color:#9CA3AF;">No books yet. Add your first one above.</div>`
-        }
-      </div>
-    `;
-  }
-
-  function renderBookCard(book) {
-    const title = escapeHtml(book.title);
-    const author = escapeHtml(book.author || "");
-    const totalPages = book.totalPages || 0;
-    const currentPage = book.currentPage || 0;
-    const notes = escapeHtml(book.notes || "");
-
-    const p = percent(currentPage, totalPages);
-
-    return `
-      <div style="
-        padding:14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.14);
-        background:rgba(0,0,0,0.18);
-      ">
-        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-          <div>
-            <div style="color:#E5E7EB; font-weight:950; font-size:1.05rem;">
-              ${title}
-            </div>
-            ${
-              author
-                ? `<div style="color:#9CA3AF; font-weight:800; font-size:0.9rem;">by ${author}</div>`
-                : ""
-            }
-          </div>
-
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button onclick="openBookEdit('${book.id}')" style="
-              padding:8px 12px;
-              border-radius:10px;
-              background:rgba(255,255,255,0.08);
-              border:1px solid rgba(255,255,255,0.16);
-              color:white;
-              cursor:pointer;
-              font-weight:900;
-            ">Edit</button>
-
-            <button onclick="deleteBook('${book.id}')" style="
-              padding:8px 12px;
-              border-radius:10px;
-              background:none;
-              border:1px solid rgba(239,68,68,0.35);
-              color:#FCA5A5;
-              cursor:pointer;
-              font-weight:950;
-            ">Delete</button>
-          </div>
-        </div>
-
-        <div style="margin-top:10px;">
-          <div style="display:flex; justify-content:space-between; font-weight:900; color:#E5E7EB;">
-            <span>Progress</span>
-            <span>${currentPage}/${totalPages || "?"} pages (${p}%)</span>
-          </div>
-
-          <div style="margin-top:6px; height:10px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden;">
-            <div style="
-              height:100%;
-              width:${p}%;
-              border-radius:999px;
-              background:linear-gradient(90deg, rgba(99,102,241,0.95), rgba(236,72,153,0.95));
-            "></div>
-          </div>
-
-          <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-            <input id="pageInput-${book.id}" type="number" placeholder="Current page"
-              style="
-                width:140px;
-                background:rgba(255,255,255,0.05);
-                border:1px solid rgba(255,255,255,0.15);
-                border-radius:10px;
-                padding:6px 8px;
-                color:white;
-                outline:none;
-              " />
-
-            <button onclick="updateBookProgress('${book.id}')" style="
-              padding:6px 12px;
-              border-radius:10px;
-              background:rgba(255,255,255,0.08);
-              border:1px solid rgba(255,255,255,0.16);
-              color:white;
-              cursor:pointer;
-              font-weight:900;
-            ">Update</button>
-          </div>
-        </div>
-
-        ${
-          notes
-            ? `<div style="margin-top:10px; color:#E5E7EB; line-height:1.45; white-space:pre-wrap;">${notes}</div>`
-            : `<div style="margin-top:10px; color:#9CA3AF;">No notes yet.</div>`
-        }
-      </div>
-    `;
-  }
-
-  // ---------------- PUBLIC API ----------------
-
-  window.addBook = function () {
-    const titleEl = document.getElementById("bookTitleInput");
-    const authorEl = document.getElementById("bookAuthorInput");
-    const pagesEl = document.getElementById("bookPagesInput");
-
-    if (!titleEl) return;
-
-    const title = titleEl.value.trim();
-    const author = authorEl ? authorEl.value.trim() : "";
-    const totalPages = parseInt(pagesEl?.value || "0", 10) || 0;
-
-    if (!title) return;
-
-    const books = getBooks();
-    const now = Date.now();
-
+    const books = loadBooks();
     books.push({
-      id: uid(),
-      title,
-      author,
-      totalPages,
+      id: uuid(),
+      title: title.trim(),
+      author: author.trim(),
+      totalPages: Number(pages) || 0,
       currentPage: 0,
-      notes: "",
-      createdAt: now,
-      updatedAt: now
+      status: status || "want",
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     });
 
     saveBooks(books);
-
-    titleEl.value = "";
-    if (authorEl) authorEl.value = "";
-    if (pagesEl) pagesEl.value = "";
-
     renderBooks();
   };
 
-  window.deleteBook = function (id) {
-    const books = getBooks().filter(b => b.id !== id);
-    saveBooks(books);
-    renderBooks();
-  };
-
-  window.updateBookProgress = function (id) {
-    const input = document.getElementById(`pageInput-${id}`);
-    if (!input) return;
-
-    const value = parseInt(input.value || "0", 10);
-    if (!Number.isFinite(value)) return;
-
-    const books = getBooks();
-    const now = Date.now();
-
-    const updated = books.map(b =>
-      b.id === id
-        ? { ...b, currentPage: Math.max(0, value), updatedAt: now }
-        : b
-    );
-
-    saveBooks(updated);
-    renderBooks();
-  };
-
-  window.openBookEdit = function (id) {
-    if (typeof openModal !== "function") return;
-
-    const books = getBooks();
+  Books.moveBook = function(id, status) {
+    const books = loadBooks();
     const book = books.find(b => b.id === id);
     if (!book) return;
 
-    const title = escapeHtml(book.title);
-    const author = escapeHtml(book.author || "");
-    const totalPages = book.totalPages || 0;
-    const notes = escapeHtml(book.notes || "");
+    book.status = status;
+    book.updatedAt = Date.now();
 
-    openModal(`
-      <div style="
-        width:min(720px, 92vw);
-        max-height:82vh;
-        overflow:auto;
-        padding:16px;
-        border-radius:16px;
-        border:1px solid rgba(255,255,255,0.14);
-        background:rgba(10,10,12,0.95);
-      ">
-        <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-          <div style="color:#E5E7EB; font-weight:950; font-size:1.1rem;">Edit Book</div>
-          <button onclick="closeModal(event)" style="
-            background:none; border:none; color:#E5E7EB; cursor:pointer; font-weight:950; font-size:1.2rem;
-          ">✕</button>
-        </div>
-
-        <div style="margin-top:12px; color:#9CA3AF; font-weight:900;">Title</div>
-        <input id="bookEditTitle" value="${title}" style="
-          width:100%;
-          margin-top:6px;
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.15);
-          border-radius:12px;
-          padding:10px 12px;
-          color:white;
-          outline:none;
-        "/>
-
-        <div style="margin-top:12px; color:#9CA3AF; font-weight:900;">Author</div>
-        <input id="bookEditAuthor" value="${author}" style="
-          width:100%;
-          margin-top:6px;
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.15);
-          border-radius:12px;
-          padding:10px 12px;
-          color:white;
-          outline:none;
-        "/>
-
-        <div style="margin-top:12px; color:#9CA3AF; font-weight:900;">Total Pages</div>
-        <input id="bookEditPages" type="number" value="${totalPages}" style="
-          width:100%;
-          margin-top:6px;
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.15);
-          border-radius:12px;
-          padding:10px 12px;
-          color:white;
-          outline:none;
-        "/>
-
-        <div style="margin-top:12px; color:#9CA3AF; font-weight:900;">Notes / Highlights</div>
-        <textarea id="bookEditNotes" style="
-          width:100%;
-          height:160px;
-          margin-top:6px;
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.15);
-          border-radius:12px;
-          padding:10px 12px;
-          color:white;
-          outline:none;
-        ">${notes}</textarea>
-
-        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-          <button onclick="saveBookEdit('${escapeHtml(book.id)}')" style="
-            padding:9px 14px;
-            border-radius:10px;
-            background:linear-gradient(135deg,#6366f1,#ec4899);
-            color:white;
-            border:none;
-            cursor:pointer;
-            font-weight:950;
-          ">Save</button>
-
-          <button onclick="closeModal(event)" style="
-            padding:9px 14px;
-            border-radius:10px;
-            background:rgba(255,255,255,0.08);
-            border:1px solid rgba(255,255,255,0.16);
-            color:white;
-            cursor:pointer;
-            font-weight:900;
-          ">Cancel</button>
-        </div>
-      </div>
-    `);
-  };
-
-  window.saveBookEdit = function (id) {
-    const titleEl = document.getElementById("bookEditTitle");
-    const authorEl = document.getElementById("bookEditAuthor");
-    const pagesEl = document.getElementById("bookEditPages");
-    const notesEl = document.getElementById("bookEditNotes");
-
-    if (!titleEl) return;
-
-    const title = titleEl.value.trim();
-    const author = authorEl ? authorEl.value.trim() : "";
-    const totalPages = parseInt(pagesEl?.value || "0", 10) || 0;
-    const notes = notesEl ? notesEl.value.trim() : "";
-
-    if (!title) return;
-
-    const books = getBooks();
-    const now = Date.now();
-
-    const updated = books.map(b =>
-      b.id === id
-        ? { ...b, title, author, totalPages, notes, updatedAt: now }
-        : b
-    );
-
-    saveBooks(updated);
-
-    if (typeof closeModal === "function") closeModal();
+    saveBooks(books);
     renderBooks();
   };
 
-  // ---------------- HOOK PAGE ACTIVATION ----------------
+  Books.deleteBook = function(id) {
+    const books = loadBooks().filter(b => b.id !== id);
+    saveBooks(books);
+    renderBooks();
+  };
 
-  function hookNavigation() {
-    document.addEventListener("click", e => {
-      const tab = e.target && e.target.closest ? e.target.closest(".nav-tab") : null;
-      if (!tab) return;
-      setTimeout(renderBooks, 50);
+  Books.updateProgress = function(id, newPage) {
+    const books = loadBooks();
+    const book = books.find(b => b.id === id);
+    if (!book) return;
+
+    book.currentPage = Math.min(Number(newPage), book.totalPages);
+    book.updatedAt = Date.now();
+
+    saveBooks(books);
+
+    const history = loadHistory();
+    history.push({
+      bookId: id,
+      day: todayKey(),
+      page: book.currentPage
+    });
+    saveHistory(history);
+
+    renderBooks();
+  };
+
+  // ==========================
+  // RENDER UI
+  // ==========================
+
+  function renderBooks() {
+    const mount = ensureMount();
+    if (!mount) return;
+
+    const books = loadBooks();
+
+    const current = books.filter(b => b.status === "current");
+    const want = books.filter(b => b.status === "want");
+    const read = books.filter(b => b.status === "read");
+
+    mount.innerHTML = `
+      <div class="habit-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="section-title">📖 Currently Reading</div>
+          <button class="form-submit" id="addBookBtn">Add Book</button>
+        </div>
+        ${current.length ? current.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No books currently being read.</div>`}
+      </div>
+
+      <div class="habit-section">
+        <div class="section-title">📚 Want to Read</div>
+        ${want.length ? want.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No books in wishlist.</div>`}
+      </div>
+
+      <div class="habit-section">
+        <div class="section-title">✅ Books Read</div>
+        ${read.length ? read.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No completed books yet.</div>`}
+      </div>
+
+      <div class="habit-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="section-title">📈 Reading Progress</div>
+          <select id="bookSelect" class="form-input" style="width:auto;">
+            ${current.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("")}
+          </select>
+        </div>
+        <canvas id="booksChart" height="140"></canvas>
+      </div>
+    `;
+
+    bindEvents();
+    renderChart();
+  }
+
+  function renderBookCard(book) {
+    const progress = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
+
+    let buttons = "";
+    if (book.status === "want") {
+      buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="current">Start Reading</button>`;
+    }
+    if (book.status === "current") {
+      buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="read">Mark Read</button>`;
+      buttons += `<button class="form-cancel" data-action="progress" data-id="${book.id}">Update Progress</button>`;
+    }
+
+    buttons += `<button class="form-cancel" data-action="delete" data-id="${book.id}" style="color:#ef4444;">Delete</button>`;
+
+    return `
+      <div class="idea-item" style="margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:800;">${escapeHtml(book.title)}</div>
+            <div style="color:#9CA3AF;">${escapeHtml(book.author || "")}</div>
+            ${book.totalPages ? `<div style="color:#a78bfa;">${book.currentPage}/${book.totalPages} pages (${progress}%)</div>` : ""}
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${buttons}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==========================
+  // EVENTS
+  // ==========================
+
+  function bindEvents() {
+    const mount = document.getElementById(MOUNT_ID);
+    if (!mount) return;
+
+    const addBtn = mount.querySelector("#addBookBtn");
+    if (addBtn) addBtn.onclick = openAddBookModal;
+
+    mount.querySelectorAll("[data-action]").forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+
+        if (action === "move") Books.moveBook(id, btn.dataset.status);
+        if (action === "delete") Books.deleteBook(id);
+        if (action === "progress") openProgressModal(id);
+      };
     });
   }
 
-  function observeActivation() {
-    const page = document.getElementById("booksPage");
-    if (!page || typeof MutationObserver === "undefined") return;
+  // ==========================
+  // MODALS
+  // ==========================
 
-    const obs = new MutationObserver(() => {
-      if (page.classList.contains("active")) {
-        renderBooks();
+  function openAddBookModal() {
+    if (typeof openModal !== "function") return alert("Modal system missing.");
+
+    openModal(`
+      <div class="section-title">Add Book</div>
+
+      <div class="form-group">
+        <label>Title</label>
+        <input id="bookTitle" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label>Author (optional)</label>
+        <input id="bookAuthor" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label>Total Pages</label>
+        <input id="bookPages" type="number" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select id="bookStatus" class="form-input">
+          <option value="want">Want to Read</option>
+          <option value="current">Currently Reading</option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="saveBook">Save</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
+
+    document.getElementById("saveBook").onclick = () => {
+      Books.addBook(
+        document.getElementById("bookTitle").value,
+        document.getElementById("bookAuthor").value,
+        document.getElementById("bookPages").value,
+        document.getElementById("bookStatus").value
+      );
+      closeModal();
+    };
+  }
+
+  function openProgressModal(id) {
+    const books = loadBooks();
+    const book = books.find(b => b.id === id);
+    if (!book) return;
+
+    openModal(`
+      <div class="section-title">Update Progress</div>
+      <div class="form-group">
+        <label>Current Page</label>
+        <input id="progressPage" type="number" class="form-input" value="${book.currentPage}">
+      </div>
+      <div class="form-actions">
+        <button class="form-submit" id="updateProgress">Update</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
+
+    document.getElementById("updateProgress").onclick = () => {
+      Books.updateProgress(id, document.getElementById("progressPage").value);
+      closeModal();
+    };
+  }
+
+  // ==========================
+  // CHART
+  // ==========================
+
+  function renderChart() {
+    const mount = document.getElementById(MOUNT_ID);
+    if (!mount) return;
+
+    const select = mount.querySelector("#bookSelect");
+    const canvas = mount.querySelector("#booksChart");
+    if (!select || !canvas) return;
+
+    const bookId = select.value;
+    const history = loadHistory().filter(h => h.bookId === bookId);
+
+    const labels = history.map(h => new Date(h.day).toLocaleDateString(undefined,{month:"short",day:"numeric"}));
+    const data = history.map(h => h.page);
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(canvas, {
+      type:"line",
+      data:{
+        labels,
+        datasets:[{
+          label:"Pages Read",
+          data,
+          tension:0.35
+        }]
+      },
+      options:{
+        responsive:true,
+        scales:{ y:{ beginAtZero:true } }
       }
     });
 
-    obs.observe(page, { attributes: true, attributeFilter: ["class"] });
+    select.onchange = renderChart;
+  }
+
+  // ==========================
+  // NAV HOOK
+  // ==========================
+
+  function hook() {
+    document.addEventListener("click", e => {
+      const tab = e.target.closest?.(".nav-tab");
+      if (!tab) return;
+      setTimeout(renderBooks, 100);
+    });
   }
 
   function boot() {
-    hookNavigation();
-    observeActivation();
-    setTimeout(renderBooks, 0);
+    hook();
+    setTimeout(renderBooks, 120);
   }
 
   if (document.readyState === "loading") {
@@ -467,4 +374,5 @@
   } else {
     boot();
   }
+
 })();
