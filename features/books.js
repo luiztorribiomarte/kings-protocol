@@ -1,10 +1,12 @@
 // =====================================================
-// BOOKS INTELLIGENCE SYSTEM (KP EDITION)
+// BOOKS INTELLIGENCE SYSTEM (KP ELITE)
 // - Want to Read → Currently Reading → Read
 // - Progress tracking (pages + daily logs)
-// - Move between sections with buttons
-// - Delete + Edit
-// - Reading progress line chart
+// - Daily reading streaks
+// - Monthly analytics
+// - Insight engine (pattern detection)
+// - Gamification (XP, levels, achievements)
+// - Knowledge extraction (notes + highlights)
 // - Mount-safe (never wipes other modules)
 // =====================================================
 
@@ -12,10 +14,12 @@
   "use strict";
 
   const STORAGE_KEY = "booksData";
-  const HISTORY_KEY = "booksProgressHistory";
+  const HISTORY_KEY = "booksProgressHistory"; // per-book progress snapshots + daily deltas
+  const GAME_KEY = "booksGamification";       // xp, achievements, etc
   const MOUNT_ID = "booksMount";
 
   let chart = null;
+  let monthlyChart = null;
 
   function getContainer() {
     return document.getElementById("booksContainer");
@@ -58,40 +62,300 @@
     localStorage.setItem(HISTORY_KEY, JSON.stringify(data));
   }
 
+  function loadGame() {
+    try {
+      return JSON.parse(localStorage.getItem(GAME_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function saveGame(data) {
+    localStorage.setItem(GAME_KEY, JSON.stringify(data));
+  }
+
   function uuid() {
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
+  function dayKeyFromDate(d) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  }
+
   function todayKey() {
-    const d = new Date();
-    d.setHours(0,0,0,0);
-    return d.getTime();
+    return dayKeyFromDate(new Date());
+  }
+
+  function monthKeyFromDay(dayMs) {
+    const d = new Date(dayMs);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
 
   function escapeHtml(str) {
     return String(str || "")
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;");
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  // ==========================
-  // CORE ACTIONS
-  // ==========================
+  function clamp(n, min, max) {
+    n = Number(n);
+    if (Number.isNaN(n)) return min;
+    return Math.max(min, Math.min(max, n));
+  }
+
+  // =====================================================
+  // GAMIFICATION
+  // =====================================================
+
+  function ensureGameDefaults() {
+    const game = loadGame();
+    if (!game.xp) game.xp = 0;
+    if (!Array.isArray(game.achievements)) game.achievements = [];
+    if (!Array.isArray(game.milestones)) game.milestones = []; // optional future log
+    saveGame(game);
+    return game;
+  }
+
+  function levelFromXP(xp) {
+    // 500 pages = 1 level
+    return Math.floor((xp || 0) / 500) + 1;
+  }
+
+  function unlockAchievement(game, key) {
+    if (!game.achievements.includes(key)) {
+      game.achievements.push(key);
+      saveGame(game);
+    }
+  }
+
+  function computeAchievements(game, stats) {
+    // Stats used:
+    // stats.totalPagesReadAllTime
+    // stats.totalBooksRead
+    // stats.currentStreak
+    // stats.bestStreak
+    // stats.monthPages (current month)
+    // stats.daysReadThisMonth
+
+    const pages = stats.totalPagesReadAllTime || 0;
+    const books = stats.totalBooksRead || 0;
+    const streak = stats.currentStreak || 0;
+    const best = stats.bestStreak || 0;
+
+    if (pages >= 50) unlockAchievement(game, "first-50");
+    if (pages >= 250) unlockAchievement(game, "pages-250");
+    if (pages >= 1000) unlockAchievement(game, "pages-1000");
+    if (books >= 1) unlockAchievement(game, "first-book");
+    if (books >= 5) unlockAchievement(game, "books-5");
+    if (books >= 10) unlockAchievement(game, "books-10");
+    if (streak >= 3) unlockAchievement(game, "streak-3");
+    if (streak >= 7) unlockAchievement(game, "streak-7");
+    if (best >= 14) unlockAchievement(game, "streak-14");
+  }
+
+  function achievementLabel(key) {
+    const map = {
+      "first-50": "Read 50 pages",
+      "pages-250": "Read 250 pages",
+      "pages-1000": "Read 1,000 pages",
+      "first-book": "Finish 1 book",
+      "books-5": "Finish 5 books",
+      "books-10": "Finish 10 books",
+      "streak-3": "3-day streak",
+      "streak-7": "7-day streak",
+      "streak-14": "14-day best streak"
+    };
+    return map[key] || key;
+  }
+
+  // =====================================================
+  // INSIGHTS ENGINE (NO EXTERNAL API)
+  // =====================================================
+
+  function weekdayName(dayMs) {
+    return new Date(dayMs).toLocaleDateString(undefined, { weekday: "short" });
+  }
+
+  function computeInsights(historyDailyTotals) {
+    // historyDailyTotals: array of {day, pages}
+    if (!historyDailyTotals.length) {
+      return [
+        "No reading data yet. Log pages for a few days and insights will appear."
+      ];
+    }
+
+    // Best weekday
+    const byWeekday = {};
+    historyDailyTotals.forEach(x => {
+      const wd = weekdayName(x.day);
+      byWeekday[wd] = byWeekday[wd] || { total: 0, days: 0 };
+      byWeekday[wd].total += x.pages;
+      byWeekday[wd].days += 1;
+    });
+
+    let bestDay = null;
+    let bestAvg = 0;
+    Object.keys(byWeekday).forEach(k => {
+      const avg = byWeekday[k].total / byWeekday[k].days;
+      if (avg > bestAvg) {
+        bestAvg = avg;
+        bestDay = k;
+      }
+    });
+
+    // Consistency
+    const daysRead = historyDailyTotals.filter(x => x.pages > 0).length;
+    const spanDays = Math.max(1, Math.round((historyDailyTotals[historyDailyTotals.length - 1].day - historyDailyTotals[0].day) / 86400000) + 1);
+    const consistency = Math.round((daysRead / spanDays) * 100);
+
+    // Momentum (last 7 vs previous 7)
+    const last14 = historyDailyTotals.slice(-14);
+    const last7 = last14.slice(-7).reduce((a, b) => a + b.pages, 0);
+    const prev7 = last14.slice(0, Math.max(0, last14.length - 7)).reduce((a, b) => a + b.pages, 0);
+    const momentum = last7 > prev7 ? "up" : last7 < prev7 ? "down" : "flat";
+
+    const insights = [];
+
+    if (bestDay) {
+      insights.push(`Your strongest reading day is ${bestDay} (avg ${bestAvg.toFixed(1)} pages).`);
+    }
+
+    insights.push(`Consistency: you read on about ${consistency}% of days in your tracked range.`);
+
+    if (historyDailyTotals.length >= 14) {
+      if (momentum === "up") insights.push("Momentum is rising: last 7 days beat the previous 7.");
+      if (momentum === "down") insights.push("Momentum dipped: last 7 days are below the previous 7.");
+      if (momentum === "flat") insights.push("Momentum is steady: last 7 days match the previous 7.");
+    } else {
+      insights.push("Track at least 14 days for momentum insights.");
+    }
+
+    // Micro-coaching suggestion
+    const avgPerReadDay = Math.round(
+      historyDailyTotals.reduce((a, b) => a + b.pages, 0) / Math.max(1, daysRead)
+    );
+    if (avgPerReadDay < 10) {
+      insights.push("Try a 10-page minimum daily rule for a week.");
+    } else if (avgPerReadDay < 25) {
+      insights.push("You’re in a good zone. Push 5 extra pages on your best weekday.");
+    } else {
+      insights.push("High output. Consider tracking notes/highlights to compound learning.");
+    }
+
+    return insights.slice(0, 5);
+  }
+
+  // =====================================================
+  // STATS / ANALYTICS
+  // =====================================================
+
+  function buildDailyTotals(history) {
+    // Sum across all books: pages read per day
+    const map = {};
+    history.forEach(h => {
+      const d = Number(h.day);
+      const delta = Number(h.delta || 0);
+      map[d] = (map[d] || 0) + Math.max(0, delta);
+    });
+
+    const days = Object.keys(map).map(Number).sort((a, b) => a - b);
+    return days.map(day => ({ day, pages: map[day] }));
+  }
+
+  function computeStreak(dailyTotals) {
+    // streak: consecutive days ending today where pages > 0
+    const today = todayKey();
+    const map = {};
+    dailyTotals.forEach(x => { map[x.day] = x.pages; });
+
+    let streak = 0;
+    let cursor = today;
+
+    while (map[cursor] > 0) {
+      streak += 1;
+      cursor -= 86400000;
+    }
+
+    // best streak in history
+    let best = 0;
+    let run = 0;
+    const sorted = dailyTotals.slice().sort((a, b) => a.day - b.day);
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].pages > 0) run += 1;
+      else run = 0;
+      if (run > best) best = run;
+    }
+
+    return { current: streak, best };
+  }
+
+  function computeMonthlyAnalytics(history) {
+    // returns:
+    // - monthTotals: [{month, pages}]
+    // - thisMonth: {pages, daysRead, avg}
+    const monthMap = {};
+    const dayMapThisMonth = {};
+
+    history.forEach(h => {
+      const day = Number(h.day);
+      const month = monthKeyFromDay(day);
+      const delta = Math.max(0, Number(h.delta || 0));
+      monthMap[month] = (monthMap[month] || 0) + delta;
+    });
+
+    const nowMonth = monthKeyFromDay(todayKey());
+    history.forEach(h => {
+      const day = Number(h.day);
+      const month = monthKeyFromDay(day);
+      if (month !== nowMonth) return;
+      const delta = Math.max(0, Number(h.delta || 0));
+      dayMapThisMonth[day] = (dayMapThisMonth[day] || 0) + delta;
+    });
+
+    const daysRead = Object.keys(dayMapThisMonth).filter(d => dayMapThisMonth[d] > 0).length;
+    const pagesThisMonth = monthMap[nowMonth] || 0;
+    const avg = daysRead ? (pagesThisMonth / daysRead) : 0;
+
+    const monthTotals = Object.keys(monthMap)
+      .sort()
+      .map(m => ({ month: m, pages: monthMap[m] }));
+
+    return {
+      monthTotals,
+      thisMonth: { month: nowMonth, pages: pagesThisMonth, daysRead, avg }
+    };
+  }
+
+  function totalPagesReadAllTime(history) {
+    return history.reduce((sum, h) => sum + Math.max(0, Number(h.delta || 0)), 0);
+  }
+
+  function totalBooksRead(books) {
+    return books.filter(b => b.status === "read").length;
+  }
+
+  // =====================================================
+  // GLOBAL API
+  // =====================================================
 
   window.Books = window.Books || {};
 
-  Books.addBook = function(title, author, pages, status) {
-    if (!title.trim()) return;
+  Books.addBook = function (title, author, pages, status) {
+    if (!String(title || "").trim()) return;
 
     const books = loadBooks();
     books.push({
       id: uuid(),
-      title: title.trim(),
-      author: author.trim(),
+      title: String(title).trim(),
+      author: String(author || "").trim(),
       totalPages: Number(pages) || 0,
       currentPage: 0,
       status: status || "want",
+      notes: [],
+      highlights: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
     });
@@ -100,7 +364,7 @@
     renderBooks();
   };
 
-  Books.moveBook = function(id, status) {
+  Books.moveBook = function (id, status) {
     const books = loadBooks();
     const book = books.find(b => b.id === id);
     if (!book) return;
@@ -112,48 +376,225 @@
     renderBooks();
   };
 
-  Books.deleteBook = function(id) {
+  Books.deleteBook = function (id) {
     const books = loadBooks().filter(b => b.id !== id);
     saveBooks(books);
+
+    // Keep history; it’s useful. (You can add a purge later if you want.)
     renderBooks();
   };
 
-  Books.updateProgress = function(id, newPage) {
+  Books.updateProgress = function (id, newPage, dailyPagesOptional) {
     const books = loadBooks();
     const book = books.find(b => b.id === id);
     if (!book) return;
 
-    book.currentPage = Math.min(Number(newPage), book.totalPages);
+    const history = loadHistory();
+    const t = todayKey();
+
+    const current = clamp(newPage, 0, book.totalPages || 999999);
+
+    // Find last known page for this book (any day)
+    const prevEntry = history
+      .filter(h => h.bookId === id)
+      .sort((a, b) => a.day - b.day)
+      .slice(-1)[0];
+
+    const prevPage = prevEntry ? Number(prevEntry.page || 0) : Number(book.currentPage || 0);
+
+    // If user provided "pages read today", prioritize it as the delta
+    let delta = 0;
+
+    if (dailyPagesOptional !== undefined && dailyPagesOptional !== null && String(dailyPagesOptional).trim() !== "") {
+      delta = Math.max(0, Number(dailyPagesOptional) || 0);
+    } else {
+      delta = Math.max(0, current - prevPage);
+    }
+
+    // If there is already an entry for today, update it (no duplicates)
+    const todayEntry = history.find(h => h.bookId === id && Number(h.day) === t);
+
+    if (todayEntry) {
+      // Adjust delta: keep it safe and non-negative
+      // We treat delta as "pages read today", not necessarily (current - yesterday).
+      todayEntry.page = current;
+      todayEntry.delta = delta;
+    } else {
+      history.push({
+        bookId: id,
+        day: t,
+        page: current,
+        delta
+      });
+    }
+
+    saveHistory(history);
+
+    book.currentPage = current;
     book.updatedAt = Date.now();
+
+    // Auto-finish guard
+    if (book.totalPages && book.currentPage >= book.totalPages) {
+      book.status = "read";
+    }
 
     saveBooks(books);
 
-    const history = loadHistory();
-    history.push({
-      bookId: id,
-      day: todayKey(),
-      page: book.currentPage
-    });
-    saveHistory(history);
+    // Gamification XP = pages read (delta)
+    const game = ensureGameDefaults();
+    game.xp += delta;
+    saveGame(game);
 
     renderBooks();
   };
 
-  // ==========================
-  // RENDER UI
-  // ==========================
+  Books.addKnowledge = function (id, type, text) {
+    const books = loadBooks();
+    const book = books.find(b => b.id === id);
+    if (!book) return;
+
+    const entry = {
+      id: uuid(),
+      text: String(text || "").trim(),
+      createdAt: Date.now()
+    };
+
+    if (!entry.text) return;
+
+    if (type === "note") book.notes = Array.isArray(book.notes) ? book.notes : [];
+    if (type === "highlight") book.highlights = Array.isArray(book.highlights) ? book.highlights : [];
+
+    if (type === "note") book.notes.push(entry);
+    if (type === "highlight") book.highlights.push(entry);
+
+    book.updatedAt = Date.now();
+    saveBooks(books);
+    renderBooks();
+  };
+
+  Books.viewKnowledge = function (id) {
+    const book = loadBooks().find(b => b.id === id);
+    if (!book) return;
+
+    if (typeof openModal !== "function") return;
+
+    const notes = (book.notes || []).slice().reverse();
+    const highlights = (book.highlights || []).slice().reverse();
+
+    openModal(`
+      <div class="section-title">Knowledge: ${escapeHtml(book.title)}</div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800; margin-bottom:6px;">Notes (${notes.length})</div>
+        ${notes.length ? notes.map(n => `
+          <div class="idea-item" style="margin-bottom:8px;">
+            <div style="color:#9CA3AF; font-size:0.8rem;">${new Date(n.createdAt).toLocaleString()}</div>
+            <div>${escapeHtml(n.text)}</div>
+          </div>
+        `).join("") : `<div style="color:#9CA3AF;">No notes yet.</div>`}
+      </div>
+
+      <div>
+        <div style="font-weight:800; margin-bottom:6px;">Highlights (${highlights.length})</div>
+        ${highlights.length ? highlights.map(h => `
+          <div class="idea-item" style="margin-bottom:8px;">
+            <div style="color:#9CA3AF; font-size:0.8rem;">${new Date(h.createdAt).toLocaleString()}</div>
+            <div>${escapeHtml(h.text)}</div>
+          </div>
+        `).join("") : `<div style="color:#9CA3AF;">No highlights yet.</div>`}
+      </div>
+    `);
+  };
+
+  // =====================================================
+  // UI RENDER
+  // =====================================================
 
   function renderBooks() {
     const mount = ensureMount();
     if (!mount) return;
 
     const books = loadBooks();
+    const history = loadHistory();
 
     const current = books.filter(b => b.status === "current");
     const want = books.filter(b => b.status === "want");
     const read = books.filter(b => b.status === "read");
 
+    const dailyTotals = buildDailyTotals(history);
+    const streak = computeStreak(dailyTotals);
+    const monthly = computeMonthlyAnalytics(history);
+
+    const pagesAll = totalPagesReadAllTime(history);
+    const booksReadCount = totalBooksRead(books);
+
+    const game = ensureGameDefaults();
+    const lvl = levelFromXP(game.xp);
+
+    // achievements update
+    computeAchievements(game, {
+      totalPagesReadAllTime: pagesAll,
+      totalBooksRead: booksReadCount,
+      currentStreak: streak.current,
+      bestStreak: streak.best,
+      monthPages: monthly.thisMonth.pages,
+      daysReadThisMonth: monthly.thisMonth.daysRead
+    });
+
+    const insights = computeInsights(dailyTotals);
+
     mount.innerHTML = `
+      <div class="habit-section">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div class="section-title">📚 Reading Dashboard</div>
+            <div style="color:#9CA3AF;">
+              Streak: <span style="color:#22c55e; font-weight:900;">${streak.current} day(s)</span>
+              (Best: ${streak.best})
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <div class="content-stat-card" style="padding:12px 14px; min-width:160px;">
+              <div style="color:#9CA3AF;">XP</div>
+              <div style="font-size:1.2rem; font-weight:900;">${Number(game.xp).toLocaleString()}</div>
+            </div>
+            <div class="content-stat-card" style="padding:12px 14px; min-width:160px;">
+              <div style="color:#9CA3AF;">Level</div>
+              <div style="font-size:1.2rem; font-weight:900;">${lvl}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-stats" style="margin-top:14px;">
+          <div class="content-stat-card">
+            <div>Pages Read (All Time)</div>
+            <div style="font-size:1.6rem; font-weight:900;">${Number(pagesAll).toLocaleString()}</div>
+          </div>
+          <div class="content-stat-card">
+            <div>Books Finished</div>
+            <div style="font-size:1.6rem; font-weight:900;">${booksReadCount}</div>
+          </div>
+          <div class="content-stat-card">
+            <div>This Month</div>
+            <div style="font-size:1.6rem; font-weight:900;">${monthly.thisMonth.pages} pages</div>
+            <div style="color:#9CA3AF; font-size:0.85rem;">
+              ${monthly.thisMonth.daysRead} day(s) • avg ${monthly.thisMonth.avg.toFixed(1)}/day
+            </div>
+          </div>
+          <div class="content-stat-card">
+            <div>Achievements</div>
+            <div style="font-size:1.1rem; font-weight:900;">${game.achievements.length}</div>
+            <button class="form-cancel" id="viewAchievementsBtn" style="margin-top:10px;">View</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="habit-section">
+        <div class="section-title">🧠 Insights</div>
+        ${insights.map(x => `<div style="margin-bottom:8px;">• ${escapeHtml(x)}</div>`).join("")}
+      </div>
+
       <div class="habit-section">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div class="section-title">📖 Currently Reading</div>
@@ -173,43 +614,73 @@
       </div>
 
       <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="section-title">📈 Reading Progress</div>
-          <select id="bookSelect" class="form-input" style="width:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title">📈 Book Progress</div>
+          <select id="bookSelect" class="form-input" style="width:auto; min-width:220px;">
             ${current.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("")}
+            ${(!current.length && want.length) ? want.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("") : ""}
+            ${(!current.length && !want.length && read.length) ? read.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("") : ""}
           </select>
         </div>
         <canvas id="booksChart" height="140"></canvas>
       </div>
+
+      <div class="habit-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="section-title">📅 Monthly Pages Read</div>
+        </div>
+        <canvas id="booksMonthlyChart" height="140"></canvas>
+      </div>
     `;
 
     bindEvents();
-    renderChart();
+    renderProgressChart();
+    renderMonthlyChart();
   }
 
   function renderBookCard(book) {
     const progress = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
+    const notesCount = (book.notes || []).length;
+    const highlightsCount = (book.highlights || []).length;
 
     let buttons = "";
+
     if (book.status === "want") {
       buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="current">Start Reading</button>`;
     }
+
     if (book.status === "current") {
       buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="read">Mark Read</button>`;
       buttons += `<button class="form-cancel" data-action="progress" data-id="${book.id}">Update Progress</button>`;
     }
 
+    buttons += `<button class="form-cancel" data-action="knowledge" data-id="${book.id}">Knowledge</button>`;
+    buttons += `<button class="form-cancel" data-action="addNote" data-id="${book.id}">Add Note</button>`;
+    buttons += `<button class="form-cancel" data-action="addHighlight" data-id="${book.id}">Add Highlight</button>`;
     buttons += `<button class="form-cancel" data-action="delete" data-id="${book.id}" style="color:#ef4444;">Delete</button>`;
 
     return `
       <div class="idea-item" style="margin-top:10px;">
-        <div style="display:flex; justify-content:space-between; gap:10px;">
-          <div>
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="min-width:260px;">
             <div style="font-weight:800;">${escapeHtml(book.title)}</div>
             <div style="color:#9CA3AF;">${escapeHtml(book.author || "")}</div>
-            ${book.totalPages ? `<div style="color:#a78bfa;">${book.currentPage}/${book.totalPages} pages (${progress}%)</div>` : ""}
+
+            ${book.totalPages ? `
+              <div style="color:#a78bfa; margin-top:6px;">
+                ${book.currentPage}/${book.totalPages} pages (${progress}%)
+              </div>
+              <div style="margin-top:8px; height:6px; border-radius:6px; background:rgba(255,255,255,0.18); overflow:hidden;">
+                <div style="height:100%; width:${progress}%; background:linear-gradient(135deg,#6366f1,#ec4899);"></div>
+              </div>
+            ` : `<div style="color:#9CA3AF; margin-top:6px;">Set total pages to track progress.</div>`}
+
+            <div style="color:#9CA3AF; font-size:0.85rem; margin-top:8px;">
+              Notes: ${notesCount} • Highlights: ${highlightsCount}
+            </div>
           </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start;">
             ${buttons}
           </div>
         </div>
@@ -217,9 +688,9 @@
     `;
   }
 
-  // ==========================
-  // EVENTS
-  // ==========================
+  // =====================================================
+  // EVENTS + MODALS
+  // =====================================================
 
   function bindEvents() {
     const mount = document.getElementById(MOUNT_ID);
@@ -227,6 +698,9 @@
 
     const addBtn = mount.querySelector("#addBookBtn");
     if (addBtn) addBtn.onclick = openAddBookModal;
+
+    const viewAch = mount.querySelector("#viewAchievementsBtn");
+    if (viewAch) viewAch.onclick = openAchievementsModal;
 
     mount.querySelectorAll("[data-action]").forEach(btn => {
       btn.onclick = () => {
@@ -236,13 +710,12 @@
         if (action === "move") Books.moveBook(id, btn.dataset.status);
         if (action === "delete") Books.deleteBook(id);
         if (action === "progress") openProgressModal(id);
+        if (action === "knowledge") Books.viewKnowledge(id);
+        if (action === "addNote") openKnowledgeModal(id, "note");
+        if (action === "addHighlight") openKnowledgeModal(id, "highlight");
       };
     });
   }
-
-  // ==========================
-  // MODALS
-  // ==========================
 
   function openAddBookModal() {
     if (typeof openModal !== "function") return alert("Modal system missing.");
@@ -295,12 +768,24 @@
     const book = books.find(b => b.id === id);
     if (!book) return;
 
+    if (typeof openModal !== "function") return;
+
     openModal(`
       <div class="section-title">Update Progress</div>
+
       <div class="form-group">
         <label>Current Page</label>
         <input id="progressPage" type="number" class="form-input" value="${book.currentPage}">
       </div>
+
+      <div class="form-group">
+        <label>Pages read today (optional)</label>
+        <input id="pagesToday" type="number" class="form-input" placeholder="Example: 20">
+        <div style="color:#9CA3AF; font-size:0.85rem; margin-top:6px;">
+          If you fill this, it will log today's pages read even if your current page doesn't jump much.
+        </div>
+      </div>
+
       <div class="form-actions">
         <button class="form-submit" id="updateProgress">Update</button>
         <button class="form-cancel" onclick="closeModal()">Cancel</button>
@@ -308,16 +793,66 @@
     `);
 
     document.getElementById("updateProgress").onclick = () => {
-      Books.updateProgress(id, document.getElementById("progressPage").value);
+      Books.updateProgress(
+        id,
+        document.getElementById("progressPage").value,
+        document.getElementById("pagesToday").value
+      );
       closeModal();
     };
   }
 
-  // ==========================
-  // CHART
-  // ==========================
+  function openKnowledgeModal(id, type) {
+    const book = loadBooks().find(b => b.id === id);
+    if (!book) return;
 
-  function renderChart() {
+    if (typeof openModal !== "function") return;
+
+    const title = type === "note" ? "Add Note" : "Add Highlight";
+
+    openModal(`
+      <div class="section-title">${title}</div>
+      <div style="color:#9CA3AF; margin-bottom:10px;">${escapeHtml(book.title)}</div>
+
+      <div class="form-group">
+        <label>${type === "note" ? "Note" : "Highlight"}</label>
+        <textarea id="knowledgeText" class="form-input" rows="6" placeholder="Paste your notes/highlights here..."></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="saveKnowledge">Save</button>
+        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    `);
+
+    document.getElementById("saveKnowledge").onclick = () => {
+      Books.addKnowledge(id, type, document.getElementById("knowledgeText").value);
+      closeModal();
+    };
+  }
+
+  function openAchievementsModal() {
+    const game = ensureGameDefaults();
+    if (typeof openModal !== "function") return;
+
+    const list = (game.achievements || []).slice().reverse();
+
+    openModal(`
+      <div class="section-title">Achievements</div>
+      ${list.length ? list.map(a => `
+        <div class="idea-item" style="margin-bottom:10px;">
+          <div style="font-weight:900;">${escapeHtml(achievementLabel(a))}</div>
+          <div style="color:#9CA3AF; font-size:0.85rem;">${escapeHtml(a)}</div>
+        </div>
+      `).join("") : `<div style="color:#9CA3AF;">No achievements unlocked yet.</div>`}
+    `);
+  }
+
+  // =====================================================
+  // CHARTS
+  // =====================================================
+
+  function renderProgressChart() {
     const mount = document.getElementById(MOUNT_ID);
     if (!mount) return;
 
@@ -325,36 +860,81 @@
     const canvas = mount.querySelector("#booksChart");
     if (!select || !canvas) return;
 
-    const bookId = select.value;
-    const history = loadHistory().filter(h => h.bookId === bookId);
+    const books = loadBooks();
+    const history = loadHistory();
 
-    const labels = history.map(h => new Date(h.day).toLocaleDateString(undefined,{month:"short",day:"numeric"}));
-    const data = history.map(h => h.page);
+    const bookId = select.value;
+    const book = books.find(b => b.id === bookId);
+
+    const series = history
+      .filter(h => h.bookId === bookId)
+      .sort((a, b) => a.day - b.day);
+
+    const labels = series.map(h => new Date(h.day).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+    const data = series.map(h => Number(h.page || 0));
 
     if (chart) chart.destroy();
 
     chart = new Chart(canvas, {
-      type:"line",
-      data:{
+      type: "line",
+      data: {
         labels,
-        datasets:[{
-          label:"Pages Read",
+        datasets: [{
+          label: book ? `${book.title} (page)` : "Progress",
           data,
-          tension:0.35
+          tension: 0.35
         }]
       },
-      options:{
-        responsive:true,
-        scales:{ y:{ beginAtZero:true } }
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
       }
     });
 
-    select.onchange = renderChart;
+    select.onchange = renderBooks; // re-render so the chart always follows the selected book cleanly
   }
 
-  // ==========================
+  function renderMonthlyChart() {
+    const mount = document.getElementById(MOUNT_ID);
+    if (!mount) return;
+
+    const canvas = mount.querySelector("#booksMonthlyChart");
+    if (!canvas) return;
+
+    const history = loadHistory();
+    const monthly = computeMonthlyAnalytics(history);
+
+    // show last 8 months max (clean)
+    const last = monthly.monthTotals.slice(-8);
+    const labels = last.map(x => x.month);
+    const data = last.map(x => x.pages);
+
+    if (monthlyChart) monthlyChart.destroy();
+
+    monthlyChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Pages per month",
+          data,
+          tension: 0.35
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // =====================================================
   // NAV HOOK
-  // ==========================
+  // =====================================================
 
   function hook() {
     document.addEventListener("click", e => {
