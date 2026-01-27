@@ -1,8 +1,7 @@
 // ============================================
-// WORKOUT ENGINE — INTELLIGENCE LAYER
-// SAFE: does NOT modify workout.js
-// Reads workoutData only (localStorage)
-// Provides: streak, weekly stats, daily series, PR detection helpers
+// WORKOUT ENGINE — ALIGNED WITH workout.js
+// Reads Workouts.workouts[] structure
+// Provides analytics, streaks, series, PRs
 // ============================================
 
 window.WorkoutEngine = (function () {
@@ -15,95 +14,59 @@ window.WorkoutEngine = (function () {
     }
   }
 
-  function loadWorkoutData() {
-    return safeParse(localStorage.getItem("workoutData") || "{}", {});
+  function loadWorkouts() {
+    return safeParse(localStorage.getItem("kp_workouts") || "[]", []);
   }
 
-  function toDayKey(isoOrDate) {
-    try {
-      const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
-      return d.toISOString().split("T")[0];
-    } catch {
-      return new Date().toISOString().split("T")[0];
-    }
+  function toDayKey(date) {
+    const d = new Date(date);
+    return d.toISOString().split("T")[0];
   }
 
   function getAllSessions() {
-    const data = loadWorkoutData();
-    const out = [];
+    const workouts = loadWorkouts();
+    const sessions = [];
 
-    Object.keys(data).forEach(exercise => {
-      const arr = Array.isArray(data[exercise]) ? data[exercise] : [];
-      arr.forEach(s => {
-        out.push({
-          exercise,
-          date: s.date,
-          weight: Number(s.weight || 0),
-          reps: Number(s.reps || 0),
-          sets: Number(s.sets || 0)
+    workouts.forEach(w => {
+      (w.exercises || []).forEach(ex => {
+        (ex.sets || []).forEach(s => {
+          sessions.push({
+            date: w.date,
+            workoutId: w.id,
+            exercise: ex.name,
+            weight: Number(s.weight || 0),
+            reps: Number(s.reps || 0)
+          });
         });
       });
     });
 
-    out.sort((a, b) => new Date(a.date) - new Date(b.date));
-    return out;
-  }
-
-  function getRangeKeys(range) {
-    const sessions = getAllSessions();
-    const today = new Date();
-
-    if (range === "all") {
-      const set = new Set(sessions.map(s => toDayKey(s.date)));
-      const keys = [...set].sort((a, b) => new Date(a) - new Date(b));
-      if (!keys.length) return getRangeKeys("7");
-      return keys;
-    }
-
-    const n = range === "30" ? 30 : 7;
-    const keys = [];
-    for (let i = n - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      keys.push(toDayKey(d));
-    }
-    return keys;
+    sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+    return sessions;
   }
 
   function calcVolume(s) {
-    const w = Number(s.weight || 0);
-    const r = Number(s.reps || 0);
-    const sets = Number(s.sets || 0);
-    return w * r * sets;
+    return s.weight * s.reps;
   }
 
-  // Epley estimate (common + simple). Safe for reps>=1.
   function estimate1RM(weight, reps) {
-    const w = Number(weight || 0);
-    const r = Number(reps || 0);
-    if (!w || r < 1) return 0;
-    return w * (1 + r / 30);
+    if (!weight || !reps) return 0;
+    return weight * (1 + reps / 30);
   }
-
-  // ======================
-  // METRICS
-  // ======================
 
   function getWorkoutDays() {
-    const sessions = getAllSessions();
-    const days = new Set(sessions.map(s => toDayKey(s.date)));
-    return [...days];
+    const workouts = loadWorkouts();
+    return [...new Set(workouts.map(w => toDayKey(w.date)))];
   }
 
-  function getWorkoutStreak(maxLookbackDays = 120) {
+  function getWorkoutStreak() {
     const days = new Set(getWorkoutDays());
     let streak = 0;
 
-    for (let i = 0; i < maxLookbackDays; i++) {
+    for (let i = 0; i < 120; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = toDayKey(d);
-
       if (days.has(key)) streak++;
       else break;
     }
@@ -112,42 +75,38 @@ window.WorkoutEngine = (function () {
   }
 
   function getDailySeries(range = "7") {
-    const keys = getRangeKeys(range);
     const sessions = getAllSessions();
+    const today = new Date();
+
+    let keys = [];
+    if (range === "all") {
+      keys = [...new Set(sessions.map(s => toDayKey(s.date)))];
+    } else {
+      const n = range === "30" ? 30 : 7;
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        keys.push(toDayKey(d));
+      }
+    }
 
     const map = {};
-    keys.forEach(k => (map[k] = { sessions: 0, volume: 0, exercises: new Set() }));
+    keys.forEach(k => (map[k] = { sessions: 0, volume: 0 }));
 
     sessions.forEach(s => {
       const k = toDayKey(s.date);
       if (!map[k]) return;
-      map[k].sessions += 1;
+      map[k].sessions++;
       map[k].volume += calcVolume(s);
-      map[k].exercises.add(s.exercise);
     });
 
     return {
-      keys,
       labels: keys.map(k => {
-        const d = new Date(k + "T00:00:00");
+        const d = new Date(k);
         return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }),
       sessions: keys.map(k => map[k].sessions),
-      volume: keys.map(k => map[k].volume),
-      exercises: keys.map(k => map[k].exercises.size)
-    };
-  }
-
-  function getWeeklyStats() {
-    const series = getDailySeries("7");
-    const totalSessions = series.sessions.reduce((a, b) => a + b, 0);
-    const totalVolume = series.volume.reduce((a, b) => a + b, 0);
-    const activeDays = series.sessions.filter(x => x > 0).length;
-
-    return {
-      sessions: totalSessions,
-      volume: totalVolume,
-      activeDays
+      volume: keys.map(k => map[k].volume)
     };
   }
 
@@ -165,66 +124,26 @@ window.WorkoutEngine = (function () {
     });
 
     return {
-      dateKey: today,
       sessions: sessions.length,
-      exercises: Object.keys(byExercise).sort((a, b) => a.localeCompare(b)),
+      exercises: Object.keys(byExercise),
       byExercise,
       totalVolume
     };
   }
 
-  function getExerciseSeries(exercise) {
-    const data = loadWorkoutData();
-    const sessions = Array.isArray(data[exercise]) ? data[exercise] : [];
-    if (!sessions.length) return null;
-
-    const sorted = [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    const labels = sorted.map(s => {
-      const d = new Date(s.date);
-      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    });
-
-    const weights = sorted.map(s => Number(s.weight || 0));
-    const volumes = sorted.map(s => calcVolume(s));
-    const est1rm = sorted.map(s => Math.round(estimate1RM(s.weight, s.reps)));
-
-    return {
-      labels,
-      weights,
-      volumes,
-      est1rm,
-      sessions: sorted
-    };
-  }
-
   function computePRs() {
-    const data = loadWorkoutData();
+    const sessions = getAllSessions();
     const pr = {};
 
-    Object.keys(data).forEach(exercise => {
-      const arr = Array.isArray(data[exercise]) ? data[exercise] : [];
-      if (!arr.length) return;
+    sessions.forEach(s => {
+      if (!pr[s.exercise]) pr[s.exercise] = { bestWeight: 0, bestVolume: 0, best1RM: 0 };
 
-      let bestWeight = 0;
-      let bestVolume = 0;
-      let best1RM = 0;
+      const v = calcVolume(s);
+      const one = estimate1RM(s.weight, s.reps);
 
-      arr.forEach(s => {
-        const w = Number(s.weight || 0);
-        const v = calcVolume(s);
-        const one = estimate1RM(s.weight, s.reps);
-
-        if (w > bestWeight) bestWeight = w;
-        if (v > bestVolume) bestVolume = v;
-        if (one > best1RM) best1RM = one;
-      });
-
-      pr[exercise] = {
-        bestWeight,
-        bestVolume,
-        best1RM: Math.round(best1RM)
-      };
+      if (s.weight > pr[s.exercise].bestWeight) pr[s.exercise].bestWeight = s.weight;
+      if (v > pr[s.exercise].bestVolume) pr[s.exercise].bestVolume = v;
+      if (one > pr[s.exercise].best1RM) pr[s.exercise].best1RM = Math.round(one);
     });
 
     return pr;
@@ -232,30 +151,23 @@ window.WorkoutEngine = (function () {
 
   function getWorkoutSummary() {
     const sessions = getAllSessions();
-    const exercises = Object.keys(loadWorkoutData());
-
     return {
-      totalExercises: exercises.length,
       totalSessions: sessions.length,
       streak: getWorkoutStreak(),
-      weekly: getWeeklyStats()
+      weekly: {
+        sessions: getDailySeries("7").sessions.reduce((a, b) => a + b, 0),
+        volume: getDailySeries("7").volume.reduce((a, b) => a + b, 0)
+      }
     };
   }
 
-  function debug() {
-    console.log("WorkoutEngine summary:", getWorkoutSummary());
-  }
-
   return {
-    loadWorkoutData,
+    loadWorkouts,
     getAllSessions,
     getWorkoutSummary,
     getWorkoutStreak,
-    getWeeklyStats,
     getDailySeries,
     getTodaySummary,
-    getExerciseSeries,
-    computePRs,
-    debug
+    computePRs
   };
 })();
