@@ -1,18 +1,22 @@
 // =====================================================
-// CONTENT HUB CORE (STABLE CREATOR SYSTEM)
+// CONTENT HUB CORE (STABLE CREATOR SYSTEM - MOUNT SAFE)
 // Ideas → Posted
-// Add, Edit, Post, Delete ideas (NO POPUPS)
-// Designed to survive KP Core + overlays + re-renders
+// - Add, Edit, Post, Delete ideas (NO POPUPS)
+// - CRITICAL FIX: renders ONLY inside its own mount div
+//   so it does NOT wipe other content modules/upgrades
+// - Compatible with existing "contentHubItems" storage
 // =====================================================
 
 (function () {
   "use strict";
 
   const STORAGE_KEY = "contentHubItems";
+  const HUB_MOUNT_ID = "contentHubMount";
 
   function loadItems() {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(raw) ? raw : [];
     } catch {
       return [];
     }
@@ -33,136 +37,186 @@
       .replace(/>/g, "&gt;");
   }
 
-  function getContainer() {
+  function getContentContainer() {
     return document.getElementById("contentContainer");
   }
 
+  // Ensures we have a safe mount point that only THIS module controls.
+  function ensureMount() {
+    const container = getContentContainer();
+    if (!container) return null;
+
+    let mount = document.getElementById(HUB_MOUNT_ID);
+    if (mount) return mount;
+
+    mount = document.createElement("div");
+    mount.id = HUB_MOUNT_ID;
+
+    // Put it at the top so upgrades can render below if they want
+    container.prepend(mount);
+
+    return mount;
+  }
+
+  // Normalize stages from any older versions
+  function normStage(stage) {
+    return String(stage || "idea").trim().toLowerCase();
+  }
+
+  // Anything not posted is treated as an IDEA (your new simplified system)
+  function isPosted(item) {
+    return normStage(item.stage) === "posted";
+  }
+
   // ===============================
-  // CORE ACTIONS (GLOBAL + STABLE)
+  // GLOBAL API (stable access)
   // ===============================
+  window.ContentHub = window.ContentHub || {};
 
-  window.ContentHub = {
-    addIdea(title, notes) {
-      const items = loadItems();
-      items.push({
-        id: uuid(),
-        title,
-        notes,
-        stage: "idea",
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
-      saveItems(items);
-      renderContentHub();
-    },
+  window.ContentHub.addIdea = function (title, notes) {
+    const t = String(title || "").trim();
+    const n = String(notes || "").trim();
+    if (!t) return;
 
-    postIdea(id) {
-      const items = loadItems();
-      const item = items.find(i => i.id === id);
-      if (!item) return;
+    const items = loadItems();
+    items.push({
+      id: uuid(),
+      title: t,
+      notes: n,
+      stage: "idea",
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
 
-      item.stage = "posted";
-      item.updatedAt = Date.now();
+    saveItems(items);
+    renderContentHub();
+  };
 
-      saveItems(items);
-      renderContentHub();
-    },
+  window.ContentHub.postIdea = function (id) {
+    const items = loadItems();
+    const item = items.find(i => String(i.id) === String(id));
+    if (!item) return;
 
-    deleteIdea(id) {
-      const items = loadItems().filter(i => i.id !== id);
-      saveItems(items);
-      renderContentHub();
-    },
+    item.stage = "posted";
+    item.updatedAt = Date.now();
 
-    editIdea(id) {
-      const items = loadItems();
-      const item = items.find(i => i.id === id);
-      if (!item) return;
-      openEditIdeaModal(item);
-    },
+    saveItems(items);
+    renderContentHub();
+  };
 
-    updateIdea(id, title, notes) {
-      const items = loadItems();
-      const item = items.find(i => i.id === id);
-      if (!item) return;
+  window.ContentHub.deleteIdea = function (id) {
+    const before = loadItems();
+    const after = before.filter(i => String(i.id) !== String(id));
+    saveItems(after);
+    renderContentHub();
+  };
 
-      item.title = title;
-      item.notes = notes;
-      item.updatedAt = Date.now();
+  window.ContentHub.editIdea = function (id) {
+    const items = loadItems();
+    const item = items.find(i => String(i.id) === String(id));
+    if (!item) return;
+    openEditIdeaModal(item);
+  };
 
-      saveItems(items);
-      closeModal();
-      renderContentHub();
-    }
+  window.ContentHub.updateIdea = function (id, title, notes) {
+    const t = String(title || "").trim();
+    const n = String(notes || "").trim();
+
+    const items = loadItems();
+    const item = items.find(i => String(i.id) === String(id));
+    if (!item) return;
+
+    item.title = t || item.title;
+    item.notes = n;
+    item.updatedAt = Date.now();
+
+    saveItems(items);
+
+    // closeModal exists in your main JS; guard anyway
+    if (typeof closeModal === "function") closeModal();
+
+    renderContentHub();
   };
 
   // ===============================
-  // UI RENDER
+  // RENDER
   // ===============================
-
   function renderContentHub() {
-    const container = getContainer();
-    if (!container) return;
+    const mount = ensureMount();
+    if (!mount) return;
 
-    const items = loadItems();
-    const ideas = items.filter(i => i.stage === "idea");
-    const posted = items.filter(i => i.stage === "posted");
+    try {
+      const items = loadItems();
 
-    container.innerHTML = `
-      <div id="contentHubContainer">
+      const ideas = items.filter(i => !isPosted(i));
+      const posted = items.filter(i => isPosted(i));
 
-        <div class="habit-section">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="section-title">💡 Ideas</div>
-            <button class="form-submit" id="addIdeaBtn">Add Idea</button>
+      mount.innerHTML = `
+        <div id="contentHubContainer">
+
+          <div class="habit-section">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="section-title">💡 Ideas</div>
+              <button class="form-submit" id="addIdeaBtn">Add Idea</button>
+            </div>
+
+            <div style="margin-top:10px;">
+              ${
+                ideas.length
+                  ? ideas.map(renderIdeaCard).join("")
+                  : `<div style="color:#9CA3AF;">No ideas yet.</div>`
+              }
+            </div>
           </div>
 
-          <div style="margin-top:10px;">
-            ${
-              ideas.length
-                ? ideas.map(renderIdeaCard).join("")
-                : `<div style="color:#9CA3AF;">No ideas yet.</div>`
-            }
+          <div class="habit-section">
+            <div class="section-title">✅ Posted</div>
+
+            <div style="margin-top:10px;">
+              ${
+                posted.length
+                  ? posted.map(renderIdeaCard).join("")
+                  : `<div style="color:#9CA3AF;">No posted content yet.</div>`
+              }
+            </div>
           </div>
+
         </div>
+      `;
 
+      bindEvents();
+    } catch (err) {
+      console.error("[ContentHub] render error:", err);
+      mount.innerHTML = `
         <div class="habit-section">
-          <div class="section-title">✅ Posted</div>
-
-          <div style="margin-top:10px;">
-            ${
-              posted.length
-                ? posted.map(renderIdeaCard).join("")
-                : `<div style="color:#9CA3AF;">No posted content yet.</div>`
-            }
-          </div>
+          <div class="section-title">Content</div>
+          <div style="color:#EF4444;">Render failed. Check console for error.</div>
         </div>
-
-      </div>
-    `;
-
-    bindContentEvents();
+      `;
+    }
   }
 
   function renderIdeaCard(item) {
-    const label = item.stage === "posted" ? "POSTED" : "IDEA";
+    const id = String(item.id || "");
+    const title = escapeHtml(item.title);
+    const label = isPosted(item) ? "POSTED" : "IDEA";
 
     return `
-      <div style="margin-top:10px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25);">
+      <div class="idea-item" style="margin-top:10px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25);">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
           <div>
-            <div style="font-weight:800;">${escapeHtml(item.title)}</div>
+            <div style="font-weight:800;">${title}</div>
             <div style="color:#9CA3AF; font-size:0.85rem;">${label}</div>
           </div>
 
           <div style="display:flex; gap:6px;">
             ${
-              item.stage === "idea"
-                ? `<button class="form-submit" data-action="post" data-id="${item.id}">Post</button>`
+              !isPosted(item)
+                ? `<button class="form-submit" data-action="post" data-id="${id}">Post</button>`
                 : ""
             }
-            <button class="form-cancel" data-action="edit" data-id="${item.id}">Edit</button>
-            <button class="form-cancel" style="color:#ef4444;" data-action="delete" data-id="${item.id}">Delete</button>
+            <button class="form-cancel" data-action="edit" data-id="${id}">Edit</button>
+            <button class="form-cancel" style="color:#ef4444;" data-action="delete" data-id="${id}">Delete</button>
           </div>
         </div>
       </div>
@@ -170,28 +224,24 @@
   }
 
   // ===============================
-  // EVENT BINDING (REAL FIX)
+  // EVENTS
   // ===============================
-
-  function bindContentEvents() {
+  function bindEvents() {
     const root = document.getElementById("contentHubContainer");
     if (!root) return;
 
-    // Add Idea button
     const addBtn = document.getElementById("addIdeaBtn");
-    if (addBtn) {
-      addBtn.onclick = openAddIdeaModal;
-    }
+    if (addBtn) addBtn.onclick = openAddIdeaModal;
 
-    // Action buttons (Post / Edit / Delete)
+    // Use direct binding each render (stable)
     root.querySelectorAll("[data-action]").forEach(btn => {
       btn.onclick = () => {
         const action = btn.dataset.action;
         const id = btn.dataset.id;
 
-        if (action === "post") ContentHub.postIdea(id);
-        if (action === "edit") ContentHub.editIdea(id);
-        if (action === "delete") ContentHub.deleteIdea(id);
+        if (action === "post") window.ContentHub.postIdea(id);
+        if (action === "edit") window.ContentHub.editIdea(id);
+        if (action === "delete") window.ContentHub.deleteIdea(id);
       };
     });
   }
@@ -199,8 +249,9 @@
   // ===============================
   // MODALS
   // ===============================
-
   function openAddIdeaModal() {
+    if (typeof openModal !== "function") return alert("Modal system missing.");
+
     openModal(`
       <div class="section-title">Add Idea</div>
 
@@ -220,16 +271,20 @@
       </div>
     `);
 
-    document.getElementById("saveIdeaBtn").onclick = () => {
-      const title = document.getElementById("ideaTitleInput").value.trim();
-      const notes = document.getElementById("ideaNotesInput").value.trim();
-      if (!title) return;
-      ContentHub.addIdea(title, notes);
-      closeModal();
-    };
+    const btn = document.getElementById("saveIdeaBtn");
+    if (btn) {
+      btn.onclick = () => {
+        const title = document.getElementById("ideaTitleInput").value.trim();
+        const notes = document.getElementById("ideaNotesInput").value.trim();
+        window.ContentHub.addIdea(title, notes);
+        if (typeof closeModal === "function") closeModal();
+      };
+    }
   }
 
   function openEditIdeaModal(item) {
+    if (typeof openModal !== "function") return alert("Modal system missing.");
+
     openModal(`
       <div class="section-title">Edit Idea</div>
 
@@ -249,17 +304,19 @@
       </div>
     `);
 
-    document.getElementById("updateIdeaBtn").onclick = () => {
-      const title = document.getElementById("ideaTitleInput").value.trim();
-      const notes = document.getElementById("ideaNotesInput").value.trim();
-      ContentHub.updateIdea(item.id, title, notes);
-    };
+    const btn = document.getElementById("updateIdeaBtn");
+    if (btn) {
+      btn.onclick = () => {
+        const title = document.getElementById("ideaTitleInput").value.trim();
+        const notes = document.getElementById("ideaNotesInput").value.trim();
+        window.ContentHub.updateIdea(item.id, title, notes);
+      };
+    }
   }
 
   // ===============================
-  // NAV HOOK
+  // NAV HOOK (re-render on Content tab)
   // ===============================
-
   function hookNav() {
     document.addEventListener("click", e => {
       const tab = e.target.closest?.(".nav-tab");
@@ -270,7 +327,7 @@
 
   function boot() {
     hookNav();
-    setTimeout(renderContentHub, 100);
+    setTimeout(renderContentHub, 120);
   }
 
   if (document.readyState === "loading") {
