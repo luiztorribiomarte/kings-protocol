@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,16 +53,15 @@
     <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
 
-        <!-- DAILY FOCUS -->
+        <!-- SCHEDULE (REPLACES DAILY FOCUS) -->
         <div class="habit-section">
-            <div class="section-title">🎯 Daily Focus</div>
-            <textarea id="dailyFocusInput" class="form-input" rows="2"
-                placeholder="What is the one thing that matters today?"></textarea>
+            <div class="section-title">📅 Today's Schedule</div>
+            <div id="scheduleContainer"></div>
         </div>
 
-        <!-- TODO LIST (NEW) -->
+        <!-- TODO LIST -->
         <div class="habit-section">
-            <div class="section-title">🧾 Today’s Tasks</div>
+            <div class="section-title">🧾 Today's Tasks</div>
 
             <div style="display:flex; gap:8px; margin-bottom:12px;">
                 <input id="todoInput" class="form-input" placeholder="Add a task…" />
@@ -73,7 +71,7 @@
             <div id="todoList"></div>
         </div>
 
-        <!-- Existing dashboard content continues untouched -->
+        <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="daysAt80">0/7</div>
@@ -89,20 +87,21 @@
             </div>
         </div>
 
-        <div id="dailyStatus">Checking today’s status…</div>
-<div class="habit-section">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <div class="section-title">📈 Performance Trend</div>
+        <div id="dailyStatus">Checking today's status…</div>
 
-    <select id="trendRange" class="form-input" style="width:auto; padding:6px 10px;">
-      <option value="7">7 Days</option>
-      <option value="30">30 Days</option>
-      <option value="all">All Time</option>
-    </select>
-  </div>
+        <div class="habit-section">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="section-title">📈 Performance Trend</div>
 
-  <canvas id="trendChart" height="140"></canvas>
-</div>
+            <select id="trendRange" class="form-input" style="width:auto; padding:6px 10px;">
+              <option value="7">7 Days</option>
+              <option value="30">30 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          <canvas id="trendChart" height="140"></canvas>
+        </div>
 
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
@@ -140,8 +139,6 @@
 <script src="./features/goals.js"></script>
 
 <script src="./features/workout.js"></script>
-
-
 
 <script src="./features/journal.js"></script>
 <script src="./features/journalMindAI.js"></script>
