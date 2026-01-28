@@ -136,27 +136,37 @@ function addTodo() {
   input.value = "";
   saveTodos();
   renderTodos();
-  renderLifeScore();
-  renderDNAProfile();
-  renderWeeklyGraph();
+  
+  // Trigger all dashboard updates
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
 function toggleTodo(index) {
+  if (!todos[index]) return;
   todos[index].done = !todos[index].done;
   saveTodos();
   renderTodos();
-  renderLifeScore();
-  renderDNAProfile();
-  renderWeeklyGraph();
+  
+  // Trigger all dashboard updates
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
 function deleteTodo(index) {
   todos.splice(index, 1);
   saveTodos();
   renderTodos();
-  renderLifeScore();
-  renderDNAProfile();
-  renderWeeklyGraph();
+  
+  // Trigger all dashboard updates
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
 function renderTodos() {
@@ -174,14 +184,24 @@ function renderTodos() {
     row.style.display = "flex";
     row.style.justifyContent = "space-between";
     row.style.marginBottom = "6px";
+    row.style.padding = "4px";
 
     row.innerHTML = `
-      <span style="cursor:pointer; ${todo.done ? "text-decoration:line-through; color:#6B7280;" : ""}"
-            onclick="toggleTodo(${i})">${todo.text}</span>
-      <button onclick="deleteTodo(${i})" style="background:none; border:none; color:#EF4444; cursor:pointer;">✕</button>
+      <span style="cursor:pointer; flex:1; ${todo.done ? "text-decoration:line-through; color:#6B7280;" : "color:#E5E7EB;"}"
+            onclick="toggleTodo(${i})">${escapeHtml(todo.text)}</span>
+      <button onclick="deleteTodo(${i})" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:1.1rem;">✕</button>
     `;
     list.appendChild(row);
   });
+}
+
+function escapeHtml(str) {
+  return String(str||"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
 }
 
 // ===============================
