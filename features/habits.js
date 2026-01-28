@@ -1,7 +1,5 @@
-
 // ============================================
-// HABITS MODULE — FULL SYSTEM + CHARTS + CRUD
-// DOES NOT REMOVE EXISTING FEATURES
+// HABITS MODULE — WITH DRAG & DROP REORDERING
 // ============================================
 
 window.habits = window.habits || [];
@@ -100,9 +98,10 @@ function toggleHabit(habitId, dateStr) {
   if (typeof renderLifeScore === "function") renderLifeScore();
   if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
   if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
-// ---------- BRIDGE ----------
+// ---------- BRIDGE (FIXED FOR PROPER COMPLETION TRACKING) ----------
 function getDayCompletion(dateStr = getDateString()) {
   if (!habits.length) return { percent: 0, done: 0, total: 0 };
 
@@ -116,7 +115,55 @@ function getDayCompletion(dateStr = getDateString()) {
 }
 
 function getDayCompletionPercent(dateStr) {
-  return getDayCompletion(dateStr).percent / 100;
+  return getDayCompletion(dateStr).percent;
+}
+
+// ---------- DRAG & DROP ----------
+let draggedHabitIndex = null;
+
+function handleDragStart(e, index) {
+  draggedHabitIndex = index;
+  e.target.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+  e.target.style.opacity = '1';
+  draggedHabitIndex = null;
+}
+
+function handleDragOver(e) {
+  if (e.preventDefault) {
+    e.preventDefault();
+  }
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleDragEnter(e) {
+  e.target.closest('tr')?.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.target.closest('tr')?.classList.remove('drag-over');
+}
+
+function handleDrop(e, dropIndex) {
+  if (e.stopPropagation) {
+    e.stopPropagation();
+  }
+  
+  e.target.closest('tr')?.classList.remove('drag-over');
+  
+  if (draggedHabitIndex !== null && draggedHabitIndex !== dropIndex) {
+    const draggedItem = habits[draggedHabitIndex];
+    habits.splice(draggedHabitIndex, 1);
+    habits.splice(dropIndex, 0, draggedItem);
+    saveHabits();
+    renderHabits();
+  }
+  
+  return false;
 }
 
 // ---------- UI ----------
@@ -128,6 +175,17 @@ function renderHabits() {
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   let html = `
+    <style>
+      .drag-over {
+        border-top: 2px solid #6366F1 !important;
+      }
+      .habit-row {
+        cursor: move;
+      }
+      .habit-row:hover {
+        background: rgba(255,255,255,0.03);
+      }
+    </style>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
       <div style="font-weight:800;">Daily Habits - This Week</div>
       <button onclick="openHabitManager()" style="padding:6px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; cursor:pointer;">
@@ -138,6 +196,9 @@ function renderHabits() {
     <table class="habit-table" style="width:100%; border-collapse: collapse;">
       <thead>
         <tr>
+          <th style="text-align:left; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08); width:30px;">
+            <span style="font-size:0.8rem; color:#9CA3AF;">☰</span>
+          </th>
           <th style="text-align:left; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">Habit</th>
           ${weekDates.map((d,i)=>`
             <th style="text-align:center; padding:14px; border-bottom:1px solid rgba(255,255,255,0.08);">
@@ -147,8 +208,18 @@ function renderHabits() {
         </tr>
       </thead>
       <tbody>
-        ${habits.map(h=>`
-          <tr>
+        ${habits.map((h, habitIndex)=>`
+          <tr class="habit-row"
+              draggable="true"
+              ondragstart="handleDragStart(event, ${habitIndex})"
+              ondragend="handleDragEnd(event)"
+              ondragover="handleDragOver(event)"
+              ondragenter="handleDragEnter(event)"
+              ondragleave="handleDragLeave(event)"
+              ondrop="handleDrop(event, ${habitIndex})">
+            <td style="padding:14px; text-align:center; color:#9CA3AF; cursor:move;">
+              ☰
+            </td>
             <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px; font-weight:600;">
               ${h.icon} ${escapeHtml(h.name)}
             </td>
@@ -156,7 +227,7 @@ function renderHabits() {
               const dateStr = getDateString(d);
               const done = isComplete(h.id,dateStr);
               return `
-                <td onclick="toggleHabit('${h.id}','${dateStr}')" style="text-align:center; cursor:pointer;">
+                <td onclick="toggleHabit('${h.id}','${dateStr}')" style="text-align:center; cursor:pointer; padding:14px;">
                   ${done ? "✅" : "○"}
                 </td>
               `;
@@ -180,9 +251,9 @@ function updateStats() {
   const weekDates = getWeekDates(new Date());
   const dayPercents = weekDates.map(d => getDayCompletionPercent(getDateString(d)));
 
-  const daysAt80 = dayPercents.filter(p => p >= 0.8).length;
+  const daysAt80 = dayPercents.filter(p => p >= 80).length;
   const weeklyAvg = dayPercents.reduce((a,b)=>a+b,0)/(dayPercents.length||1);
-  const weeklyPercent = Math.round(weeklyAvg*100);
+  const weeklyPercent = Math.round(weeklyAvg);
   const streak = calculateCurrentStreak();
 
   if (daysAt80El) daysAt80El.textContent = `${daysAt80}/7`;
@@ -197,7 +268,7 @@ function calculateCurrentStreak() {
   while (true) {
     const dateStr = getDateString(cursor);
     const pct = getDayCompletionPercent(dateStr);
-    if (pct >= 0.8) {
+    if (pct >= 80) {
       streak++;
       cursor.setDate(cursor.getDate() - 1);
     } else break;
@@ -242,6 +313,12 @@ function addHabit() {
   saveHabits();
   closeModal();
   renderHabits();
+  
+  // Refresh dashboard components
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
 function deleteHabit(id) {
@@ -250,6 +327,12 @@ function deleteHabit(id) {
   saveHabits();
   closeModal();
   renderHabits();
+  
+  // Refresh dashboard components
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
+  if (typeof renderDashboardTrendChart === "function") renderDashboardTrendChart();
 }
 
 // ---------- HABIT CHART ----------
@@ -341,4 +424,4 @@ if (window.App) {
   App.on("dashboard", () => renderHabits());
 }
 
-console.log("Habits system upgraded");
+console.log("Habits system with drag & drop loaded");
