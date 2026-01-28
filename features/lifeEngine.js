@@ -120,6 +120,9 @@ function calculateLifeScore() {
   const taskPct = getTaskPercentToday();
   const streakBonus = getStreakBonus();
 
+  // Debug logging
+  console.log("Life Score Calculation:", { habitPct, energyPct, taskPct, streakBonus });
+
   const score =
     habitPct * 0.5 +
     energyPct * 0.25 +
@@ -129,10 +132,10 @@ function calculateLifeScore() {
   return {
     score: Math.min(100, Math.round(score)),
     breakdown: {
-      habits: habitPct,
-      energy: energyPct,
-      tasks: taskPct,
-      streakBonus
+      habits: Math.round(habitPct),
+      energy: Math.round(energyPct),
+      tasks: Math.round(taskPct),
+      streakBonus: Math.round(streakBonus)
     }
   };
 }
