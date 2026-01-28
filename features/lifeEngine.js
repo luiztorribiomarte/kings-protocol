@@ -1,7 +1,6 @@
 // ============================================
-// LIFE ENGINE 7.1 — DASHBOARD PERFORMANCE GRAPH
-// SAFE: does not remove features, keeps old function names working
-// Adds: dashboard line chart (Habits/Energy/Tasks) with 7/30/all-time
+// LIFE ENGINE 7.2 — FIXED FOR DYNAMIC HABITS
+// Properly recalculates when habits are added/removed
 // ============================================
 
 // ---------- Helpers ----------
@@ -45,13 +44,17 @@ function prettyLabel(dateStr) {
   }
 }
 
-// ---------- Core metrics ----------
+// ---------- Core metrics (FIXED) ----------
 function getHabitPercent(dateKey = todayKey()) {
   try {
+    // Always use the latest getDayCompletion function
     if (typeof getDayCompletion === "function") {
-      return safeNum(getDayCompletion(dateKey).percent);
+      const result = getDayCompletion(dateKey);
+      return safeNum(result.percent);
     }
-  } catch {}
+  } catch (e) {
+    console.error("Error getting habit percent:", e);
+  }
   return 0;
 }
 
@@ -74,17 +77,27 @@ function getTaskPercentToday() {
   return 0;
 }
 
-// Note: your app currently does not store tasks per-day.
-// So the trend uses today’s tasks percent across the range (stable + non-breaking).
-// If you later add per-day task history, this function supports it.
 function getTaskPercentForDay(dateKey = todayKey()) {
   try {
     const hist = JSON.parse(localStorage.getItem("todoHistory") || "{}");
-    if (hist && typeof hist === "object" && typeof hist[dateKey] === "number") {
-      return hist[dateKey];
+    if (hist && typeof hist === "object" && hist[dateKey]) {
+      // New format stores an object with percent
+      if (typeof hist[dateKey] === "object" && typeof hist[dateKey].percent === "number") {
+        return hist[dateKey].percent;
+      }
+      // Old format stores just the number
+      if (typeof hist[dateKey] === "number") {
+        return hist[dateKey];
+      }
     }
   } catch {}
-  return getTaskPercentToday();
+  
+  // For today, use current tasks
+  if (dateKey === todayKey()) {
+    return getTaskPercentToday();
+  }
+  
+  return 0;
 }
 
 function getStreakBonus() {
@@ -100,7 +113,7 @@ function getStreakBonus() {
   return Math.min(streak * 2, 15);
 }
 
-// ---------- Life Score ----------
+// ---------- Life Score (FIXED) ----------
 function calculateLifeScore() {
   const habitPct = getHabitPercent();
   const energyPct = getEnergyPercent();
@@ -124,7 +137,7 @@ function calculateLifeScore() {
   };
 }
 
-// ---------- DNA ----------
+// ---------- DNA (FIXED) ----------
 function calculateDNA() {
   const days = getLastDays(14);
   const habitVals = days.map(d => getHabitPercent(d));
@@ -258,7 +271,7 @@ function renderDNAProfile() {
   renderDNAPanel();
 }
 
-// ---------- Dashboard Performance Trend Chart ----------
+// ---------- Dashboard Performance Trend Chart (FIXED) ----------
 let dashboardTrendChart = null;
 
 function getTrendDays(range) {
@@ -292,9 +305,27 @@ function renderDashboardTrendChart() {
     data: {
       labels,
       datasets: [
-        { label: "Habits %", data: habits, tension: 0.3 },
-        { label: "Energy %", data: energy, tension: 0.3 },
-        { label: "Tasks %", data: tasks, tension: 0.3 }
+        { 
+          label: "Habits %", 
+          data: habits, 
+          tension: 0.3,
+          borderColor: '#6366F1',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)'
+        },
+        { 
+          label: "Energy %", 
+          data: energy, 
+          tension: 0.3,
+          borderColor: '#EC4899',
+          backgroundColor: 'rgba(236, 72, 153, 0.1)'
+        },
+        { 
+          label: "Tasks %", 
+          data: tasks, 
+          tension: 0.3,
+          borderColor: '#F59E0B',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)'
+        }
       ]
     },
     options: {
@@ -321,7 +352,7 @@ function bindTrendRange() {
   select.__kpBound = true;
 }
 
-// ---------- Weekly summary stat (keeps your existing “Weekly Completion” card working) ----------
+// ---------- Weekly summary stat (FIXED) ----------
 function renderWeeklyGraph() {
   const el = document.getElementById("weeklyCompletion");
   if (!el) return;
@@ -360,10 +391,10 @@ function renderWeeklyGraph() {
 
   // If mood updates from other tabs etc
   window.addEventListener("storage", (e) => {
-    if (e.key === "moodData" || e.key === "habitCompletions" || e.key === "todos") {
+    if (e.key === "moodData" || e.key === "habitCompletions" || e.key === "todos" || e.key === "habits") {
       safeInit();
     }
   });
 })();
 
-console.log("Life Engine 7.1 loaded");
+console.log("Life Engine 7.2 (Fixed for dynamic habits) loaded");
