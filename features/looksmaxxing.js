@@ -1,7 +1,5 @@
 // ============================================
-// LOOKSMAXXING MODULE v2 (RPG x Elite Masculine)
-// - Adds RPG stats, body weight tracker, jaw/neck tracker
-// - Does NOT break existing routines/goals/check-ins
+// LOOKSMAXXING MODULE v2.1 (RPG x Elite Masculine - FIXED)
 // ============================================
 
 let looksData = {
@@ -23,7 +21,14 @@ function initLooksMaxxing() {
     } catch {}
   }
 
-  if (!looksData.routines || looksData.routines.length === 0) {
+  // ✅ SAFETY GUARDS (fix your crash)
+  if (!looksData.jawNeckLogs) looksData.jawNeckLogs = {};
+  if (!looksData.weightLogs) looksData.weightLogs = [];
+  if (!looksData.routines) looksData.routines = [];
+  if (!looksData.goals) looksData.goals = [];
+  if (!looksData.checkIns) looksData.checkIns = [];
+
+  if (looksData.routines.length === 0) {
     looksData.routines = [
       { id: "skincare_am", category: "Face", name: "Morning Skincare", frequency: "daily", lastDone: null },
       { id: "skincare_pm", category: "Face", name: "Night Skincare", frequency: "daily", lastDone: null },
@@ -31,13 +36,6 @@ function initLooksMaxxing() {
       { id: "beard", category: "Style", name: "Beard Trim", frequency: "weekly", lastDone: null },
       { id: "posture", category: "Body", name: "Posture Check", frequency: "daily", lastDone: null },
       { id: "workout", category: "Body", name: "Workout", frequency: "daily", lastDone: null }
-    ];
-    saveLooksData();
-  }
-
-  if (!looksData.goals || looksData.goals.length === 0) {
-    looksData.goals = [
-      { id: "weight", name: "Weight", current: 0, target: 0, unit: "lbs", active: true }
     ];
     saveLooksData();
   }
@@ -59,8 +57,9 @@ function calculateLooksStats() {
   const routineTotal = looksData.routines.length || 1;
   const routineScore = Math.round((routineDone / routineTotal) * 100);
 
-  const jawDone = looksData.jawNeckLogs[today]?.jaw ? 1 : 0;
-  const neckDone = looksData.jawNeckLogs[today]?.neck ? 1 : 0;
+  const todayJawData = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
+  const jawDone = todayJawData.jaw ? 1 : 0;
+  const neckDone = todayJawData.neck ? 1 : 0;
   const jawScore = Math.round(((jawDone + neckDone) / 2) * 100);
 
   const weightTrend = looksData.weightLogs.slice(-7);
@@ -166,7 +165,7 @@ function renderStatBar(label, value) {
   `;
 }
 
-// ---------- WEIGHT TRACKER ----------
+// ---------- WEIGHT ----------
 function logWeight() {
   const input = document.getElementById("weightInput");
   const weight = parseFloat(input.value);
