@@ -2,6 +2,17 @@
 // CALENDAR VIEW - Monthly Overview with Day Details
 // ============================================
 
+function safeGetDayCompletion(dateStr) {
+  try {
+    if (typeof getDayCompletion === "function") {
+      return getDayCompletion(dateStr);
+    }
+  } catch (e) {
+    console.error("Error getting day completion:", e);
+  }
+  return { percent: 0, done: 0, total: 0 };
+}
+
 function getMonthDates(year, month) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -19,9 +30,7 @@ function getDateString(date) {
 }
 
 function getDayColor(dateStr) {
-  const pct = typeof getDayCompletion === "function" 
-    ? getDayCompletion(dateStr).percent 
-    : 0;
+  const pct = safeGetDayCompletion(dateStr).percent;
   
   if (pct >= 80) return { bg: "rgba(34,197,94,0.2)", border: "rgba(34,197,94,0.5)", text: "Perfect" };
   if (pct >= 60) return { bg: "rgba(168,85,247,0.2)", border: "rgba(168,85,247,0.5)", text: "Solid" };
@@ -137,9 +146,7 @@ function showDayDetails(dateStr) {
   const date = new Date(dateStr);
   const dayName = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   
-  const habitData = typeof getDayCompletion === "function" 
-    ? getDayCompletion(dateStr) 
-    : { percent: 0, done: 0, total: 0 };
+  const habitData = safeGetDayCompletion(dateStr);
   
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
   const dayMood = moodData[dateStr];
