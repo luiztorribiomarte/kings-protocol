@@ -16,6 +16,17 @@ function getLastDays(n) {
   return days;
 }
 
+function safeGetDayCompletion(dateStr) {
+  try {
+    if (typeof getDayCompletion === "function") {
+      return getDayCompletion(dateStr);
+    }
+  } catch (e) {
+    console.error("Error getting day completion:", e);
+  }
+  return { percent: 0, done: 0, total: 0 };
+}
+
 // ---------- CORE INSIGHT GENERATORS ----------
 
 function analyzeEnergyHabitCorrelation() {
@@ -29,9 +40,7 @@ function analyzeEnergyHabitCorrelation() {
     const energy = moodData[day]?.energy || null;
     if (energy === null) return;
     
-    const habitPct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
+    const habitPct = safeGetDayCompletion(day).percent;
     
     if (energy >= 7) highEnergyDays.push(habitPct);
     if (energy <= 4) lowEnergyDays.push(habitPct);
