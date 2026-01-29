@@ -93,9 +93,21 @@ function getTodayKey() {
   return new Date().toISOString().split("T")[0];
 }
 
-let todos = JSON.parse(localStorage.getItem("todos")) || [];
-let todoHistory = JSON.parse(localStorage.getItem("todoHistory")) || {};
-let lastTodoDate = localStorage.getItem("lastTodoDate");
+let todos = [];
+let todoHistory = {};
+let lastTodoDate = null;
+
+// Load from storage on init
+try {
+  todos = JSON.parse(localStorage.getItem("todos")) || [];
+  todoHistory = JSON.parse(localStorage.getItem("todoHistory")) || {};
+  lastTodoDate = localStorage.getItem("lastTodoDate");
+} catch (e) {
+  console.error("Error loading todos:", e);
+  todos = [];
+  todoHistory = {};
+  lastTodoDate = null;
+}
 
 // 🔥 DAILY RESET + SAVE HISTORY
 function checkDailyTaskReset() {
@@ -213,8 +225,18 @@ function escapeHtml(str) {
 // ===============================
 // 📅 SCHEDULE SYSTEM (NEW)
 // ===============================
-let schedule = JSON.parse(localStorage.getItem("schedule")) || [];
-let lastScheduleDate = localStorage.getItem("lastScheduleDate");
+let schedule = [];
+let lastScheduleDate = null;
+
+// Load from storage on init
+try {
+  schedule = JSON.parse(localStorage.getItem("schedule")) || [];
+  lastScheduleDate = localStorage.getItem("lastScheduleDate");
+} catch (e) {
+  console.error("Error loading schedule:", e);
+  schedule = [];
+  lastScheduleDate = null;
+}
 
 function checkDailyScheduleReset() {
   const today = getTodayKey();
