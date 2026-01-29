@@ -9,11 +9,12 @@ function showPage(page) {
     dashboard: 1,
     goalsHabits: 2,
     workout: 3,
-    journal: 4,
-    visionBoard: 5,
-    content: 6,
-    books: 7,
-    settings: 8
+    looksmaxxing: 4,
+    journal: 5,
+    visionBoard: 6,
+    content: 7,
+    books: 8,
+    settings: 9
   };
 
   const pageId = page + "Page";
@@ -34,10 +35,15 @@ function showPage(page) {
     renderLifeScore();
     renderWeeklyGraph();
     renderDNAProfile();
+    if (typeof renderInsightsWidget === "function") renderInsightsWidget();
   }
 
   if (page === "journal") {
     renderJournal();
+  }
+
+  if (page === "looksmaxxing") {
+    if (typeof renderLooksMaxxing === "function") renderLooksMaxxing();
   }
 }
 
