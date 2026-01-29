@@ -51,9 +51,13 @@ function initLooksMaxxing() {
   // Initialize default goals if empty
   if (!looksData.goals || looksData.goals.length === 0) {
     looksData.goals = [
-      { id: "weight", name: "Target Weight", current: 0, target: 0, unit: "lbs" },
-      { id: "bodyfat", name: "Body Fat %", current: 0, target: 0, unit: "%" },
-      { id: "muscle", name: "Muscle Mass", current: 0, target: 0, unit: "lbs" }
+      { id: "weight", name: "Weight", current: 0, target: 0, unit: "lbs", active: true },
+      { id: "waist", name: "Waist", current: 0, target: 0, unit: "in", active: true },
+      { id: "chest", name: "Chest", current: 0, target: 0, unit: "in", active: false },
+      { id: "arms", name: "Arms (flexed)", current: 0, target: 0, unit: "in", active: false },
+      { id: "pushups", name: "Push-ups (max set)", current: 0, target: 0, unit: "reps", active: false },
+      { id: "pullups", name: "Pull-ups", current: 0, target: 0, unit: "reps", active: false },
+      { id: "plank", name: "Plank Hold", current: 0, target: 0, unit: "sec", active: false }
     ];
     saveLooksData();
   }
@@ -136,12 +140,14 @@ function renderGoalsProgress() {
   const el = document.getElementById("goalsProgress");
   if (!el) return;
 
-  if (!looksData.goals || looksData.goals.length === 0) {
-    el.innerHTML = `<div style="color:#9CA3AF;">No goals set yet. Click "Edit Goals" to add some!</div>`;
+  const activeGoals = looksData.goals.filter(g => g.active !== false);
+
+  if (activeGoals.length === 0) {
+    el.innerHTML = `<div style="color:#9CA3AF;">No active goals. Click "Edit Goals" to activate some!</div>`;
     return;
   }
 
-  const html = looksData.goals.map(goal => {
+  const html = activeGoals.map(goal => {
     const progress = goal.target > 0 ? Math.min(100, Math.round((goal.current / goal.target) * 100)) : 0;
     const remaining = goal.target - goal.current;
     const color = progress >= 100 ? "#22C55E" : progress >= 75 ? "#A78BFA" : progress >= 50 ? "#F59E0B" : "#EF4444";
@@ -168,11 +174,24 @@ function renderGoalsProgress() {
 function openEditGoals() {
   const html = `
     <h2>Edit Body Goals</h2>
-    <div style="max-height:400px; overflow:auto;">
+    <p style="color:#9CA3AF; font-size:0.9rem; margin-bottom:14px;">
+      Toggle goals on/off and set your targets. Only active goals show on dashboard.
+    </p>
+    
+    <div style="max-height:400px; overflow:auto; margin-bottom:14px;">
       ${looksData.goals.map((goal, i) => `
-        <div style="padding:14px; margin-bottom:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.03);">
-          <div style="font-weight:700; margin-bottom:8px;">${goal.name}</div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div style="padding:14px; margin-bottom:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:${goal.active !== false ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.03)'};">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-weight:700;">${goal.name}</div>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" 
+                ${goal.active !== false ? 'checked' : ''} 
+                onchange="toggleGoalActive(${i}, this.checked)"
+                style="cursor:pointer;" />
+              <span style="font-size:0.85rem; color:#9CA3AF;">Active</span>
+            </label>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 80px; gap:10px;">
             <div>
               <label style="font-size:0.85rem; color:#9CA3AF;">Current</label>
               <input type="number" step="0.1" value="${goal.current}" 
@@ -185,15 +204,57 @@ function openEditGoals() {
                 onchange="updateGoal(${i}, 'target', parseFloat(this.value))"
                 class="form-input" />
             </div>
+            <div>
+              <label style="font-size:0.85rem; color:#9CA3AF;">Unit</label>
+              <input type="text" value="${goal.unit}"
+                onchange="updateGoal(${i}, 'unit', this.value)"
+                class="form-input" />
+            </div>
           </div>
         </div>
       `).join("")}
     </div>
+    
+    <div style="padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05); margin-bottom:14px;">
+      <div style="font-weight:700; margin-bottom:8px;">Add Custom Goal</div>
+      <div style="display:grid; grid-template-columns: 1fr 80px auto; gap:8px;">
+        <input id="newGoalName" placeholder="Goal name" class="form-input" />
+        <input id="newGoalUnit" placeholder="Unit" class="form-input" />
+        <button onclick="addCustomGoal()" class="form-submit">Add</button>
+      </div>
+    </div>
+    
     <div style="margin-top:14px;">
       <button onclick="closeModal(); renderLooksMaxxing();" class="form-submit">Save & Close</button>
     </div>
   `;
   openModal(html);
+}
+
+function toggleGoalActive(index, active) {
+  looksData.goals[index].active = active;
+  saveLooksData();
+  renderGoalsProgress();
+}
+
+function addCustomGoal() {
+  const name = document.getElementById("newGoalName")?.value.trim();
+  const unit = document.getElementById("newGoalUnit")?.value.trim() || "units";
+  
+  if (!name) return alert("Goal name required");
+  
+  looksData.goals.push({
+    id: "custom_" + Date.now(),
+    name,
+    current: 0,
+    target: 0,
+    unit,
+    active: true
+  });
+  
+  saveLooksData();
+  openEditGoals();
+  renderGoalsProgress();
 }
 
 function updateGoal(index, field, value) {
