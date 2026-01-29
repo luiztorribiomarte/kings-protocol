@@ -2,6 +2,17 @@
 // WEEKLY REVIEW MODULE - Automated Summary & Comparison
 // ============================================
 
+function safeGetDayCompletion(dateStr) {
+  try {
+    if (typeof getDayCompletion === "function") {
+      return getDayCompletion(dateStr);
+    }
+  } catch (e) {
+    console.error("Error getting day completion:", e);
+  }
+  return { percent: 0, done: 0, total: 0 };
+}
+
 function getWeekDates(offset = 0) {
   const today = new Date();
   const currentDay = today.getDay(); // 0 = Sunday
@@ -9,12 +20,14 @@ function getWeekDates(offset = 0) {
   // Get Sunday of the target week
   const sunday = new Date(today);
   sunday.setDate(today.getDate() - currentDay - (offset * 7));
+  sunday.setHours(0, 0, 0, 0);
   
   const week = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(sunday);
     day.setDate(sunday.getDate() + i);
-    week.push(day.toISOString().split("T")[0]);
+    const dateStr = day.toISOString().split("T")[0];
+    week.push(dateStr);
   }
   
   return week;
