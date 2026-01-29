@@ -86,9 +86,31 @@
                 <div class="stat-value" id="currentStreak">0</div>
                 <div class="stat-label">Current Streak</div>
             </div>
+            <div class="stat-card" onclick="openCalendar()">
+                <div class="stat-value">📅</div>
+                <div class="stat-label">Calendar View</div>
+            </div>
         </div>
 
         <div id="dailyStatus">Checking today's status…</div>
+
+        <!-- Smart Insights Widget -->
+        <div class="habit-section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div class="section-title">🧠 Smart Insights</div>
+            <button onclick="openFullInsights()" class="form-submit" style="padding:6px 12px; font-size:0.9rem;">
+              View All
+            </button>
+          </div>
+          <div id="insightsWidget"></div>
+        </div>
+
+        <!-- Weekly Review Button -->
+        <div style="margin-bottom:24px;">
+          <button onclick="openWeeklyReview()" class="form-submit" style="width:100%; padding:16px; font-size:1.05rem;">
+            📋 View Weekly Review
+          </button>
+        </div>
 
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -142,6 +164,9 @@
 
 <script src="./features/workout.js"></script>
 <script src="./features/looksmaxxing.js"></script>
+<script src="./features/insights.js"></script>
+<script src="./features/weeklyReview.js"></script>
+<script src="./features/calendar.js"></script>
 
 
 
