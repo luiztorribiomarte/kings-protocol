@@ -1,3 +1,5 @@
+// app.js (FULL UPDATED FILE - ONLY UPDATES NAV MAP TO MATCH REMOVED PAGES)
+
 // ===============================
 // PAGE NAVIGATION
 // ===============================
@@ -5,7 +7,7 @@ function showPage(page) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
 
-  // ONLY CHANGE: removed goalsHabits + settings and re-indexed tabs
+  // UPDATED: only pages you kept
   const map = {
     dashboard: 1,
     workout: 2,
