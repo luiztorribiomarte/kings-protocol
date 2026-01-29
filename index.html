@@ -1,3 +1,4 @@
+<!-- index.html (FULL UPDATED FILE) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +39,7 @@
         <h1 style="text-align:center; font-size:2.5em;">Kings Protocol</h1>
     </div>
 
-    <!-- Nav -->
+    <!-- Nav (REMOVED: Goals & Habits, Settings) -->
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
         <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
@@ -49,10 +50,10 @@
         <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
     </div>
 
-    <!-- Dashboard -->
+    <!-- Dashboard (UNCHANGED) -->
     <div id="dashboardPage" class="page active">
 
-        <!-- SCHEDULE -->
+        <!-- SCHEDULE (REPLACES DAILY FOCUS) -->
         <div class="habit-section">
             <div class="section-title">📅 Today's Schedule</div>
             <div id="scheduleContainer"></div>
@@ -92,7 +93,7 @@
 
         <div id="dailyStatus">Checking today's status…</div>
 
-        <!-- Smart Insights -->
+        <!-- Smart Insights Widget -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <div class="section-title">🧠 Smart Insights</div>
@@ -103,14 +104,13 @@
           <div id="insightsWidget"></div>
         </div>
 
-        <!-- Weekly Review -->
+        <!-- Weekly Review Button -->
         <div style="margin-bottom:24px;">
           <button onclick="openWeeklyReview()" class="form-submit" style="width:100%; padding:16px; font-size:1.05rem;">
             📋 View Weekly Review
           </button>
         </div>
 
-        <!-- Performance Trend -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="section-title">📈 Performance Trend</div>
@@ -125,13 +125,11 @@
           <canvas id="trendChart" height="140"></canvas>
         </div>
 
-        <!-- Mood -->
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
             <div id="moodTracker"></div>
         </div>
 
-        <!-- Habits -->
         <div class="habit-section">
             <div class="section-title">📋 Daily Habits - This Week</div>
             <div id="habitGrid"></div>
@@ -139,7 +137,7 @@
 
     </div>
 
-    <!-- Pages -->
+    <!-- Other Pages (REMOVED: goalsHabitsPage, settingsPage) -->
     <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
     <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
     <div id="journalPage" class="page"><div id="journalContainer"></div></div>
