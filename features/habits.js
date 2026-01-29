@@ -88,6 +88,31 @@ function isComplete(habitId, dateStr) {
   return !!(habitCompletions[dateStr] && habitCompletions[dateStr][habitId]);
 }
 
+function getHabitStreak(habitId) {
+  let streak = 0;
+  let date = new Date();
+  
+  while (true) {
+    const dateStr = getDateString(date);
+    if (isComplete(habitId, dateStr)) {
+      streak++;
+      date.setDate(date.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+function getStreakEmoji(streak) {
+  if (streak >= 30) return "🏆";
+  if (streak >= 14) return "🔥🔥🔥";
+  if (streak >= 7) return "🔥🔥";
+  if (streak >= 1) return "🔥";
+  return "";
+}
+
 function toggleHabit(habitId, dateStr) {
   if (!habitCompletions[dateStr]) habitCompletions[dateStr] = {};
   habitCompletions[dateStr][habitId] = !habitCompletions[dateStr][habitId];
@@ -208,7 +233,11 @@ function renderHabits() {
         </tr>
       </thead>
       <tbody>
-        ${habits.map((h, habitIndex)=>`
+        ${habits.map((h, habitIndex)=>{
+          const streak = getHabitStreak(h.id);
+          const streakEmoji = getStreakEmoji(streak);
+          
+          return `
           <tr class="habit-row"
               draggable="true"
               ondragstart="handleDragStart(event, ${habitIndex})"
@@ -222,6 +251,7 @@ function renderHabits() {
             </td>
             <td onclick="openHabitChart('${h.id}')" style="cursor:pointer; padding:14px; font-weight:600;">
               ${h.icon} ${escapeHtml(h.name)}
+              ${streakEmoji ? `<span style="margin-left:8px; font-size:0.9rem;" title="${streak} day streak">${streakEmoji}</span>` : ''}
             </td>
             ${weekDates.map(d=>{
               const dateStr = getDateString(d);
@@ -233,7 +263,8 @@ function renderHabits() {
               `;
             }).join("")}
           </tr>
-        `).join("")}
+        `;
+        }).join("")}
       </tbody>
     </table>
   `;
