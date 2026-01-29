@@ -41,20 +41,18 @@
     <!-- Nav -->
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
-        <button class="nav-tab" onclick="showPage('goalsHabits')">🎯 Goals & Habits</button>
         <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
         <button class="nav-tab" onclick="showPage('looksmaxxing')">💎 Looksmaxxing</button>
         <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
         <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
         <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
         <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
-        <button class="nav-tab" onclick="showPage('settings')">⚙️ Settings</button>
     </div>
 
     <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
 
-        <!-- SCHEDULE (REPLACES DAILY FOCUS) -->
+        <!-- SCHEDULE -->
         <div class="habit-section">
             <div class="section-title">📅 Today's Schedule</div>
             <div id="scheduleContainer"></div>
@@ -92,12 +90,9 @@
             </div>
         </div>
 
-        <!-- ✅ DASHBOARD CALENDAR (NEW - ALWAYS VISIBLE) -->
-        <div id="dashboardCalendar"></div>
-
         <div id="dailyStatus">Checking today's status…</div>
 
-        <!-- Smart Insights Widget -->
+        <!-- Smart Insights -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <div class="section-title">🧠 Smart Insights</div>
@@ -108,13 +103,14 @@
           <div id="insightsWidget"></div>
         </div>
 
-        <!-- Weekly Review Button -->
+        <!-- Weekly Review -->
         <div style="margin-bottom:24px;">
           <button onclick="openWeeklyReview()" class="form-submit" style="width:100%; padding:16px; font-size:1.05rem;">
             📋 View Weekly Review
           </button>
         </div>
 
+        <!-- Performance Trend -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="section-title">📈 Performance Trend</div>
@@ -129,11 +125,13 @@
           <canvas id="trendChart" height="140"></canvas>
         </div>
 
+        <!-- Mood -->
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
             <div id="moodTracker"></div>
         </div>
 
+        <!-- Habits -->
         <div class="habit-section">
             <div class="section-title">📋 Daily Habits - This Week</div>
             <div id="habitGrid"></div>
@@ -141,15 +139,13 @@
 
     </div>
 
-    <!-- Other Pages -->
-    <div id="goalsHabitsPage" class="page"><div id="goalsGrid"></div></div>
+    <!-- Pages -->
     <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
     <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
     <div id="journalPage" class="page"><div id="journalContainer"></div></div>
     <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
     <div id="contentPage" class="page"><div id="contentContainer"></div></div>
     <div id="booksPage" class="page"><div id="booksContainer"></div></div>
-    <div id="settingsPage" class="page"><p>Coming soon…</p></div>
 
 </div>
 
@@ -164,7 +160,6 @@
 
 <script src="./features/habits.js"></script>
 <script src="./features/mood.js"></script>
-<script src="./features/goals.js"></script>
 
 <script src="./features/workout.js"></script>
 <script src="./features/looksmaxxing.js"></script>
