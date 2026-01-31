@@ -1,6 +1,6 @@
 // ============================================
-// LOOKSMAXXING MODULE v2.2 (RPG x Elite Masculine)
-// IMPROVEMENT #1: Daily Command Objective (TODAY'S FOCUS)
+// LOOKSMAXXING MODULE v2.3 (RPG x Elite Masculine)
+// IMPROVEMENT #2: STREAK SYSTEM (Routines + Jaw/Neck)
 // ============================================
 
 let looksData = {
@@ -10,7 +10,12 @@ let looksData = {
   goals: [],
   checkIns: [],
   weightLogs: [],
-  jawNeckLogs: {}
+  jawNeckLogs: {},
+  streaks: {
+    routines: {},
+    jaw: { count: 0, lastDate: null },
+    neck: { count: 0, lastDate: null }
+  }
 };
 
 // ---------- INIT ----------
@@ -25,10 +30,9 @@ function initLooksMaxxing() {
   if (!looksData.jawNeckLogs) looksData.jawNeckLogs = {};
   if (!looksData.weightLogs) looksData.weightLogs = [];
   if (!looksData.routines) looksData.routines = [];
-  if (!looksData.goals) looksData.goals = [];
   if (!looksData.checkIns) looksData.checkIns = [];
-  if (!looksData.measurements) looksData.measurements = [];
-  if (!looksData.photos) looksData.photos = [];
+  if (!looksData.streaks) looksData.streaks = { routines: {}, jaw: { count: 0 }, neck: { count: 0 } };
+  if (!looksData.streaks.routines) looksData.streaks.routines = {};
 
   if (looksData.routines.length === 0) {
     looksData.routines = [
@@ -51,121 +55,147 @@ function getTodayKey() {
   return new Date().toISOString().split("T")[0];
 }
 
-// ---------- RPG STAT SYSTEM ----------
-function calculateLooksStats() {
-  const today = getTodayKey();
-
-  const routineDone = looksData.routines.filter(r => r.lastDone === today).length;
-  const routineTotal = looksData.routines.length || 1;
-  const routineScore = Math.round((routineDone / routineTotal) * 100);
-
-  const todayJawData = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-  const jawDone = todayJawData.jaw ? 1 : 0;
-  const neckDone = todayJawData.neck ? 1 : 0;
-  const jawScore = Math.round(((jawDone + neckDone) / 2) * 100);
-
-  const weightTrend = looksData.weightLogs.slice(-7);
-  let bodyScore = 50;
-  if (weightTrend.length >= 2) {
-    const diff = weightTrend[weightTrend.length - 1].weight - weightTrend[0].weight;
-    bodyScore = diff > 0 ? 80 : diff === 0 ? 50 : 30;
-  }
-
-  const face = Math.min(100, Math.round((routineScore + jawScore) / 2));
-  const body = Math.min(100, Math.round((bodyScore + routineScore) / 2));
-  const style = Math.min(100, routineScore);
-  const discipline = Math.min(100, Math.round((routineScore + bodyScore) / 2));
-  const aura = Math.min(100, Math.round((face + body + discipline) / 3));
-
-  const looksScore = Math.round((face + body + style + discipline + aura) / 5);
-
-  return { face, body, style, discipline, aura, looksScore };
+function getYesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
 }
 
-// ---------- CHECK-INS ----------
-function getThisWeekCheckIns() {
-  if (!looksData.checkIns) return 0;
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  return looksData.checkIns.filter(c => new Date(c.date) >= weekAgo).length;
-}
-
-// ---------- DAILY FOCUS ----------
-function getTodaysFocus() {
+// ---------- STREAK HELPERS ----------
+function updateRoutineStreak(routineId, completed) {
   const today = getTodayKey();
-  const jawNeck = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-  const weightLogged = looksData.weightLogs.some(w => w.date === today);
+  const yesterday = getYesterdayKey();
+  const streak = looksData.streaks.routines[routineId] || { count: 0, lastDate: null };
 
-  const pick = (cat) =>
-    looksData.routines.find(r => r.category === cat && r.lastDone !== today) || null;
-
-  const face = pick("Face");
-  const body = pick("Body");
-
-  const focus = [];
-
-  focus.push(face
-    ? { label: face.name, done: false, action: () => markRoutineDone(face.id) }
-    : { label: "Face routines complete", done: true });
-
-  focus.push(body
-    ? { label: body.name, done: false, action: () => markRoutineDone(body.id) }
-    : { label: "Body routines complete", done: true });
-
-  if (!weightLogged) {
-    focus.push({ label: "Log Body Weight", done: false, action: () => document.getElementById("weightInput")?.focus() });
-  } else if (!jawNeck.jaw) {
-    focus.push({ label: "Jaw Training", done: false, action: () => toggleJawNeck("jaw") });
-  } else if (!jawNeck.neck) {
-    focus.push({ label: "Neck Training", done: false, action: () => toggleJawNeck("neck") });
+  if (!completed) {
+    streak.count = 0;
+    streak.lastDate = null;
   } else {
-    focus.push({ label: "Discipline complete", done: true });
+    if (streak.lastDate === yesterday) {
+      streak.count += 1;
+    } else {
+      streak.count = 1;
+    }
+    streak.lastDate = today;
   }
 
-  return focus;
+  looksData.streaks.routines[routineId] = streak;
 }
 
-function renderTodaysFocus() {
-  const focus = getTodaysFocus();
+function updateJawNeckStreak(type, completed) {
+  const today = getTodayKey();
+  const yesterday = getYesterdayKey();
+  const streak = looksData.streaks[type];
+
+  if (!completed) {
+    streak.count = 0;
+    streak.lastDate = null;
+  } else {
+    if (streak.lastDate === yesterday) {
+      streak.count += 1;
+    } else {
+      streak.count = 1;
+    }
+    streak.lastDate = today;
+  }
+}
+
+// ---------- MAIN RENDER ----------
+function renderLooksMaxxing() {
+  const container = document.getElementById("looksMaxxingContainer");
+  if (!container) return;
+
+  container.innerHTML = `
+    <h2>💎 LooksMaxxing RPG System</h2>
+
+    <div class="habit-section">
+      <div class="section-title">🦷 Jaw & Neck Training</div>
+      ${renderJawNeck()}
+    </div>
+
+    <div class="habit-section">
+      <div class="section-title">✨ Routines</div>
+      <div id="routinesGrid"></div>
+    </div>
+  `;
+
+  renderRoutinesGrid();
+}
+
+// ---------- JAW & NECK ----------
+function renderJawNeck() {
+  const today = getTodayKey();
+  const log = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
+  const jawStreak = looksData.streaks.jaw.count;
+  const neckStreak = looksData.streaks.neck.count;
 
   return `
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🎯 Today's Focus</div>
-      <div style="display:grid; gap:10px;">
-        ${focus.map(f => `
-          <div onclick="${f.action ? "("+f.action+")()" : ""}"
-               style="padding:10px;border-radius:10px;
-               background:${f.done ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.05)"};
-               cursor:${f.action ? "pointer" : "default"};">
-            ${f.done ? "✅" : "○"} ${f.label}
-          </div>
-        `).join("")}
+    <div style="display:grid; gap:8px;">
+      <div onclick="toggleJawNeck('jaw')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;">
+        🦷 Jaw Training ${log.jaw ? "✅" : "○"}
+        ${jawStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${jawStreak}-day streak</div>` : ""}
+      </div>
+      <div onclick="toggleJawNeck('neck')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;">
+        💪 Neck Training ${log.neck ? "✅" : "○"}
+        ${neckStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${neckStreak}-day streak</div>` : ""}
       </div>
     </div>
   `;
 }
 
-// ---------- MAIN RENDER ----------
-function renderLooksMaxxing() {
-  const el = document.getElementById("looksMaxxingContainer");
+function toggleJawNeck(type) {
+  const today = getTodayKey();
+  if (!looksData.jawNeckLogs[today]) looksData.jawNeckLogs[today] = { jaw: false, neck: false };
+  looksData.jawNeckLogs[today][type] = !looksData.jawNeckLogs[today][type];
+
+  updateJawNeckStreak(type, looksData.jawNeckLogs[today][type]);
+  saveLooksData();
+  renderLooksMaxxing();
+}
+
+// ---------- ROUTINES ----------
+function renderRoutinesGrid() {
+  const el = document.getElementById("routinesGrid");
   if (!el) return;
 
-  const stats = calculateLooksStats();
-  const latestWeight = looksData.weightLogs.at(-1)?.weight || "—";
+  const today = getTodayKey();
+  const categories = [...new Set(looksData.routines.map(r => r.category))];
 
-  el.innerHTML = `
-    <h2>💎 LooksMaxxing RPG System</h2>
-    ${renderTodaysFocus()}
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-value">${stats.looksScore}</div><div class="stat-label">Looks Score</div></div>
-      <div class="stat-card"><div class="stat-value">${latestWeight}</div><div class="stat-label">Body Weight</div></div>
-      <div class="stat-card"><div class="stat-value">${getThisWeekCheckIns()}</div><div class="stat-label">Weekly Check-ins</div></div>
-    </div>
-  `;
+  el.innerHTML = categories.map(cat => {
+    const routines = looksData.routines.filter(r => r.category === cat);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:6px;">${cat}</div>
+        ${routines.map(r => {
+          const done = r.lastDone === today;
+          const streak = looksData.streaks.routines[r.id]?.count || 0;
+          return `
+            <div onclick="markRoutineDone('${r.id}')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;margin-bottom:6px;">
+              <strong>${r.name}</strong> ${done ? "✅" : ""}
+              ${streak ? `<div style="font-size:0.85rem;color:#F59E0B;">🔥 ${streak}-day streak</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
+function markRoutineDone(id) {
+  const r = looksData.routines.find(x => x.id === id);
+  if (!r) return;
+
+  const today = getTodayKey();
+  const completed = r.lastDone !== today;
+  r.lastDone = completed ? today : null;
+
+  updateRoutineStreak(id, completed);
+  saveLooksData();
+  renderLooksMaxxing();
 }
 
 // ---------- BOOT ----------
-(function () {
+(function bootLooksMaxxing() {
   initLooksMaxxing();
   renderLooksMaxxing();
 })();
