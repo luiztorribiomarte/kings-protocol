@@ -1,5 +1,6 @@
 // ============================================
-// LOOKSMAXXING MODULE v2.1 (RPG x Elite Masculine - FIXED)
+// LOOKSMAXXING MODULE v2.2 (RPG x Elite Masculine)
+// IMPROVEMENT #1: Daily Command Objective (TODAY'S FOCUS)
 // ============================================
 
 let looksData = {
@@ -21,12 +22,13 @@ function initLooksMaxxing() {
     } catch {}
   }
 
-  // ✅ SAFETY GUARDS (fix your crash)
   if (!looksData.jawNeckLogs) looksData.jawNeckLogs = {};
   if (!looksData.weightLogs) looksData.weightLogs = [];
   if (!looksData.routines) looksData.routines = [];
   if (!looksData.goals) looksData.goals = [];
   if (!looksData.checkIns) looksData.checkIns = [];
+  if (!looksData.measurements) looksData.measurements = [];
+  if (!looksData.photos) looksData.photos = [];
 
   if (looksData.routines.length === 0) {
     looksData.routines = [
@@ -88,168 +90,82 @@ function getThisWeekCheckIns() {
   return looksData.checkIns.filter(c => new Date(c.date) >= weekAgo).length;
 }
 
+// ---------- DAILY FOCUS ----------
+function getTodaysFocus() {
+  const today = getTodayKey();
+  const jawNeck = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
+  const weightLogged = looksData.weightLogs.some(w => w.date === today);
+
+  const pick = (cat) =>
+    looksData.routines.find(r => r.category === cat && r.lastDone !== today) || null;
+
+  const face = pick("Face");
+  const body = pick("Body");
+
+  const focus = [];
+
+  focus.push(face
+    ? { label: face.name, done: false, action: () => markRoutineDone(face.id) }
+    : { label: "Face routines complete", done: true });
+
+  focus.push(body
+    ? { label: body.name, done: false, action: () => markRoutineDone(body.id) }
+    : { label: "Body routines complete", done: true });
+
+  if (!weightLogged) {
+    focus.push({ label: "Log Body Weight", done: false, action: () => document.getElementById("weightInput")?.focus() });
+  } else if (!jawNeck.jaw) {
+    focus.push({ label: "Jaw Training", done: false, action: () => toggleJawNeck("jaw") });
+  } else if (!jawNeck.neck) {
+    focus.push({ label: "Neck Training", done: false, action: () => toggleJawNeck("neck") });
+  } else {
+    focus.push({ label: "Discipline complete", done: true });
+  }
+
+  return focus;
+}
+
+function renderTodaysFocus() {
+  const focus = getTodaysFocus();
+
+  return `
+    <div class="habit-section" style="margin-bottom:20px;">
+      <div class="section-title">🎯 Today's Focus</div>
+      <div style="display:grid; gap:10px;">
+        ${focus.map(f => `
+          <div onclick="${f.action ? "("+f.action+")()" : ""}"
+               style="padding:10px;border-radius:10px;
+               background:${f.done ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.05)"};
+               cursor:${f.action ? "pointer" : "default"};">
+            ${f.done ? "✅" : "○"} ${f.label}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 // ---------- MAIN RENDER ----------
 function renderLooksMaxxing() {
-  const container = document.getElementById("looksMaxxingContainer");
-  if (!container) return;
-
-  const stats = calculateLooksStats();
-  const latestWeight = looksData.weightLogs.slice(-1)[0]?.weight || "—";
-
-  const html = `
-    <div style="margin-bottom:20px;">
-      <h2>💎 LooksMaxxing RPG System</h2>
-      <div style="color:#9CA3AF;">Elite masculine optimization dashboard</div>
-    </div>
-
-    <div class="stats-grid" style="margin-bottom:20px;">
-      <div class="stat-card">
-        <div class="stat-value">${stats.looksScore}</div>
-        <div class="stat-label">Looks Score</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${latestWeight}</div>
-        <div class="stat-label">Body Weight (lbs)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${getThisWeekCheckIns()}</div>
-        <div class="stat-label">Weekly Check-ins</div>
-      </div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧬 RPG Character Stats</div>
-      ${renderStatBar("Face", stats.face)}
-      ${renderStatBar("Body", stats.body)}
-      ${renderStatBar("Style", stats.style)}
-      ${renderStatBar("Discipline", stats.discipline)}
-      ${renderStatBar("Aura", stats.aura)}
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🏋️ Body Weight Tracker (Bulking)</div>
-      <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input id="weightInput" type="number" placeholder="Enter weight (lbs)" class="form-input"/>
-        <button onclick="logWeight()" class="form-submit">Log</button>
-      </div>
-      <div id="weightHistory">${renderWeightHistory()}</div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🦷 Jawline & Neck Training</div>
-      <div id="jawNeckGrid">${renderJawNeck()}</div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">✨ Routines</div>
-      <div id="routinesGrid"></div>
-    </div>
-  `;
-
-  container.innerHTML = html;
-  renderRoutinesGrid();
-}
-
-// ---------- STAT BAR ----------
-function renderStatBar(label, value) {
-  return `
-    <div style="margin-bottom:10px;">
-      <div style="display:flex; justify-content:space-between;">
-        <span>${label}</span>
-        <span style="font-weight:700;">${value}</span>
-      </div>
-      <div style="height:8px; background:rgba(255,255,255,0.1); border-radius:6px;">
-        <div style="height:100%; width:${value}%; background:linear-gradient(90deg,#6366F1,#EC4899); border-radius:6px;"></div>
-      </div>
-    </div>
-  `;
-}
-
-// ---------- WEIGHT ----------
-function logWeight() {
-  const input = document.getElementById("weightInput");
-  const weight = parseFloat(input.value);
-  if (!weight) return;
-
-  looksData.weightLogs.push({ date: getTodayKey(), weight });
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-function renderWeightHistory() {
-  const last = looksData.weightLogs.slice(-5).reverse();
-  if (!last.length) return `<div style="color:#9CA3AF;">No weight logs yet.</div>`;
-  return last.map(w => `<div>${w.date}: <strong>${w.weight} lbs</strong></div>`).join("");
-}
-
-// ---------- JAW & NECK ----------
-function renderJawNeck() {
-  const today = getTodayKey();
-  const log = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-
-  return `
-    <div style="display:grid; gap:8px;">
-      <div onclick="toggleJawNeck('jaw')" style="padding:10px; border-radius:10px; background:${log.jaw ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer;">
-        🦷 Jaw Training ${log.jaw ? "✅" : "○"}
-      </div>
-      <div onclick="toggleJawNeck('neck')" style="padding:10px; border-radius:10px; background:${log.neck ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer;">
-        💪 Neck Training ${log.neck ? "✅" : "○"}
-      </div>
-    </div>
-  `;
-}
-
-function toggleJawNeck(type) {
-  const today = getTodayKey();
-  if (!looksData.jawNeckLogs[today]) looksData.jawNeckLogs[today] = { jaw: false, neck: false };
-  looksData.jawNeckLogs[today][type] = !looksData.jawNeckLogs[today][type];
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- ROUTINES ----------
-function renderRoutinesGrid() {
-  const el = document.getElementById("routinesGrid");
+  const el = document.getElementById("looksMaxxingContainer");
   if (!el) return;
 
-  const today = getTodayKey();
-  const categories = [...new Set(looksData.routines.map(r => r.category))];
+  const stats = calculateLooksStats();
+  const latestWeight = looksData.weightLogs.at(-1)?.weight || "—";
 
-  el.innerHTML = categories.map(cat => {
-    const routines = looksData.routines.filter(r => r.category === cat);
-    return `
-      <div style="margin-bottom:12px;">
-        <div style="font-weight:700; color:#A78BFA; margin-bottom:6px;">${cat}</div>
-        ${routines.map(r => {
-          const done = r.lastDone === today;
-          return `
-            <div onclick="markRoutineDone('${r.id}')" style="padding:10px; border-radius:10px; background:${done ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer; margin-bottom:6px;">
-              <strong>${r.name}</strong> <span style="color:#9CA3AF;">(${r.frequency})</span> ${done ? "✅" : ""}
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }).join("");
-}
-
-function markRoutineDone(id) {
-  const r = looksData.routines.find(x => x.id === id);
-  if (!r) return;
-  r.lastDone = r.lastDone === getTodayKey() ? null : getTodayKey();
-  saveLooksData();
-  renderLooksMaxxing();
+  el.innerHTML = `
+    <h2>💎 LooksMaxxing RPG System</h2>
+    ${renderTodaysFocus()}
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value">${stats.looksScore}</div><div class="stat-label">Looks Score</div></div>
+      <div class="stat-card"><div class="stat-value">${latestWeight}</div><div class="stat-label">Body Weight</div></div>
+      <div class="stat-card"><div class="stat-value">${getThisWeekCheckIns()}</div><div class="stat-label">Weekly Check-ins</div></div>
+    </div>
+  `;
 }
 
 // ---------- BOOT ----------
-(function bootLooksMaxxing() {
-  try {
-    initLooksMaxxing();
-    const container = document.getElementById("looksMaxxingContainer");
-    if (container) renderLooksMaxxing();
-  } catch (e) {
-    console.error("LooksMaxxing init failed:", e);
-  }
+(function () {
+  initLooksMaxxing();
+  renderLooksMaxxing();
 })();
-
-console.log("LooksMaxxing RPG module loaded");
