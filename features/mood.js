@@ -1,5 +1,5 @@
 /* features/mood.js
-   stable local date keys + safe App integration
+   fixes "past days disappeared" by migrating old/localStorage keys into YYYY-MM-DD
    keeps the same UI/functions
 */
 
@@ -8,21 +8,14 @@
 
   const App = window.App;
 
-  // one shared local day key for the whole app
-  window.getLocalDayKey =
-    window.getLocalDayKey ||
-    function getLocalDayKey(date = new Date()) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, "0");
-      const d = String(date.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    };
-
   let moodData = {};
   let moodChartInstance = null;
 
   function getDayKey(date = new Date()) {
-    return window.getLocalDayKey(date);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
   function parseDayKey(key) {
@@ -98,7 +91,7 @@
     if (avgHi != null && avgLo != null) {
       const diff = avgHi - avgLo;
       const abs = Math.abs(diff);
-      if (abs >= 5) compare = diff > 0 ? `That’s ${abs} points higher when your energy is high.` : `That’s ${abs} points higher when your energy is low.`;
+      if (abs >= 5) compare = diff > 0 ? `That's ${abs} points higher when your energy is high.` : `That's ${abs} points higher when your energy is low.`;
       else compare = `Your completion stays pretty consistent across energy levels.`;
     }
 
@@ -134,17 +127,125 @@
     return null;
   }
 
-  // migrate nothing here; mood already uses local keys
+  // --- KEY NORMALIZATION / MIGRATION (fixes missing history) ---
+  function isYYYYMMDD(k) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(k));
+  }
+
+  function toLocalDayKeyFromAny(rawKey) {
+    const k = String(rawKey).trim();
+    if (!k) return null;
+
+    // Already correct
+    if (isYYYYMMDD(k)) return k;
+
+    // YYYY/MM/DD
+    if (/^\d{4}\/\d{2}\/\d{2}$/.test(k)) {
+      const [y, m, d] = k.split("/").map(Number);
+      const dt = new Date(y, m - 1, d);
+      if (!isNaN(dt.getTime())) return getDayKey(dt);
+    }
+
+    // MM/DD/YYYY
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(k)) {
+      const [mm, dd, yy] = k.split("/").map(Number);
+      const dt = new Date(yy, mm - 1, dd);
+      if (!isNaN(dt.getTime())) return getDayKey(dt);
+    }
+
+    // Numeric timestamp (ms)
+    if (/^\d{10,13}$/.test(k)) {
+      const dt = new Date(Number(k));
+      if (!isNaN(dt.getTime())) return getDayKey(dt);
+    }
+
+    // ISO strings or Date.toString / Date.toDateString
+    const parsed = Date.parse(k);
+    if (!isNaN(parsed)) return getDayKey(new Date(parsed));
+
+    return null;
+  }
+
+  function normalizeEntry(entry) {
+    if (!entry || typeof entry !== "object") return null;
+
+    const out = {};
+    if ("energy" in entry) {
+      const e = Number(entry.energy);
+      out.energy = Number.isFinite(e) ? Math.min(10, Math.max(1, e)) : null;
+    }
+    if ("mood" in entry) {
+      out.mood = typeof entry.mood === "string" && entry.mood.trim() ? entry.mood : null;
+    }
+    // If neither exists, ignore
+    if (out.energy == null && out.mood == null) return null;
+
+    // Fill defaults if one is missing
+    if (out.energy == null) out.energy = 5;
+    if (out.mood == null) out.mood = "🙂";
+
+    return out;
+  }
+
+  function migrateMoodData(raw) {
+    // If it's not an object, bail
+    if (!raw || typeof raw !== "object") return {};
+
+    const migrated = {};
+    const keys = Object.keys(raw);
+
+    for (const oldKey of keys) {
+      const newKey = toLocalDayKeyFromAny(oldKey);
+      if (!newKey) continue;
+
+      const cleaned = normalizeEntry(raw[oldKey]);
+      if (!cleaned) continue;
+
+      // Merge rule: keep whichever has more info; prefer existing YYYY-MM-DD entries if both exist
+      if (!migrated[newKey]) {
+        migrated[newKey] = cleaned;
+      } else {
+        const a = migrated[newKey];
+        const b = cleaned;
+
+        // If one has mood and the other doesn't, combine
+        migrated[newKey] = {
+          energy: (typeof a.energy === "number" ? a.energy : b.energy),
+          mood: (a.mood ? a.mood : b.mood)
+        };
+
+        // If energy exists in both, prefer the one that came from a proper YYYY-MM-DD key originally
+        if (isYYYYMMDD(oldKey) && typeof b.energy === "number") migrated[newKey].energy = b.energy;
+        if (isYYYYMMDD(oldKey) && b.mood) migrated[newKey].mood = b.mood;
+      }
+    }
+
+    // Also preserve any already-correct keys from raw (they will overwrite migrated defaults)
+    for (const k of keys) {
+      if (!isYYYYMMDD(k)) continue;
+      const cleaned = normalizeEntry(raw[k]);
+      if (!cleaned) continue;
+      migrated[k] = cleaned;
+    }
+
+    return migrated;
+  }
 
   function initMoodData() {
     const saved = localStorage.getItem("moodData");
     if (saved) {
       try {
-        moodData = JSON.parse(saved) || {};
+        const parsed = JSON.parse(saved);
+        // migrate/normalize once, then persist cleaned version
+        const migrated = migrateMoodData(parsed || {});
+        moodData = migrated;
+        saveMoodData();
       } catch {
         moodData = {};
       }
-    } else moodData = {};
+    } else {
+      moodData = {};
+    }
   }
 
   function setTodayEnergy(val) {
@@ -371,6 +472,9 @@
   window.setTodayEnergy = setTodayEnergy;
   window.setTodayMood = setTodayMood;
   window.openMoodGraph = openMoodGraph;
+
+  // init once immediately so history is available even if App events fire oddly
+  initMoodData();
 
   // register with App (safe)
   if (App) {
