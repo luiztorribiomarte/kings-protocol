@@ -1,4 +1,3 @@
-<!-- index.html (FULL UPDATED FILE) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,7 +38,7 @@
         <h1 style="text-align:center; font-size:2.5em;">Kings Protocol</h1>
     </div>
 
-    <!-- Nav (REMOVED: Goals & Habits, Settings) -->
+    <!-- Nav -->
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
         <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
@@ -50,10 +49,10 @@
         <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
     </div>
 
-    <!-- Dashboard (UNCHANGED) -->
+    <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
 
-        <!-- SCHEDULE (REPLACES DAILY FOCUS) -->
+        <!-- SCHEDULE -->
         <div class="habit-section">
             <div class="section-title">📅 Today's Schedule</div>
             <div id="scheduleContainer"></div>
@@ -85,32 +84,28 @@
                 <div class="stat-value" id="currentStreak">0</div>
                 <div class="stat-label">Current Streak</div>
             </div>
-            <div class="stat-card" onclick="openCalendar()">
-                <div class="stat-value">📅</div>
-                <div class="stat-label">Calendar View</div>
+            <div class="stat-card" onclick="openWeeklyReview()">
+                <div class="stat-value">📋</div>
+                <div class="stat-label">Weekly Review</div>
             </div>
         </div>
 
-        <div id="dailyStatus">Checking today's status…</div>
-
-        <!-- Smart Insights Widget -->
+        <!-- EMBEDDED CALENDAR VIEW (NEW - NO BUTTON NEEDED) -->
         <div class="habit-section">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <div class="section-title">🧠 Smart Insights</div>
-            <button onclick="openFullInsights()" class="form-submit" style="padding:6px 12px; font-size:0.9rem;">
-              View All
-            </button>
-          </div>
+          <div class="section-title">📅 This Month</div>
+          <div id="embeddedCalendar"></div>
+        </div>
+
+        <!-- Smart Insights (NOW ALWAYS VISIBLE) -->
+        <div class="habit-section">
+          <div class="section-title">🧠 Smart Insights</div>
           <div id="insightsWidget"></div>
         </div>
 
-        <!-- Weekly Review Button -->
-        <div style="margin-bottom:24px;">
-          <button onclick="openWeeklyReview()" class="form-submit" style="width:100%; padding:16px; font-size:1.05rem;">
-            📋 View Weekly Review
-          </button>
-        </div>
+        <!-- LIFE SCORE & DNA -->
+        <div id="dailyStatus">Checking today's status…</div>
 
+        <!-- PERFORMANCE TREND -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="section-title">📈 Performance Trend</div>
@@ -125,11 +120,13 @@
           <canvas id="trendChart" height="140"></canvas>
         </div>
 
+        <!-- MOOD TRACKER -->
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
             <div id="moodTracker"></div>
         </div>
 
+        <!-- HABITS -->
         <div class="habit-section">
             <div class="section-title">📋 Daily Habits - This Week</div>
             <div id="habitGrid"></div>
@@ -137,7 +134,7 @@
 
     </div>
 
-    <!-- Other Pages (REMOVED: goalsHabitsPage, settingsPage) -->
+    <!-- Other Pages -->
     <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
     <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
     <div id="journalPage" class="page"><div id="journalContainer"></div></div>
