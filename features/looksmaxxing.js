@@ -1,6 +1,6 @@
 // ============================================
-// LOOKSMAXXING MODULE v2.4 (RPG x Elite Masculine)
-// IMPROVEMENT #3: WEIGHT TREND SIGNAL (BULK MODE)
+// LOOKSMAXXING MODULE v2.5 (RPG x Elite Masculine)
+// IMPROVEMENT #4: STAT EXPLANATIONS (CAUSE → EFFECT)
 // ============================================
 
 let looksData = {
@@ -71,11 +71,8 @@ function updateRoutineStreak(routineId, completed) {
     streak.count = 0;
     streak.lastDate = null;
   } else {
-    if (streak.lastDate === yesterday) {
-      streak.count += 1;
-    } else {
-      streak.count = 1;
-    }
+    if (streak.lastDate === yesterday) streak.count += 1;
+    else streak.count = 1;
     streak.lastDate = today;
   }
 
@@ -91,11 +88,8 @@ function updateJawNeckStreak(type, completed) {
     streak.count = 0;
     streak.lastDate = null;
   } else {
-    if (streak.lastDate === yesterday) {
-      streak.count += 1;
-    } else {
-      streak.count = 1;
-    }
+    if (streak.lastDate === yesterday) streak.count += 1;
+    else streak.count = 1;
     streak.lastDate = today;
   }
 }
@@ -103,9 +97,7 @@ function updateJawNeckStreak(type, completed) {
 // ---------- WEIGHT TREND ----------
 function getWeightTrend() {
   const logs = looksData.weightLogs.slice(-7);
-  if (logs.length < 2) {
-    return { status: "Not enough data", delta: 0 };
-  }
+  if (logs.length < 2) return { status: "Not enough data", delta: 0 };
 
   const first = logs[0].weight;
   const last = logs[logs.length - 1].weight;
@@ -118,48 +110,89 @@ function getWeightTrend() {
   return { status, delta };
 }
 
+// ---------- STAT CALC ----------
+function calculateLooksStats() {
+  const today = getTodayKey();
+
+  const routineDone = looksData.routines.filter(r => r.lastDone === today).length;
+  const routineTotal = looksData.routines.length || 1;
+  const routineScore = Math.round((routineDone / routineTotal) * 100);
+
+  const todayJaw = looksData.jawNeckLogs[today]?.jaw ? 1 : 0;
+  const todayNeck = looksData.jawNeckLogs[today]?.neck ? 1 : 0;
+  const jawScore = Math.round(((todayJaw + todayNeck) / 2) * 100);
+
+  const trend = getWeightTrend();
+  let bodyScore = trend.status === "On Track" ? 80 : trend.status === "Losing" ? 30 : 50;
+
+  const face = Math.min(100, Math.round((routineScore + jawScore) / 2));
+  const body = Math.min(100, Math.round((bodyScore + routineScore) / 2));
+  const style = Math.min(100, routineScore);
+  const discipline = Math.min(100, Math.round((routineScore + bodyScore) / 2));
+  const aura = Math.min(100, Math.round((face + body + discipline) / 3));
+  const looksScore = Math.round((face + body + style + discipline + aura) / 5);
+
+  return { face, body, style, discipline, aura, looksScore, routineScore, jawScore, trend };
+}
+
+// ---------- STAT EXPLANATIONS ----------
+function renderStatExplanations(stats) {
+  const explanations = [
+    {
+      title: "Face",
+      text: stats.jawScore < 100
+        ? "Face drops when jaw/neck or skincare routines are skipped."
+        : "Face is strong due to consistent skincare and jaw/neck work."
+    },
+    {
+      title: "Body",
+      text: stats.trend.status === "On Track"
+        ? "Body is improving because weight is trending up."
+        : stats.trend.status === "Losing"
+        ? "Body is dropping because weight is trending down."
+        : "Body is stalled. Increase calories or consistency."
+    },
+    {
+      title: "Discipline",
+      text: stats.routineScore < 70
+        ? "Discipline falls when routines are skipped."
+        : "Discipline is high due to routine consistency."
+    },
+    {
+      title: "Aura",
+      text: "Aura rises when Face, Body, and Discipline stay consistent together."
+    }
+  ];
+
+  return `
+    <div class="habit-section" style="margin-top:20px;">
+      <div class="section-title">🧠 Why Your Stats Changed</div>
+      ${explanations.map(e => `
+        <div style="margin-bottom:8px;">
+          <strong>${e.title}:</strong> ${e.text}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 // ---------- MAIN RENDER ----------
 function renderLooksMaxxing() {
   const container = document.getElementById("looksMaxxingContainer");
   if (!container) return;
 
+  const stats = calculateLooksStats();
   const latestWeight = looksData.weightLogs.at(-1)?.weight || "—";
-  const trend = getWeightTrend();
 
   container.innerHTML = `
     <h2>💎 LooksMaxxing RPG System</h2>
 
     <div class="habit-section">
-      <div class="section-title">🏋️ Body Weight Tracker (Bulking)</div>
-
-      <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input id="weightInput" type="number" placeholder="Enter weight (lbs)" class="form-input"/>
-        <button onclick="logWeight()" class="form-submit">Log</button>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <strong>Current Weight:</strong> ${latestWeight} lbs
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <strong>Status:</strong>
-        <span style="color:${
-          trend.status === "On Track" ? "#22C55E" :
-          trend.status === "Losing" ? "#EF4444" :
-          "#F59E0B"
-        };">
-          ${trend.status}
-        </span>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <strong>7-day change:</strong>
-        ${trend.delta > 0 ? "+" : ""}${trend.delta} lbs
-      </div>
-
-      <div style="color:#9CA3AF; font-size:0.95rem;">
-        On Track = bulk working · Stalled = increase calories · Losing = fix consistency
-      </div>
+      <div class="section-title">🏋️ Body Weight Tracker</div>
+      <input id="weightInput" type="number" class="form-input" placeholder="Enter weight (lbs)" />
+      <button onclick="logWeight()" class="form-submit">Log</button>
+      <div>Current: ${latestWeight} lbs</div>
+      <div>Status: ${stats.trend.status} (${stats.trend.delta > 0 ? "+" : ""}${stats.trend.delta} lbs)</div>
     </div>
 
     <div class="habit-section">
@@ -171,6 +204,8 @@ function renderLooksMaxxing() {
       <div class="section-title">✨ Routines</div>
       <div id="routinesGrid"></div>
     </div>
+
+    ${renderStatExplanations(stats)}
   `;
 
   renderRoutinesGrid();
@@ -195,16 +230,8 @@ function renderJawNeck() {
   const neckStreak = looksData.streaks.neck.count;
 
   return `
-    <div style="display:grid; gap:8px;">
-      <div onclick="toggleJawNeck('jaw')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;">
-        🦷 Jaw Training ${log.jaw ? "✅" : "○"}
-        ${jawStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${jawStreak}-day streak</div>` : ""}
-      </div>
-      <div onclick="toggleJawNeck('neck')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;">
-        💪 Neck Training ${log.neck ? "✅" : "○"}
-        ${neckStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${neckStreak}-day streak</div>` : ""}
-      </div>
-    </div>
+    <div onclick="toggleJawNeck('jaw')">🦷 Jaw ${log.jaw ? "✅" : "○"} ${jawStreak ? `🔥 ${jawStreak}` : ""}</div>
+    <div onclick="toggleJawNeck('neck')">💪 Neck ${log.neck ? "✅" : "○"} ${neckStreak ? `🔥 ${neckStreak}` : ""}</div>
   `;
 }
 
@@ -229,18 +256,13 @@ function renderRoutinesGrid() {
   el.innerHTML = categories.map(cat => {
     const routines = looksData.routines.filter(r => r.category === cat);
     return `
-      <div style="margin-bottom:12px;">
-        <div style="font-weight:700;margin-bottom:6px;">${cat}</div>
-        ${routines.map(r => {
-          const done = r.lastDone === today;
-          const streak = looksData.streaks.routines[r.id]?.count || 0;
-          return `
-            <div onclick="markRoutineDone('${r.id}')" style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:pointer;margin-bottom:6px;">
-              <strong>${r.name}</strong> ${done ? "✅" : ""}
-              ${streak ? `<div style="font-size:0.85rem;color:#F59E0B;">🔥 ${streak}-day streak</div>` : ""}
-            </div>
-          `;
-        }).join("")}
+      <div>
+        <strong>${cat}</strong>
+        ${routines.map(r => `
+          <div onclick="markRoutineDone('${r.id}')">
+            ${r.name} ${r.lastDone === today ? "✅" : ""}
+          </div>
+        `).join("")}
       </div>
     `;
   }).join("");
@@ -260,7 +282,7 @@ function markRoutineDone(id) {
 }
 
 // ---------- BOOT ----------
-(function bootLooksMaxxing() {
+(function () {
   initLooksMaxxing();
   renderLooksMaxxing();
 })();
