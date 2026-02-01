@@ -1,17 +1,6 @@
 // ============================================
 // LOOKSMAXXING MODULE v3.0 (RPG x Elite Masculine)
-// ALL UPGRADES PACK (Additive Only, Backward Compatible)
-// - Today's Focus (smarter + One Thing Lock + Difficulty Scaling)
-// - Streaks (routines + jaw + neck)
-// - Weight Trend Signal (Bulk/Cut/Maintain)
-// - Stat Explanations (cause -> effect)
-// - Confidence Index + Missed-Day Explanation
-// - Weekly Identity Summary (7-day prompt + log)
-// - Heat Meter (last 7 days)
-// - 30-Day Before/After Narrative
-// - Silent Regression Guard (3+ days inactivity compact mode)
-// - Archetype Mode (behavior-based identity label)
-// ============================================
+
 
 let looksData = {
   routines: [],
