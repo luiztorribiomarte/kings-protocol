@@ -35,15 +35,17 @@ function showPage(page) {
     // NOTE: scheduleContainer now shows Weekly Planner (safe swap)
     if (typeof renderSchedule === "function") renderSchedule();
 
-    renderLifeScore();
-    renderWeeklyGraph();
-    renderDNAProfile();
+    // ✅ SAFETY: never hard-crash if a module isn't loaded
+    if (typeof renderLifeScore === "function") renderLifeScore();
+    if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+    if (typeof renderDNAProfile === "function") renderDNAProfile();
+
     if (typeof renderInsightsWidget === "function") renderInsightsWidget();
     if (typeof renderEmbeddedCalendar === "function") renderEmbeddedCalendar();
   }
 
   if (page === "journal") {
-    renderJournal();
+    if (typeof renderJournal === "function") renderJournal();
   }
 
   if (page === "looksmaxxing") {
@@ -228,10 +230,6 @@ function escapeHtml(str) {
 
 // =====================================================
 // ✅ WEEKLY PLANNER SYSTEM (REPLACES DAILY SCHEDULE UI)
-// - Week resets automatically (new week starts fresh)
-// - Keeps past weeks saved (history preserved)
-// - Click a day to set intentions + time blocks + checkoffs
-// - Triggers Life Score / DNA / Weekly Graph / Trend updates live
 // =====================================================
 
 const WEEKLY_PLANNER_KEY = "weeklyPlannerData";
@@ -578,7 +576,6 @@ window.deletePlannerItem = deletePlannerItem;
 
 // ===============================
 // 📅 SCHEDULE SYSTEM (OLD - PRESERVED FOR SAFETY)
-// NOTE: renderSchedule() now renders Weekly Planner to match your new dashboard behavior.
 // ===============================
 let schedule = [];
 let lastScheduleDate = null;
@@ -668,7 +665,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderTodos();
   renderSchedule(); // now renders weekly planner
-  renderLifeScore();
-  renderWeeklyGraph();
-  renderDNAProfile();
+
+  // ✅ SAFETY: never hard-crash if a module isn't loaded
+  if (typeof renderLifeScore === "function") renderLifeScore();
+  if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
+  if (typeof renderDNAProfile === "function") renderDNAProfile();
 });
