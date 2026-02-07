@@ -1,3 +1,18 @@
+// =====================================================
+// KINGS PROTOCOL — WORKOUT SYSTEM (SINGLE FILE, ELITE)
+// File: features/workout.js
+// - Books-style layout (Currently Training / Planned / Completed)
+// - Workouts -> Exercises -> Sets (individual sets with custom weight/reps)
+// - Edit/Delete sets (NO confirm popups)
+// - Move workouts across sections
+// - PRs, streak, weekly stats
+// - Charts: weekly momentum (7/30/all) + exercise progress
+// - SAFE UPGRADE:
+//    ✅ crash-proof old localStorage data (no wiping)
+//    ✅ completed workouts grouped by month + collapsible + load older months
+// - Safe mount: does not wipe other page features
+// =====================================================
+
 (function () {
   "use strict";
 
@@ -701,4 +716,912 @@
     const workouts = loadWorkouts();
 
     const current = workouts.filter(w => w.status === "current").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const planned = workouts.filter(w => w.status === "planned").s
+    const planned = workouts.filter(w => w.status === "planned").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const completedAll = workouts.filter(w => w.status === "completed").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    const streak = computeStreak(workouts);
+    const series7 = computeDailySeries(workouts, "7");
+    const weeklySets = series7.sets.reduce((a, b) => a + b, 0);
+    const weeklyVolume = series7.volume.reduce((a, b) => a + b, 0);
+
+    const today = computeTodaySummary(workouts);
+    const prs = computePRs(workouts).slice(0, 8);
+
+    const ui = loadUIState();
+    const allExercises = getAllExerciseNames(workouts);
+
+    // pick a default exercise for chart
+    if (!ui.exerciseChartExercise && allExercises.length) {
+      ui.exerciseChartExercise = allExercises[0];
+      saveUIState(ui);
+    }
+
+    // Group completed workouts by month to prevent infinite scroll
+    const completedByMonth = {};
+    completedAll.forEach(w => {
+      const mk = monthKeyFromWorkout(w);
+      if (!completedByMonth[mk]) completedByMonth[mk] = [];
+      completedByMonth[mk].push(w);
+    });
+
+    const monthKeys = Object.keys(completedByMonth).sort((a, b) => (a < b ? 1 : -1)); // newest first
+    const monthsToShow = Math.max(1, Number(ui.completedMonthsToShow || 3));
+    const visibleMonths = monthKeys.slice(0, monthsToShow);
+    const hasMoreMonths = monthKeys.length > visibleMonths.length;
+
+    mount.innerHTML = `
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title" style="margin:0;">Workouts</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="form-submit" id="kpAddWorkoutBtn">Add workout</button>
+            <button class="form-submit" id="kpOpenWeeklyGraphBtn" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">View graph</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px; display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px;">
+          <div style="border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); border-radius:14px; padding:12px;">
+            <div style="color:#9ca3af; font-size:0.85rem; font-weight:800;">Streak</div>
+            <div style="font-size:1.8rem; font-weight:900; margin-top:6px;">${streak}</div>
+            <div style="color:#9ca3af; font-size:0.85rem; margin-top:4px;">days in a row</div>
+          </div>
+
+          <div style="border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); border-radius:14px; padding:12px;">
+            <div style="color:#9ca3af; font-size:0.85rem; font-weight:800;">Last 7 days</div>
+            <div style="font-size:1.8rem; font-weight:900; margin-top:6px;">${weeklySets}</div>
+            <div style="color:#9ca3af; font-size:0.85rem; margin-top:4px;">sets logged</div>
+          </div>
+
+          <div style="border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); border-radius:14px; padding:12px;">
+            <div style="color:#9ca3af; font-size:0.85rem; font-weight:800;">Last 7 days</div>
+            <div style="font-size:1.8rem; font-weight:900; margin-top:6px;">${Number(weeklyVolume || 0).toLocaleString()}</div>
+            <div style="color:#9ca3af; font-size:0.85rem; margin-top:4px;">total volume</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.10); padding-top:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+            <div style="color:white; font-weight:900;">Today</div>
+            <div style="color:#9ca3af; font-size:0.9rem;">
+              ${today.totalSets} sets • ${today.exercises.length} exercises • ${Number(today.volume || 0).toLocaleString()} volume
+            </div>
+          </div>
+
+          <div>
+            ${
+              !today.exercises.length
+                ? `<div style="color:#9ca3af;">No sets logged today.</div>`
+                : today.exercises.map(exName => {
+                    const arr = today.byExercise[exName] || [];
+                    const latest = arr[arr.length - 1];
+                    const vol = arr.reduce((a, s) => a + Number(s.volume || 0), 0);
+                    return `
+                      <div style="border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); border-radius:12px; padding:10px 12px; display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px;">
+                        <div>
+                          <div style="color:white; font-weight:900;">${escapeHtml(exName)}</div>
+                          <div style="color:#9ca3af; font-size:0.85rem; margin-top:2px;">
+                            latest: ${Number(latest.weight || 0)} lbs × ${Number(latest.reps || 0)} • ${formatDay(latest.date)}
+                          </div>
+                        </div>
+                        <div style="color:#e5e7eb; font-weight:900;">${Number(vol || 0).toLocaleString()}</div>
+                      </div>
+                    `;
+                  }).join("")
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div class="section-title" style="margin:0;">Currently training</div>
+        <div style="margin-top:10px;">
+          ${current.length ? current.map(renderWorkoutCard).join("") : `<div style="color:#9ca3af;">No active workouts.</div>`}
+        </div>
+      </div>
+
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div class="section-title" style="margin:0;">Planned workouts</div>
+        <div style="margin-top:10px;">
+          ${planned.length ? planned.map(renderWorkoutCard).join("") : `<div style="color:#9ca3af;">No planned workouts.</div>`}
+        </div>
+      </div>
+
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title" style="margin:0;">Workouts completed</div>
+          <div style="color:#9ca3af; font-size:0.9rem;">grouped by month • prevents infinite scrolling</div>
+        </div>
+
+        <div style="margin-top:10px;">
+          ${
+            !monthKeys.length
+              ? `<div style="color:#9ca3af;">No completed workouts.</div>`
+              : visibleMonths.map(mk => renderCompletedMonthBlock(mk, completedByMonth[mk] || [], ui)).join("")
+          }
+
+          ${
+            hasMoreMonths
+              ? `
+                <div style="margin-top:12px;">
+                  <button class="form-submit" data-action="loadMoreCompletedMonths" style="width:100%; background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">
+                    Load older months
+                  </button>
+                </div>
+              `
+              : ``
+          }
+        </div>
+      </div>
+
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title" style="margin:0;">Personal records</div>
+          <div style="color:#9ca3af; font-size:0.9rem;">best 1RM, weight, and volume</div>
+        </div>
+
+        <div style="margin-top:10px;">
+          ${
+            prs.length
+              ? prs.map(p => `
+                <div class="idea-item" style="margin-top:8px;">
+                  <div style="font-weight:900;">${escapeHtml(p.exerciseName)}</div>
+                  <div style="color:#9ca3af; margin-top:4px; font-size:0.9rem;">
+                    best 1RM: ${p.best1RM} • best weight: ${p.bestWeight} • best volume: ${Number(p.bestVolume || 0).toLocaleString()} • ${formatDay(p.date)}
+                  </div>
+                </div>
+              `).join("")
+              : `<div style="color:#9ca3af;">No PRs yet.</div>`
+          }
+        </div>
+      </div>
+
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title" style="margin:0;">Strength progress</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <select id="kpExerciseChartSelect" class="form-input" style="width:auto; min-width:220px;">
+              ${
+                allExercises.length
+                  ? allExercises.map(n => `<option value="${escapeHtml(n)}" ${n === ui.exerciseChartExercise ? "selected" : ""}>${escapeHtml(n)}</option>`).join("")
+                  : `<option value="">No exercises yet</option>`
+              }
+            </select>
+
+            <select id="kpExerciseChartMetric" class="form-input" style="width:auto;">
+              <option value="1rm" ${ui.exerciseChartMetric === "1rm" ? "selected" : ""}>Estimated 1RM</option>
+              <option value="weight" ${ui.exerciseChartMetric === "weight" ? "selected" : ""}>Best weight per day</option>
+              <option value="volume" ${ui.exerciseChartMetric === "volume" ? "selected" : ""}>Total volume per day</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="color:#9ca3af; font-size:0.9rem; margin-top:10px;">
+          Progress is calculated per day for the selected exercise.
+        </div>
+
+        <div style="width:100%; height:320px; margin-top:10px;">
+          <canvas id="kpExerciseChartCanvas" height="320"></canvas>
+        </div>
+      </div>
+    `;
+
+    bindTopEvents();
+    bindWorkoutCardEvents();
+    bindExerciseChartEvents();
+    renderExerciseProgressChart();
+  }
+
+  function renderCompletedMonthBlock(monthKey, workouts, ui) {
+    const expanded = !!ui.completedExpanded?.[monthKey];
+
+    // default behavior: newest month expanded, older collapsed
+    const isNewest = false; // we’ll handle in init below
+    const exp = expanded;
+
+    const count = workouts.length;
+    const totalVol = workouts.reduce((sum, w) => sum + calcWorkoutVolume(w), 0);
+
+    return `
+      <div style="margin-top:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); border-radius:16px; overflow:hidden;">
+        <div
+          data-action="toggleCompletedMonth"
+          data-month="${escapeHtml(monthKey)}"
+          style="cursor:pointer; padding:14px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px;"
+        >
+          <div>
+            <div style="font-weight:900; color:white;">${escapeHtml(prettyMonth(monthKey))}</div>
+            <div style="color:#9ca3af; font-size:0.85rem; margin-top:2px;">
+              ${count} workout${count === 1 ? "" : "s"} • total volume ${Number(totalVol || 0).toLocaleString()}
+            </div>
+          </div>
+
+          <div style="color:#e5e7eb; font-weight:900; display:flex; align-items:center; gap:10px;">
+            <span style="opacity:0.85;">${exp ? "Hide" : "Show"}</span>
+            <span style="font-size:1.1rem;">${exp ? "▾" : "▸"}</span>
+          </div>
+        </div>
+
+        <div style="padding:0 14px 14px 14px; display:${exp ? "block" : "none"};">
+          ${workouts.map(renderWorkoutCard).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderWorkoutCard(workout) {
+    const statusPill = workout.status === "current"
+      ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#bbf7d0;">active</span>`
+      : workout.status === "planned"
+        ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(250,204,21,0.25); background:rgba(250,204,21,0.08); color:#fde68a;">planned</span>`
+        : `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(148,163,184,0.25); background:rgba(148,163,184,0.08); color:#e5e7eb;">completed</span>`;
+
+    const headerBtns = [];
+
+    if (workout.status === "planned") {
+      headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="current">Start</button>`);
+    }
+    if (workout.status === "current") {
+      headerBtns.push(`<button class="form-submit" data-action="addExercise" data-id="${workout.id}">Add exercise</button>`);
+      headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="completed">Finish</button>`);
+    }
+    if (workout.status === "completed") {
+      headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="current">Re-open</button>`);
+    }
+
+    headerBtns.push(`<button class="form-cancel" data-action="deleteWorkout" data-id="${workout.id}" style="color:#ef4444;">Delete</button>`);
+
+    const vol = calcWorkoutVolume(workout);
+
+    return `
+      <div class="idea-item" style="margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:220px;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <div style="font-weight:900; font-size:1.05rem;">${escapeHtml(normText(workout.name, "Untitled"))}</div>
+              ${statusPill}
+            </div>
+            <div style="color:#9ca3af; margin-top:4px;">
+              ${escapeHtml(normText(workout.type, ""))}
+              <span style="margin-left:10px;">• total volume: ${Number(vol || 0).toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${headerBtns.join("")}
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          ${
+            (workout.exercises || []).length
+              ? workout.exercises.map(ex => renderExerciseBlock(workout, ex)).join("")
+              : `<div style="color:#9ca3af;">No exercises yet.</div>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  function renderExerciseBlock(workout, ex) {
+    const sets = Array.isArray(ex.sets) ? ex.sets : [];
+    const setsSorted = [...sets].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    return `
+      <div style="margin-top:10px; padding:12px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03);">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="font-weight:900;">${escapeHtml(normText(ex.name, "Exercise"))}</div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button
+              class="form-submit"
+              data-action="renameExercise"
+              data-w="${workout.id}"
+              data-e="${ex.id}"
+              style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);"
+            >
+              Rename
+            </button>
+
+            <button
+              class="form-cancel"
+              data-action="deleteExercise"
+              data-w="${workout.id}"
+              data-e="${ex.id}"
+              style="color:#ef4444;"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <input
+            type="number"
+            inputmode="decimal"
+            placeholder="Weight"
+            class="form-input"
+            style="width:110px;"
+            data-role="setWeight"
+            data-w="${workout.id}"
+            data-e="${ex.id}"
+          />
+          <input
+            type="number"
+            inputmode="numeric"
+            placeholder="Reps"
+            class="form-input"
+            style="width:90px;"
+            data-role="setReps"
+            data-w="${workout.id}"
+            data-e="${ex.id}"
+          />
+          <input
+            type="date"
+            class="form-input"
+            style="width:170px;"
+            value="${todayISO()}"
+            data-role="setDate"
+            data-w="${workout.id}"
+            data-e="${ex.id}"
+          />
+          <button
+            class="form-submit"
+            data-action="addSet"
+            data-w="${workout.id}"
+            data-e="${ex.id}"
+          >
+            Add set
+          </button>
+        </div>
+
+        <div style="margin-top:10px;">
+          ${
+            setsSorted.length
+              ? setsSorted.map((s, idx) => renderSetRow(workout.id, ex.id, s, idx)).join("")
+              : `<div style="color:#9ca3af;">No sets yet. Add your first set above.</div>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSetRow(workoutId, exerciseId, set, idx) {
+    const w = Number(set.weight || 0);
+    const r = Number(set.reps || 0);
+    const vol = w * r;
+    const one = Math.round(estimate1RM(w, r) || 0);
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.10); background:rgba(0,0,0,0.16); margin-top:8px; flex-wrap:wrap;">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div style="color:#9ca3af; font-weight:900; width:34px;">#${idx + 1}</div>
+          <div style="font-weight:900; color:white;">${w} x ${r}</div>
+          <div style="color:#9ca3af;">vol ${Number(vol || 0).toLocaleString()}</div>
+          <div style="color:#a78bfa;">1RM ${one}</div>
+          <div style="color:#9ca3af;">${formatDay(set.date || todayISO())}</div>
+        </div>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button
+            class="form-submit"
+            data-action="editSet"
+            data-w="${workoutId}"
+            data-e="${exerciseId}"
+            data-s="${set.id}"
+            style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);"
+          >
+            Edit
+          </button>
+
+          <button
+            class="form-cancel"
+            data-action="deleteSet"
+            data-w="${workoutId}"
+            data-e="${exerciseId}"
+            data-s="${set.id}"
+            style="color:#ef4444;"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // -----------------------------
+  // Bind events
+  // -----------------------------
+  function bindTopEvents() {
+    const mount = byId(MOUNT_ID);
+    if (!mount) return;
+
+    const addBtn = mount.querySelector("#kpAddWorkoutBtn");
+    if (addBtn) addBtn.onclick = openAddWorkoutModal;
+
+    const graphBtn = mount.querySelector("#kpOpenWeeklyGraphBtn");
+    if (graphBtn) graphBtn.onclick = () => openWeeklyGraphModal("7");
+  }
+
+  function bindWorkoutCardEvents() {
+    const mount = byId(MOUNT_ID);
+    if (!mount) return;
+
+    mount.querySelectorAll("[data-action]").forEach(btn => {
+      btn.onclick = () => {
+        const action = btn.dataset.action;
+
+        if (action === "deleteWorkout") {
+          deleteWorkout(btn.dataset.id);
+          return;
+        }
+
+        if (action === "moveWorkout") {
+          moveWorkout(btn.dataset.id, btn.dataset.status);
+          return;
+        }
+
+        if (action === "addExercise") {
+          openAddExerciseModal(btn.dataset.id);
+          return;
+        }
+
+        if (action === "deleteExercise") {
+          deleteExercise(btn.dataset.w, btn.dataset.e);
+          return;
+        }
+
+        if (action === "renameExercise") {
+          openRenameExerciseModal(btn.dataset.w, btn.dataset.e);
+          return;
+        }
+
+        if (action === "addSet") {
+          const wId = btn.dataset.w;
+          const eId = btn.dataset.e;
+
+          const weightEl = mount.querySelector(`[data-role="setWeight"][data-w="${wId}"][data-e="${eId}"]`);
+          const repsEl = mount.querySelector(`[data-role="setReps"][data-w="${wId}"][data-e="${eId}"]`);
+          const dateEl = mount.querySelector(`[data-role="setDate"][data-w="${wId}"][data-e="${eId}"]`);
+
+          const weight = weightEl ? weightEl.value : "";
+          const reps = repsEl ? repsEl.value : "";
+          const date = dateEl ? dateEl.value : todayISO();
+
+          addSet(wId, eId, weight, reps, date);
+
+          if (weightEl) weightEl.value = "";
+          if (repsEl) repsEl.value = "";
+          return;
+        }
+
+        if (action === "deleteSet") {
+          deleteSet(btn.dataset.w, btn.dataset.e, btn.dataset.s);
+          return;
+        }
+
+        if (action === "editSet") {
+          openEditSetModal(btn.dataset.w, btn.dataset.e, btn.dataset.s);
+          return;
+        }
+
+        // NEW: month grouping controls
+        if (action === "toggleCompletedMonth") {
+          const mk = btn.dataset.month;
+          const ui = loadUIState();
+          ui.completedExpanded = ui.completedExpanded || {};
+          ui.completedExpanded[mk] = !ui.completedExpanded[mk];
+          saveUIState(ui);
+          render();
+          return;
+        }
+
+        if (action === "loadMoreCompletedMonths") {
+          const ui = loadUIState();
+          ui.completedMonthsToShow = Math.min(999, Number(ui.completedMonthsToShow || 3) + 3);
+          saveUIState(ui);
+          render();
+          return;
+        }
+      };
+    });
+  }
+
+  function bindExerciseChartEvents() {
+    const mount = byId(MOUNT_ID);
+    if (!mount) return;
+
+    const exSel = mount.querySelector("#kpExerciseChartSelect");
+    const metricSel = mount.querySelector("#kpExerciseChartMetric");
+
+    if (exSel) {
+      exSel.onchange = () => {
+        const ui = loadUIState();
+        ui.exerciseChartExercise = exSel.value;
+        saveUIState(ui);
+        renderExerciseProgressChart();
+      };
+    }
+
+    if (metricSel) {
+      metricSel.onchange = () => {
+        const ui = loadUIState();
+        ui.exerciseChartMetric = metricSel.value;
+        saveUIState(ui);
+        renderExerciseProgressChart();
+      };
+    }
+  }
+
+  // -----------------------------
+  // Modals
+  // -----------------------------
+  function openAddWorkoutModal() {
+    openModalSafe(`
+      <div class="section-title">Add workout</div>
+
+      <div class="form-group">
+        <label>Name</label>
+        <input id="kpWorkoutName" class="form-input" placeholder="e.g. Push day" />
+      </div>
+
+      <div class="form-group">
+        <label>Type</label>
+        <input id="kpWorkoutType" class="form-input" placeholder="e.g. strength / hypertrophy / conditioning" />
+      </div>
+
+      <div class="form-group">
+        <label>Where should it go?</label>
+        <select id="kpWorkoutStatus" class="form-input">
+          <option value="planned">Planned workouts</option>
+          <option value="current">Currently training</option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="kpSaveWorkoutBtn">Save</button>
+        <button class="form-cancel" id="kpCancelWorkoutBtn">Cancel</button>
+      </div>
+    `);
+
+    const saveBtn = byId("kpSaveWorkoutBtn");
+    const cancelBtn = byId("kpCancelWorkoutBtn");
+
+    if (cancelBtn) cancelBtn.onclick = closeModalSafe;
+
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const name = byId("kpWorkoutName")?.value || "";
+        const type = byId("kpWorkoutType")?.value || "";
+        const status = byId("kpWorkoutStatus")?.value || "planned";
+        addWorkout(name, type, status);
+        closeModalSafe();
+      };
+    }
+  }
+
+  function openAddExerciseModal(workoutId) {
+    openModalSafe(`
+      <div class="section-title">Add exercise</div>
+
+      <div class="form-group">
+        <label>Exercise name</label>
+        <input id="kpExerciseName" class="form-input" placeholder="e.g. Bench press" />
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="kpSaveExerciseBtn">Add</button>
+        <button class="form-cancel" id="kpCancelExerciseBtn">Cancel</button>
+      </div>
+    `);
+
+    const saveBtn = byId("kpSaveExerciseBtn");
+    const cancelBtn = byId("kpCancelExerciseBtn");
+
+    if (cancelBtn) cancelBtn.onclick = closeModalSafe;
+
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const name = byId("kpExerciseName")?.value || "";
+        addExercise(workoutId, name);
+        closeModalSafe();
+      };
+    }
+  }
+
+  function openRenameExerciseModal(workoutId, exerciseId) {
+    const workouts = loadWorkouts();
+    const w = workouts.find(x => x.id === workoutId);
+    const ex = w?.exercises?.find(e => e.id === exerciseId);
+    const currentName = normText(ex?.name, "");
+
+    openModalSafe(`
+      <div class="section-title">Rename exercise</div>
+
+      <div class="form-group">
+        <label>New name</label>
+        <input id="kpRenameExerciseInput" class="form-input" value="${escapeHtml(currentName)}" />
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="kpRenameExerciseSave">Save</button>
+        <button class="form-cancel" id="kpRenameExerciseCancel">Cancel</button>
+      </div>
+    `);
+
+    const saveBtn = byId("kpRenameExerciseSave");
+    const cancelBtn = byId("kpRenameExerciseCancel");
+
+    if (cancelBtn) cancelBtn.onclick = closeModalSafe;
+
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const name = byId("kpRenameExerciseInput")?.value || "";
+        renameExercise(workoutId, exerciseId, name);
+        closeModalSafe();
+      };
+    }
+  }
+
+  function openEditSetModal(workoutId, exerciseId, setId) {
+    const workouts = loadWorkouts();
+    const w = workouts.find(x => x.id === workoutId);
+    const ex = w?.exercises?.find(e => e.id === exerciseId);
+    const set = ex?.sets?.find(s => s.id === setId);
+
+    if (!set) return;
+
+    openModalSafe(`
+      <div class="section-title">Edit set</div>
+
+      <div class="form-group">
+        <label>Date</label>
+        <input id="kpEditSetDate" type="date" class="form-input" value="${escapeHtml(set.date || todayISO())}" />
+      </div>
+
+      <div class="form-group">
+        <label>Weight</label>
+        <input id="kpEditSetWeight" type="number" class="form-input" value="${Number(set.weight || 0)}" />
+      </div>
+
+      <div class="form-group">
+        <label>Reps</label>
+        <input id="kpEditSetReps" type="number" class="form-input" value="${Number(set.reps || 0)}" />
+      </div>
+
+      <div class="form-actions">
+        <button class="form-submit" id="kpEditSetSave">Save</button>
+        <button class="form-cancel" id="kpEditSetCancel">Cancel</button>
+      </div>
+    `);
+
+    const saveBtn = byId("kpEditSetSave");
+    const cancelBtn = byId("kpEditSetCancel");
+
+    if (cancelBtn) cancelBtn.onclick = closeModalSafe;
+
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const d = byId("kpEditSetDate")?.value || todayISO();
+        const wv = byId("kpEditSetWeight")?.value || 0;
+        const rv = byId("kpEditSetReps")?.value || 0;
+        editSet(workoutId, exerciseId, setId, wv, rv, d);
+        closeModalSafe();
+      };
+    }
+  }
+
+  // -----------------------------
+  // Weekly graph modal
+  // -----------------------------
+  function openWeeklyGraphModal(range) {
+    const title = range === "30" ? "Last 30 days" : range === "all" ? "All time" : "Last 7 days";
+
+    openModalSafe(`
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+        <div style="color:white; font-weight:900; font-size:1.1rem;">Workout momentum (${title})</div>
+
+        <select id="kpWeeklyRangeSelect" class="form-input" style="width:auto;">
+          <option value="7" ${range === "7" ? "selected" : ""}>7 days</option>
+          <option value="30" ${range === "30" ? "selected" : ""}>30 days</option>
+          <option value="all" ${range === "all" ? "selected" : ""}>All time</option>
+        </select>
+      </div>
+
+      <div style="color:#9ca3af; font-size:0.9rem; margin-bottom:12px;">
+        Two lines: sets logged and training volume. Volume = weight × reps.
+      </div>
+
+      <div style="width:100%; height:320px;">
+        <canvas id="kpWeeklyCanvas" height="320"></canvas>
+      </div>
+
+      <div style="margin-top:12px;">
+        <button class="form-cancel" style="width:100%;" onclick="closeModal()">Close</button>
+      </div>
+    `);
+
+    const sel = byId("kpWeeklyRangeSelect");
+    if (sel) sel.onchange = () => openWeeklyGraphModal(sel.value);
+
+    setTimeout(() => renderWeeklyChart(range), 0);
+  }
+
+  function renderWeeklyChart(range) {
+    if (typeof Chart === "undefined") return;
+
+    const canvas = byId("kpWeeklyCanvas");
+    if (!canvas) return;
+
+    const workouts = loadWorkouts();
+    const series = computeDailySeries(workouts, range);
+
+    if (weeklyChart) {
+      try { weeklyChart.destroy(); } catch {}
+      weeklyChart = null;
+    }
+
+    weeklyChart = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        labels: series.labels,
+        datasets: [
+          {
+            label: "Sets",
+            data: series.sets,
+            tension: 0.35,
+            borderWidth: 3,
+            spanGaps: true,
+            yAxisID: "y"
+          },
+          {
+            label: "Volume",
+            data: series.volume,
+            tension: 0.35,
+            borderWidth: 3,
+            spanGaps: true,
+            yAxisID: "y1"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: "rgba(255,255,255,0.8)" } }
+        },
+        scales: {
+          x: { ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.08)" } },
+          y: {
+            beginAtZero: true,
+            ticks: { color: "rgba(255,255,255,0.65)" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          },
+          y1: {
+            beginAtZero: true,
+            position: "right",
+            ticks: { color: "rgba(255,255,255,0.65)" },
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    });
+  }
+
+  // -----------------------------
+  // Exercise progress chart
+  // -----------------------------
+  function renderExerciseProgressChart() {
+    if (typeof Chart === "undefined") return;
+
+    const mount = byId(MOUNT_ID);
+    if (!mount) return;
+
+    const canvas = mount.querySelector("#kpExerciseChartCanvas");
+    if (!canvas) return;
+
+    const workouts = loadWorkouts();
+    const ui = loadUIState();
+
+    const series = computeExerciseSeries(workouts, ui.exerciseChartExercise);
+    if (!series) {
+      if (exerciseChart) {
+        try { exerciseChart.destroy(); } catch {}
+        exerciseChart = null;
+      }
+      return;
+    }
+
+    let data = series.best1rm;
+    let label = "Estimated 1RM";
+
+    if (ui.exerciseChartMetric === "weight") {
+      data = series.bestWeight;
+      label = "Best weight per day";
+    }
+
+    if (ui.exerciseChartMetric === "volume") {
+      data = series.volume;
+      label = "Total volume per day";
+    }
+
+    if (exerciseChart) {
+      try { exerciseChart.destroy(); } catch {}
+      exerciseChart = null;
+    }
+
+    exerciseChart = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        labels: series.labels,
+        datasets: [{
+          label,
+          data,
+          tension: 0.35,
+          borderWidth: 3,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          spanGaps: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: "rgba(255,255,255,0.8)" } },
+          tooltip: {
+            callbacks: {
+              afterBody: (items) => {
+                const idx = items?.[0]?.dataIndex ?? 0;
+                const d = series.days[idx];
+                if (!d) return [];
+                return [
+                  `Day: ${d.day}`,
+                  `Best 1RM: ${Math.round(d.best1rm || 0)}`,
+                  `Best weight: ${Math.round(d.bestWeight || 0)}`,
+                  `Volume: ${Math.round(d.volume || 0).toLocaleString()}`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.08)" } },
+          y: { beginAtZero: true, ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.08)" } }
+        }
+      }
+    });
+  }
+
+  // -----------------------------
+  // Boot
+  // -----------------------------
+  function boot() {
+    hookShowPage();
+    hookNavClicks();
+
+    // render if workout page is already active or user reloads on workout page
+    setTimeout(() => {
+      if (isWorkoutPageActive()) render();
+    }, 120);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+
+  // Optional global API (useful for debugging in console)
+  window.KPWorkouts = {
+    render,
+    addWorkout,
+    addExercise,
+    addSet,
+    moveWorkout,
+    deleteWorkout
+  };
+})();
