@@ -7,9 +7,12 @@
 // - Move workouts across sections
 // - PRs, streak, weekly stats
 // - Charts: weekly momentum (7/30/all) + exercise progress
-// - SAFE UPGRADE:
-//    ✅ crash-proof old localStorage data (no wiping)
-//    ✅ completed workouts grouped by month + collapsible + load older months
+// - SAFE UPGRADE (2026-02-07):
+//   ✅ Fixes potential "toLowerCase of undefined" crash for older data
+//   ✅ Solves infinite scrolling by:
+//      1) Collapsible workout cards (per-workout expand/collapse)
+//      2) Completed pagination ("Load more")
+//      3) Search filter (find workouts/exercises fast)
 // - Safe mount: does not wipe other page features
 // =====================================================
 
@@ -65,15 +68,6 @@
       .replaceAll("'", "&#039;");
   }
 
-  function normText(v, fallback) {
-    const s = String(v ?? "").trim();
-    return s ? s : String(fallback ?? "").trim() || "";
-  }
-
-  function safeLower(v) {
-    return String(v ?? "").toLowerCase();
-  }
-
   function todayISO() {
     const d = new Date();
     return d.toISOString().split("T")[0];
@@ -92,7 +86,7 @@
       const d = new Date(isoDay + "T00:00:00");
       return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     } catch {
-      return String(isoDay || "");
+      return isoDay;
     }
   }
 
@@ -100,6 +94,14 @@
     const x = Number(n);
     if (!Number.isFinite(x)) return min;
     return Math.min(max, Math.max(min, x));
+  }
+
+  function normStr(x) {
+    return String(x ?? "").trim();
+  }
+
+  function lower(x) {
+    return normStr(x).toLowerCase();
   }
 
   // Epley estimate (simple, common)
@@ -125,13 +127,12 @@
 
   function flattenAllSets(workouts) {
     const out = [];
-
     (workouts || []).forEach(w => {
-      const workoutName = normText(w?.name, "Untitled");
+      const workoutName = normStr(w?.name);
       (w?.exercises || []).forEach(ex => {
-        const exerciseName = normText(ex?.name, "Exercise");
+        const exerciseName = normStr(ex?.name);
         (ex?.sets || []).forEach(set => {
-          const d = dayKey(set?.date);
+          const date = dayKey(set?.date);
           const weight = Number(set?.weight || 0);
           const reps = Number(set?.reps || 0);
           out.push({
@@ -139,7 +140,7 @@
             workoutName,
             exerciseId: ex?.id,
             exerciseName,
-            date: d,
+            date,
             weight,
             reps,
             volume: weight * reps,
@@ -154,62 +155,41 @@
   }
 
   // -----------------------------
-  // Data model (CRASH-PROOF)
+  // Data model
   // -----------------------------
   function normalizeWorkouts(list) {
     if (!Array.isArray(list)) return [];
 
-    return list.map(w => {
-      const workoutName = normText(w?.name, "Untitled");
-      const workoutType = normText(w?.type, "");
-      const workoutStatus = normText(w?.status, "planned") || "planned";
-
-      const exercises = Array.isArray(w?.exercises) ? w.exercises : [];
-
-      return {
-        id: w?.id || uuid(),
-        name: workoutName,
-        type: workoutType,
-        status: workoutStatus, // planned | current | completed
-        createdAt: Number(w?.createdAt || Date.now()),
-        updatedAt: Number(w?.updatedAt || Date.now()),
-        exercises: exercises.map(ex => {
-          const exName = normText(ex?.name, "Exercise");
-          const sets = Array.isArray(ex?.sets) ? ex.sets : [];
-          return {
+    return list.map(w => ({
+      id: w?.id || uuid(),
+      name: normStr(w?.name || "Untitled") || "Untitled",
+      type: normStr(w?.type || ""),
+      status: w?.status || "planned", // planned | current | completed
+      createdAt: Number(w?.createdAt || Date.now()),
+      updatedAt: Number(w?.updatedAt || Date.now()),
+      exercises: Array.isArray(w?.exercises)
+        ? w.exercises.map(ex => ({
             id: ex?.id || uuid(),
-            name: exName,
+            name: normStr(ex?.name || "Exercise") || "Exercise",
             createdAt: Number(ex?.createdAt || Date.now()),
             updatedAt: Number(ex?.updatedAt || Date.now()),
-            sets: sets
-              .map(s => ({
-                id: s?.id || uuid(),
-                date: dayKey(s?.date || todayISO()),
-                weight: Number(s?.weight || 0),
-                reps: Number(s?.reps || 0),
-                createdAt: Number(s?.createdAt || Date.now()),
-                updatedAt: Number(s?.updatedAt || Date.now())
-              }))
-              // If any ancient bad set objects exist, filter them safely
-              .filter(x => x && Number.isFinite(Number(x.weight)) && Number.isFinite(Number(x.reps)))
-          };
-        })
-      };
-    });
+            sets: Array.isArray(ex?.sets)
+              ? ex.sets.map(s => ({
+                  id: s?.id || uuid(),
+                  date: dayKey(s?.date || todayISO()),
+                  weight: Number(s?.weight || 0),
+                  reps: Number(s?.reps || 0),
+                  createdAt: Number(s?.createdAt || Date.now()),
+                  updatedAt: Number(s?.updatedAt || Date.now())
+                }))
+              : []
+          }))
+        : []
+    }));
   }
 
   function loadWorkouts() {
-    // IMPORTANT: always normalize so old data can’t crash render
-    const raw = load(STORAGE_KEY, []);
-    const normalized = normalizeWorkouts(raw);
-
-    // If normalization repaired old data structure, persist it (safe, no wiping)
-    // This prevents future crashes if the user refreshes.
-    try {
-      save(STORAGE_KEY, normalized);
-    } catch {}
-
-    return normalized;
+    return normalizeWorkouts(load(STORAGE_KEY, []));
   }
 
   function saveWorkouts(workouts) {
@@ -217,14 +197,30 @@
   }
 
   function loadUIState() {
-    return load(UI_STATE_KEY, {
+    const s = load(UI_STATE_KEY, {
       exerciseChartExercise: "",
       exerciseChartMetric: "1rm", // 1rm | volume | weight
 
-      // completed list UX (prevents infinite scroll)
-      completedMonthsToShow: 3, // show newest 3 months at first
-      completedExpanded: {} // { "YYYY-MM": true/false }
+      // NEW (safe additions)
+      searchQuery: "",
+      completedLimit: 10,
+      collapsedWorkouts: {} // { [workoutId]: true/false }
     });
+
+    // ensure shape
+    if (!s || typeof s !== "object") {
+      return {
+        exerciseChartExercise: "",
+        exerciseChartMetric: "1rm",
+        searchQuery: "",
+        completedLimit: 10,
+        collapsedWorkouts: {}
+      };
+    }
+    if (typeof s.searchQuery !== "string") s.searchQuery = "";
+    if (!Number.isFinite(Number(s.completedLimit))) s.completedLimit = 10;
+    if (!s.collapsedWorkouts || typeof s.collapsedWorkouts !== "object") s.collapsedWorkouts = {};
+    return s;
   }
 
   function saveUIState(state) {
@@ -333,32 +329,30 @@
 
     const sets = flattenAllSets(workouts);
     sets.forEach(s => {
-      const exName = normText(s?.exerciseName, "Exercise");
-      const key = safeLower(exName);
+      const key = lower(s.exerciseName);
       if (!key) return;
 
       if (!pr[key]) {
         pr[key] = {
-          exerciseName: exName,
-          bestWeight: Number(s.weight || 0),
-          bestVolume: Number(s.volume || 0),
+          exerciseName: normStr(s.exerciseName),
+          bestWeight: s.weight,
+          bestVolume: s.volume,
           best1RM: Math.round(s.est1rm || 0),
           date: s.date
         };
         return;
       }
 
-      if (Number(s.weight || 0) > pr[key].bestWeight) {
-        pr[key].bestWeight = Number(s.weight || 0);
+      if (s.weight > pr[key].bestWeight) {
+        pr[key].bestWeight = s.weight;
         pr[key].date = s.date;
       }
-      if (Number(s.volume || 0) > pr[key].bestVolume) {
-        pr[key].bestVolume = Number(s.volume || 0);
+      if (s.volume > pr[key].bestVolume) {
+        pr[key].bestVolume = s.volume;
         pr[key].date = s.date;
       }
-      const one = Math.round(s.est1rm || 0);
-      if (one > pr[key].best1RM) {
-        pr[key].best1RM = one;
+      if (Math.round(s.est1rm || 0) > pr[key].best1RM) {
+        pr[key].best1RM = Math.round(s.est1rm || 0);
         pr[key].date = s.date;
       }
     });
@@ -368,7 +362,9 @@
 
   function computeWorkoutDays(workouts) {
     const days = new Set();
-    flattenAllSets(workouts).forEach(s => days.add(s.date));
+    flattenAllSets(workouts).forEach(s => {
+      if (s?.date) days.add(s.date);
+    });
     return [...days].sort((a, b) => new Date(a) - new Date(b));
   }
 
@@ -409,7 +405,7 @@
     sets.forEach(s => {
       if (!map[s.date]) return;
       map[s.date].sets += 1;
-      map[s.date].volume += Number(s.volume || 0);
+      map[s.date].volume += s.volume;
     });
 
     return {
@@ -428,10 +424,11 @@
     let volume = 0;
 
     sets.forEach(s => {
-      const name = normText(s.exerciseName, "Exercise");
+      const name = normStr(s.exerciseName);
+      if (!name) return;
       if (!byExercise[name]) byExercise[name] = [];
       byExercise[name].push(s);
-      volume += Number(s.volume || 0);
+      volume += s.volume;
     });
 
     const exercises = Object.keys(byExercise).sort((a, b) => a.localeCompare(b));
@@ -446,25 +443,29 @@
 
   function getAllExerciseNames(workouts) {
     const set = new Set();
-    (workouts || []).forEach(w => (w.exercises || []).forEach(ex => set.add(normText(ex?.name, "Exercise"))));
+    (workouts || []).forEach(w => (w?.exercises || []).forEach(ex => {
+      const n = normStr(ex?.name);
+      if (n) set.add(n);
+    }));
     return [...set].sort((a, b) => a.localeCompare(b));
   }
 
   function computeExerciseSeries(workouts, exerciseName) {
-    const exTarget = normText(exerciseName, "");
-    if (!exTarget) return null;
+    const exName = normStr(exerciseName);
+    if (!exName) return null;
 
-    const exLower = safeLower(exTarget);
-    const sets = flattenAllSets(workouts).filter(s => safeLower(s.exerciseName) === exLower);
+    const exLower = exName.toLowerCase();
+    const sets = flattenAllSets(workouts).filter(s => lower(s.exerciseName) === exLower);
+
     if (!sets.length) return null;
 
     // Per day: take best 1RM and also total volume
     const byDay = {};
     sets.forEach(s => {
       if (!byDay[s.date]) byDay[s.date] = { day: s.date, best1rm: 0, bestWeight: 0, volume: 0 };
-      byDay[s.date].best1rm = Math.max(byDay[s.date].best1rm, Number(s.est1rm || 0));
-      byDay[s.date].bestWeight = Math.max(byDay[s.date].bestWeight, Number(s.weight || 0));
-      byDay[s.date].volume += Number(s.volume || 0);
+      byDay[s.date].best1rm = Math.max(byDay[s.date].best1rm, s.est1rm || 0);
+      byDay[s.date].bestWeight = Math.max(byDay[s.date].bestWeight, s.weight || 0);
+      byDay[s.date].volume += s.volume || 0;
     });
 
     const days = Object.values(byDay).sort((a, b) => new Date(a.day) - new Date(b.day));
@@ -477,47 +478,19 @@
     };
   }
 
-  function monthKeyFromWorkout(workout) {
-    // Prefer updatedAt/createdAt, fallback to latest set date
-    const t = Number(workout?.updatedAt || workout?.createdAt || 0);
-    if (t) {
-      const d = new Date(t);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      return `${y}-${m}`;
-    }
-
-    // fallback: latest set date
-    const sets = [];
-    (workout?.exercises || []).forEach(ex => (ex?.sets || []).forEach(s => sets.push(dayKey(s?.date))));
-    sets.sort((a, b) => new Date(a) - new Date(b));
-    const last = sets[sets.length - 1] || todayISO();
-    return String(last).slice(0, 7);
-  }
-
-  function prettyMonth(ym) {
-    try {
-      const [y, m] = String(ym).split("-").map(Number);
-      const d = new Date(y, (m || 1) - 1, 1);
-      return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    } catch {
-      return String(ym);
-    }
-  }
-
   // -----------------------------
   // Core actions (no popups)
   // -----------------------------
   function addWorkout(name, type, status) {
-    const n = normText(name, "");
+    const n = normStr(name);
     if (!n) return;
 
     const workouts = loadWorkouts();
     workouts.push({
       id: uuid(),
       name: n,
-      type: normText(type, ""),
-      status: normText(status, "planned") || "planned",
+      type: normStr(type),
+      status: status || "planned",
       createdAt: Date.now(),
       updatedAt: Date.now(),
       exercises: []
@@ -537,14 +510,14 @@
     const workouts = loadWorkouts();
     const w = workouts.find(x => x.id === id);
     if (!w) return;
-    w.status = normText(status, "planned") || "planned";
+    w.status = status;
     w.updatedAt = Date.now();
     saveWorkouts(workouts);
     render();
   }
 
   function addExercise(workoutId, exerciseName) {
-    const name = normText(exerciseName, "");
+    const name = normStr(exerciseName);
     if (!name) return;
 
     const workouts = loadWorkouts();
@@ -576,7 +549,7 @@
   }
 
   function renameExercise(workoutId, exerciseId, newName) {
-    const name = normText(newName, "");
+    const name = normStr(newName);
     if (!name) return;
 
     const workouts = loadWorkouts();
@@ -596,6 +569,7 @@
   function addSet(workoutId, exerciseId, weight, reps, dateISO) {
     const wNum = clampNum(weight, 0, 5000);
     const rNum = clampNum(reps, 0, 200);
+
     if (!wNum || !rNum) return;
 
     const workouts = loadWorkouts();
@@ -623,17 +597,11 @@
     const afterWorkouts = loadWorkouts();
     const afterPRs = computePRs(afterWorkouts);
 
-    const exLower = safeLower(ex.name);
-    const before = beforePRs.find(p => safeLower(p.exerciseName) === exLower);
-    const after = afterPRs.find(p => safeLower(p.exerciseName) === exLower);
+    const exLower = lower(ex.name);
+    const before = beforePRs.find(p => lower(p.exerciseName) === exLower);
+    const after = afterPRs.find(p => lower(p.exerciseName) === exLower);
 
-    if (
-      after &&
-      (!before ||
-        after.best1RM > before.best1RM ||
-        after.bestWeight > before.bestWeight ||
-        after.bestVolume > before.bestVolume)
-    ) {
+    if (after && (!before || after.best1RM > before.best1RM || after.bestWeight > before.bestWeight || after.bestVolume > before.bestVolume)) {
       toast("new PR logged");
     }
 
@@ -682,6 +650,72 @@
   }
 
   // -----------------------------
+  // Collapse / Pagination / Search (NEW)
+  // -----------------------------
+  function isCollapsed(workoutId, status) {
+    const ui = loadUIState();
+    const map = ui.collapsedWorkouts || {};
+    if (typeof map[workoutId] === "boolean") return map[workoutId];
+
+    // default behavior:
+    // - current workouts expanded
+    // - planned + completed collapsed (prevents infinite scroll)
+    return status !== "current";
+  }
+
+  function setCollapsed(workoutId, val) {
+    const ui = loadUIState();
+    ui.collapsedWorkouts = ui.collapsedWorkouts || {};
+    ui.collapsedWorkouts[workoutId] = !!val;
+    saveUIState(ui);
+  }
+
+  function toggleCollapsed(workoutId) {
+    const workouts = loadWorkouts();
+    const w = workouts.find(x => x.id === workoutId);
+    const status = w?.status || "planned";
+    const next = !isCollapsed(workoutId, status);
+    setCollapsed(workoutId, next);
+    render();
+  }
+
+  function setSearchQuery(q) {
+    const ui = loadUIState();
+    ui.searchQuery = String(q || "");
+    // when searching, show more completed results to reduce “why can’t I find it?”
+    if (ui.searchQuery.trim()) ui.completedLimit = Math.max(Number(ui.completedLimit || 10), 50);
+    saveUIState(ui);
+    render();
+  }
+
+  function loadMoreCompleted() {
+    const ui = loadUIState();
+    ui.completedLimit = clampNum(Number(ui.completedLimit || 10) + 10, 10, 500);
+    saveUIState(ui);
+    render();
+  }
+
+  function workoutMatchesQuery(workout, qLower) {
+    if (!qLower) return true;
+    const a = lower(workout?.name);
+    const b = lower(workout?.type);
+    if (a.includes(qLower) || b.includes(qLower)) return true;
+
+    // check exercises + sets
+    const exs = workout?.exercises || [];
+    for (const ex of exs) {
+      const en = lower(ex?.name);
+      if (en.includes(qLower)) return true;
+
+      for (const s of (ex?.sets || [])) {
+        const d = lower(s?.date);
+        if (d.includes(qLower)) return true;
+      }
+    }
+    return false;
+  }
+
+  // -----------------------------
   // Modal helpers (uses your app modal if present)
   // -----------------------------
   function openModalSafe(html) {
@@ -713,41 +747,38 @@
     const mount = ensureMount();
     if (!mount) return;
 
-    const workouts = loadWorkouts();
+    const workoutsAll = loadWorkouts();
+    const ui = loadUIState();
+    const q = (ui.searchQuery || "").trim();
+    const qLower = q.toLowerCase();
 
-    const current = workouts.filter(w => w.status === "current").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const planned = workouts.filter(w => w.status === "planned").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const completedAll = workouts.filter(w => w.status === "completed").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    // filter by search query (across ALL statuses)
+    const workouts = qLower ? workoutsAll.filter(w => workoutMatchesQuery(w, qLower)) : workoutsAll;
 
-    const streak = computeStreak(workouts);
-    const series7 = computeDailySeries(workouts, "7");
+    const current = workouts.filter(w => w.status === "current").sort((a, b) => b.updatedAt - a.updatedAt);
+    const planned = workouts.filter(w => w.status === "planned").sort((a, b) => b.updatedAt - a.updatedAt);
+    let completed = workouts.filter(w => w.status === "completed").sort((a, b) => b.updatedAt - a.updatedAt);
+
+    // pagination only when not searching
+    const completedLimit = clampNum(Number(ui.completedLimit || 10), 10, 500);
+    const completedTotal = completed.length;
+    if (!qLower) completed = completed.slice(0, completedLimit);
+
+    const streak = computeStreak(workoutsAll); // keep streak based on ALL data (not filtered)
+    const series7 = computeDailySeries(workoutsAll, "7");
     const weeklySets = series7.sets.reduce((a, b) => a + b, 0);
     const weeklyVolume = series7.volume.reduce((a, b) => a + b, 0);
 
-    const today = computeTodaySummary(workouts);
-    const prs = computePRs(workouts).slice(0, 8);
+    const today = computeTodaySummary(workoutsAll); // today summary based on ALL data
+    const prs = computePRs(workoutsAll).slice(0, 8); // PRs based on ALL data
 
-    const ui = loadUIState();
-    const allExercises = getAllExerciseNames(workouts);
+    const allExercises = getAllExerciseNames(workoutsAll);
 
     // pick a default exercise for chart
     if (!ui.exerciseChartExercise && allExercises.length) {
       ui.exerciseChartExercise = allExercises[0];
       saveUIState(ui);
     }
-
-    // Group completed workouts by month to prevent infinite scroll
-    const completedByMonth = {};
-    completedAll.forEach(w => {
-      const mk = monthKeyFromWorkout(w);
-      if (!completedByMonth[mk]) completedByMonth[mk] = [];
-      completedByMonth[mk].push(w);
-    });
-
-    const monthKeys = Object.keys(completedByMonth).sort((a, b) => (a < b ? 1 : -1)); // newest first
-    const monthsToShow = Math.max(1, Number(ui.completedMonthsToShow || 3));
-    const visibleMonths = monthKeys.slice(0, monthsToShow);
-    const hasMoreMonths = monthKeys.length > visibleMonths.length;
 
     mount.innerHTML = `
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
@@ -758,6 +789,17 @@
             <button class="form-submit" id="kpAddWorkoutBtn">Add workout</button>
             <button class="form-submit" id="kpOpenWeeklyGraphBtn" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">View graph</button>
           </div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <input
+            id="kpWorkoutSearch"
+            class="form-input"
+            style="flex:1; min-width:220px;"
+            placeholder="Search workouts, exercises, or dates (e.g. bench, incline, 2026-02-05)"
+            value="${escapeHtml(ui.searchQuery || "")}"
+          />
+          <button class="form-submit" id="kpClearSearchBtn" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">Clear</button>
         </div>
 
         <div style="margin-top:10px; display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px;">
@@ -795,7 +837,7 @@
                 : today.exercises.map(exName => {
                     const arr = today.byExercise[exName] || [];
                     const latest = arr[arr.length - 1];
-                    const vol = arr.reduce((a, s) => a + Number(s.volume || 0), 0);
+                    const vol = arr.reduce((a, s) => a + (Number(s.volume || 0)), 0);
                     return `
                       <div style="border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); border-radius:12px; padding:10px 12px; display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px;">
                         <div>
@@ -816,42 +858,40 @@
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
         <div class="section-title" style="margin:0;">Currently training</div>
         <div style="margin-top:10px;">
-          ${current.length ? current.map(renderWorkoutCard).join("") : `<div style="color:#9ca3af;">No active workouts.</div>`}
+          ${current.length ? current.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No active workouts.</div>`}
         </div>
       </div>
 
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
         <div class="section-title" style="margin:0;">Planned workouts</div>
         <div style="margin-top:10px;">
-          ${planned.length ? planned.map(renderWorkoutCard).join("") : `<div style="color:#9ca3af;">No planned workouts.</div>`}
+          ${planned.length ? planned.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No planned workouts.</div>`}
         </div>
       </div>
 
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <div class="section-title" style="margin:0;">Workouts completed</div>
-          <div style="color:#9ca3af; font-size:0.9rem;">grouped by month • prevents infinite scrolling</div>
+          <div style="color:#9ca3af; font-size:0.9rem;">
+            ${qLower ? `filtered results: ${completedTotal}` : `showing ${Math.min(completedTotal, completedLimit)} of ${completedTotal}`}
+          </div>
         </div>
 
         <div style="margin-top:10px;">
-          ${
-            !monthKeys.length
-              ? `<div style="color:#9ca3af;">No completed workouts.</div>`
-              : visibleMonths.map(mk => renderCompletedMonthBlock(mk, completedByMonth[mk] || [], ui)).join("")
-          }
-
-          ${
-            hasMoreMonths
-              ? `
-                <div style="margin-top:12px;">
-                  <button class="form-submit" data-action="loadMoreCompletedMonths" style="width:100%; background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">
-                    Load older months
-                  </button>
-                </div>
-              `
-              : ``
-          }
+          ${completed.length ? completed.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No completed workouts.</div>`}
         </div>
+
+        ${
+          (!qLower && completedTotal > completedLimit)
+            ? `
+              <div style="margin-top:12px;">
+                <button class="form-submit" id="kpLoadMoreCompletedBtn" style="width:100%; background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">
+                  Load 10 more completed workouts
+                </button>
+              </div>
+            `
+            : ""
+        }
       </div>
 
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
@@ -913,43 +953,6 @@
     renderExerciseProgressChart();
   }
 
-  function renderCompletedMonthBlock(monthKey, workouts, ui) {
-    const expanded = !!ui.completedExpanded?.[monthKey];
-
-    // default behavior: newest month expanded, older collapsed
-    const isNewest = false; // we’ll handle in init below
-    const exp = expanded;
-
-    const count = workouts.length;
-    const totalVol = workouts.reduce((sum, w) => sum + calcWorkoutVolume(w), 0);
-
-    return `
-      <div style="margin-top:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); border-radius:16px; overflow:hidden;">
-        <div
-          data-action="toggleCompletedMonth"
-          data-month="${escapeHtml(monthKey)}"
-          style="cursor:pointer; padding:14px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px;"
-        >
-          <div>
-            <div style="font-weight:900; color:white;">${escapeHtml(prettyMonth(monthKey))}</div>
-            <div style="color:#9ca3af; font-size:0.85rem; margin-top:2px;">
-              ${count} workout${count === 1 ? "" : "s"} • total volume ${Number(totalVol || 0).toLocaleString()}
-            </div>
-          </div>
-
-          <div style="color:#e5e7eb; font-weight:900; display:flex; align-items:center; gap:10px;">
-            <span style="opacity:0.85;">${exp ? "Hide" : "Show"}</span>
-            <span style="font-size:1.1rem;">${exp ? "▾" : "▸"}</span>
-          </div>
-        </div>
-
-        <div style="padding:0 14px 14px 14px; display:${exp ? "block" : "none"};">
-          ${workouts.map(renderWorkoutCard).join("")}
-        </div>
-      </div>
-    `;
-  }
-
   function renderWorkoutCard(workout) {
     const statusPill = workout.status === "current"
       ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#bbf7d0;">active</span>`
@@ -974,32 +977,55 @@
 
     const vol = calcWorkoutVolume(workout);
 
+    const collapsed = isCollapsed(workout.id, workout.status);
+    const chevron = collapsed ? "▸" : "▾";
+    const toggleLabel = collapsed ? "Expand" : "Collapse";
+
     return `
       <div class="idea-item" style="margin-top:10px;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
           <div style="flex:1; min-width:220px;">
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <div style="font-weight:900; font-size:1.05rem;">${escapeHtml(normText(workout.name, "Untitled"))}</div>
+              <div style="font-weight:900; font-size:1.05rem;">${escapeHtml(workout.name)}</div>
               ${statusPill}
             </div>
             <div style="color:#9ca3af; margin-top:4px;">
-              ${escapeHtml(normText(workout.type, ""))}
+              ${escapeHtml(workout.type || "")}
               <span style="margin-left:10px;">• total volume: ${Number(vol || 0).toLocaleString()}</span>
             </div>
           </div>
 
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button
+              class="form-submit"
+              data-action="toggleCollapse"
+              data-id="${workout.id}"
+              style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);"
+              title="${toggleLabel}"
+            >
+              ${chevron} ${toggleLabel}
+            </button>
             ${headerBtns.join("")}
           </div>
         </div>
 
-        <div style="margin-top:12px;">
-          ${
-            (workout.exercises || []).length
-              ? workout.exercises.map(ex => renderExerciseBlock(workout, ex)).join("")
-              : `<div style="color:#9ca3af;">No exercises yet.</div>`
-          }
-        </div>
+        ${
+          collapsed
+            ? `
+              <div style="margin-top:12px; color:#9ca3af;">
+                Collapsed. Click “Expand” to view exercises & sets.
+              </div>
+            `
+            : `
+              <div style="margin-top:12px;">
+                ${
+                  (workout.exercises || []).length
+                    ? workout.exercises.map(ex => renderExerciseBlock(workout, ex)).join("")
+                    : `<div style="color:#9ca3af;">No exercises yet.</div>`
+                }
+              </div>
+            `
+        }
       </div>
     `;
   }
@@ -1011,7 +1037,7 @@
     return `
       <div style="margin-top:10px; padding:12px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03);">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <div style="font-weight:900;">${escapeHtml(normText(ex.name, "Exercise"))}</div>
+          <div style="font-weight:900;">${escapeHtml(ex.name)}</div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button
@@ -1088,8 +1114,8 @@
   }
 
   function renderSetRow(workoutId, exerciseId, set, idx) {
-    const w = Number(set.weight || 0);
-    const r = Number(set.reps || 0);
+    const w = Number(set?.weight || 0);
+    const r = Number(set?.reps || 0);
     const vol = w * r;
     const one = Math.round(estimate1RM(w, r) || 0);
 
@@ -1100,7 +1126,7 @@
           <div style="font-weight:900; color:white;">${w} x ${r}</div>
           <div style="color:#9ca3af;">vol ${Number(vol || 0).toLocaleString()}</div>
           <div style="color:#a78bfa;">1RM ${one}</div>
-          <div style="color:#9ca3af;">${formatDay(set.date || todayISO())}</div>
+          <div style="color:#9ca3af;">${formatDay(set?.date || todayISO())}</div>
         </div>
 
         <div style="display:flex; gap:8px; align-items:center;">
@@ -1142,6 +1168,21 @@
 
     const graphBtn = mount.querySelector("#kpOpenWeeklyGraphBtn");
     if (graphBtn) graphBtn.onclick = () => openWeeklyGraphModal("7");
+
+    const search = mount.querySelector("#kpWorkoutSearch");
+    if (search) {
+      search.oninput = () => setSearchQuery(search.value);
+    }
+
+    const clear = mount.querySelector("#kpClearSearchBtn");
+    if (clear) {
+      clear.onclick = () => setSearchQuery("");
+    }
+
+    const loadMore = mount.querySelector("#kpLoadMoreCompletedBtn");
+    if (loadMore) {
+      loadMore.onclick = loadMoreCompleted;
+    }
   }
 
   function bindWorkoutCardEvents() {
@@ -1151,6 +1192,11 @@
     mount.querySelectorAll("[data-action]").forEach(btn => {
       btn.onclick = () => {
         const action = btn.dataset.action;
+
+        if (action === "toggleCollapse") {
+          toggleCollapsed(btn.dataset.id);
+          return;
+        }
 
         if (action === "deleteWorkout") {
           deleteWorkout(btn.dataset.id);
@@ -1191,6 +1237,7 @@
 
           addSet(wId, eId, weight, reps, date);
 
+          // keep UX tight
           if (weightEl) weightEl.value = "";
           if (repsEl) repsEl.value = "";
           return;
@@ -1203,25 +1250,6 @@
 
         if (action === "editSet") {
           openEditSetModal(btn.dataset.w, btn.dataset.e, btn.dataset.s);
-          return;
-        }
-
-        // NEW: month grouping controls
-        if (action === "toggleCompletedMonth") {
-          const mk = btn.dataset.month;
-          const ui = loadUIState();
-          ui.completedExpanded = ui.completedExpanded || {};
-          ui.completedExpanded[mk] = !ui.completedExpanded[mk];
-          saveUIState(ui);
-          render();
-          return;
-        }
-
-        if (action === "loadMoreCompletedMonths") {
-          const ui = loadUIState();
-          ui.completedMonthsToShow = Math.min(999, Number(ui.completedMonthsToShow || 3) + 3);
-          saveUIState(ui);
-          render();
           return;
         }
       };
@@ -1334,7 +1362,7 @@
     const workouts = loadWorkouts();
     const w = workouts.find(x => x.id === workoutId);
     const ex = w?.exercises?.find(e => e.id === exerciseId);
-    const currentName = normText(ex?.name, "");
+    const currentName = ex?.name || "";
 
     openModalSafe(`
       <div class="section-title">Rename exercise</div>
@@ -1622,6 +1650,7 @@
     addExercise,
     addSet,
     moveWorkout,
-    deleteWorkout
+    deleteWorkout,
+    toggleCollapsed
   };
 })();
