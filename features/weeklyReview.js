@@ -1,172 +1,242 @@
 // ============================================
-// WEEKLY REVIEW MODULE - Automated Summary & Comparison
+// WEEKLY REVIEW MODULE - Automated Summary & Comparison (SYNCED + FIXED)
 // ============================================
 
+// ---------- DATE HELPERS (LOCAL SAFE) ----------
+function getLocalDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getWeekDates(offset = 0) {
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sunday
+
+  const start = new Date(today);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(today.getDate() - day - offset * 7);
+
+  const week = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    week.push(getLocalDateKey(d));
+  }
+
+  return week;
+}
+
+// ---------- SAFE HELPERS ----------
 function safeGetDayCompletion(dateStr) {
   try {
     if (typeof getDayCompletion === "function") {
       return getDayCompletion(dateStr);
     }
-  } catch (e) {
-    console.error("Error getting day completion:", e);
-  }
+  } catch {}
   return { percent: 0, done: 0, total: 0 };
 }
 
-function getWeekDates(offset = 0) {
-  const today = new Date();
-  const currentDay = today.getDay(); // 0 = Sunday
-  
-  // Get Sunday of the target week
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - currentDay - (offset * 7));
-  sunday.setHours(0, 0, 0, 0);
-  
-  const week = [];
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(sunday);
-    day.setDate(sunday.getDate() + i);
-    const dateStr = day.toISOString().split("T")[0];
-    week.push(dateStr);
-  }
-  
-  return week;
+function safeGetPlannerCompletion(dateStr) {
+  try {
+    if (typeof getPlannerCompletionForDay === "function") {
+      return getPlannerCompletionForDay(dateStr);
+    }
+  } catch {}
+  return { percent: 0, done: 0, total: 0 };
 }
 
+// ---------- CORE SCORE ----------
 function calculateWeekScore(weekDates) {
+  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+  const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+
   const scores = weekDates.map(date => {
-    const habitPct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(date).percent 
-      : 0;
-    
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+    // Habits
+    const habitPct = safeGetDayCompletion(date).percent;
+
+    // Mood
     const energy = moodData[date]?.energy || 0;
     const energyPct = (energy / 10) * 100;
-    
-    const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+
+    // Tasks
     const taskPct = todoHistory[date]?.percent || 0;
-    
-    return (habitPct * 0.5) + (energyPct * 0.25) + (taskPct * 0.25);
+
+    // Planner
+    const plannerPct = safeGetPlannerCompletion(date).percent;
+
+    // Weighted score
+    return (
+      habitPct * 0.35 +
+      energyPct * 0.2 +
+      taskPct * 0.2 +
+      plannerPct * 0.25
+    );
   });
-  
-  return Math.round(scores.reduce((a,b) => a+b, 0) / scores.length);
+
+  const avg =
+    scores.reduce((a, b) => a + b, 0) / (scores.length || 1);
+
+  return Math.round(avg);
 }
 
+// ---------- WINS ----------
 function getWeekWins(weekDates) {
   const wins = [];
-  
-  // Perfect days
-  const perfectDays = weekDates.filter(date => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(date).percent 
-      : 0;
-    return pct >= 80;
-  }).length;
-  
-  if (perfectDays >= 5) wins.push(`${perfectDays} days at 80%+ completion`);
-  
-  // High energy days
+
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  const highEnergyDays = weekDates.filter(date => 
-    (moodData[date]?.energy || 0) >= 7
-  ).length;
-  
-  if (highEnergyDays >= 4) wins.push(`${highEnergyDays} high-energy days`);
-  
-  // Task completion
   const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+
+  // Habit streak days
+  const strongDays = weekDates.filter(d =>
+    safeGetDayCompletion(d).percent >= 80
+  ).length;
+
+  if (strongDays >= 4) {
+    wins.push(`${strongDays} days at 80%+ habits`);
+  }
+
+  // Energy
+  const highEnergy = weekDates.filter(d =>
+    (moodData[d]?.energy || 0) >= 7
+  ).length;
+
+  if (highEnergy >= 4) {
+    wins.push(`${highEnergy} high-energy days`);
+  }
+
+  // Tasks
   const avgTasks = Math.round(
-    weekDates.reduce((sum, date) => sum + (todoHistory[date]?.percent || 0), 0) / 7
+    weekDates.reduce(
+      (s, d) => s + (todoHistory[d]?.percent || 0),
+      0
+    ) / 7
   );
-  
-  if (avgTasks >= 70) wins.push(`${avgTasks}% average task completion`);
-  
-  // Streak detection
-  const currentStreak = typeof calculateCurrentStreak === "function" 
-    ? calculateCurrentStreak() 
-    : 0;
-  
-  if (currentStreak >= 7) wins.push(`${currentStreak}-day streak active`);
-  
+
+  if (avgTasks >= 70) {
+    wins.push(`${avgTasks}% task completion`);
+  }
+
+  // Planner
+  const plannerStrong = weekDates.filter(d =>
+    safeGetPlannerCompletion(d).percent >= 70
+  ).length;
+
+  if (plannerStrong >= 4) {
+    wins.push(`${plannerStrong} strong planner days`);
+  }
+
+  // Streak
+  const streak =
+    typeof calculateCurrentStreak === "function"
+      ? calculateCurrentStreak()
+      : 0;
+
+  if (streak >= 7) {
+    wins.push(`${streak}-day streak active`);
+  }
+
   return wins.length ? wins : ["Keep building momentum"];
 }
 
+// ---------- CHALLENGES ----------
 function getWeekChallenges(weekDates) {
   const challenges = [];
-  
-  // Low completion days
-  const lowDays = weekDates.filter(date => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(date).percent 
-      : 0;
-    return pct < 50;
-  }).length;
-  
-  if (lowDays >= 2) challenges.push(`${lowDays} days below 50% completion`);
-  
-  // Low energy
+
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  const lowEnergyDays = weekDates.filter(date => 
-    (moodData[date]?.energy || 0) <= 4
+
+  // Low habits
+  const lowHabitDays = weekDates.filter(d =>
+    safeGetDayCompletion(d).percent < 50
   ).length;
-  
-  if (lowEnergyDays >= 2) challenges.push(`${lowEnergyDays} low-energy days`);
-  
-  // Missed habits
+
+  if (lowHabitDays >= 2) {
+    challenges.push(`${lowHabitDays} low habit days`);
+  }
+
+  // Low energy
+  const lowEnergy = weekDates.filter(d =>
+    (moodData[d]?.energy || 0) <= 4
+  ).length;
+
+  if (lowEnergy >= 2) {
+    challenges.push(`${lowEnergy} low-energy days`);
+  }
+
+  // Planner gaps
+  const lowPlanner = weekDates.filter(d =>
+    safeGetPlannerCompletion(d).percent < 40
+  ).length;
+
+  if (lowPlanner >= 2) {
+    challenges.push(`${lowPlanner} low-planner days`);
+  }
+
+  // Weak habit
   const habits = JSON.parse(localStorage.getItem("habits") || "[]");
-  const habitCompletions = JSON.parse(localStorage.getItem("habitCompletions") || "{}");
-  
-  if (habits.length > 0) {
-    const habitMisses = habits.map(habit => {
-      const completed = weekDates.filter(date => 
-        habitCompletions[date]?.[habit.id]
-      ).length;
-      return { habit: habit.name, completed, total: 7 };
-    }).filter(h => h.completed < 4);
-    
-    if (habitMisses.length > 0) {
-      const worst = habitMisses.sort((a,b) => a.completed - b.completed)[0];
-      challenges.push(`${worst.habit}: only ${worst.completed}/7 days`);
+  const completions = JSON.parse(
+    localStorage.getItem("habitCompletions") || "{}"
+  );
+
+  if (habits.length) {
+    const weak = habits
+      .map(h => {
+        const done = weekDates.filter(d =>
+          completions[d]?.[h.id]
+        ).length;
+
+        return { name: h.name, done };
+      })
+      .filter(h => h.done < 4)
+      .sort((a, b) => a.done - b.done)[0];
+
+    if (weak) {
+      challenges.push(`${weak.name}: ${weak.done}/7 days`);
     }
   }
-  
+
   return challenges.length ? challenges : ["No major challenges"];
 }
 
-function generateWeeklyFocus(thisWeekScore, lastWeekScore) {
-  const suggestions = [];
-  
-  if (thisWeekScore < lastWeekScore) {
-    suggestions.push("Regain momentum - focus on consistency over perfection");
+// ---------- FOCUS ----------
+function generateWeeklyFocus(thisScore, lastScore) {
+  const focus = [];
+
+  if (thisScore < lastScore) {
+    focus.push("Rebuild consistency first");
   }
-  
-  if (thisWeekScore < 70) {
-    suggestions.push("Prioritize your top 3 habits daily");
+
+  if (thisScore < 70) {
+    focus.push("Lock in top 3 habits daily");
   }
-  
+
   const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  const weekDates = getWeekDates(0);
-  const avgEnergy = weekDates.reduce((sum, date) => 
-    sum + (moodData[date]?.energy || 0), 0
-  ) / 7;
-  
+  const week = getWeekDates(0);
+
+  const avgEnergy =
+    week.reduce((s, d) => s + (moodData[d]?.energy || 0), 0) / 7;
+
   if (avgEnergy < 6) {
-    suggestions.push("Focus on sleep, nutrition, and recovery");
+    focus.push("Prioritize sleep & recovery");
   }
-  
-  if (suggestions.length === 0) {
-    suggestions.push("Maintain your momentum and aim for 7/7 perfect days");
+
+  if (!focus.length) {
+    focus.push("Push for 7/7 elite days");
   }
-  
-  return suggestions;
+
+  return focus;
 }
 
-function getMomentumIndicator(thisWeekScore, lastWeekScore) {
-  const diff = thisWeekScore - lastWeekScore;
-  
+// ---------- MOMENTUM ----------
+function getMomentumIndicator(thisScore, lastScore) {
+  const diff = thisScore - lastScore;
+
   if (diff > 10) return { icon: "🚀", text: "Accelerating", color: "#22C55E" };
   if (diff > 0) return { icon: "📈", text: "Building", color: "#A78BFA" };
   if (diff > -10) return { icon: "➡️", text: "Stable", color: "#9CA3AF" };
+
   return { icon: "📉", text: "Declining", color: "#EF4444" };
 }
 
@@ -174,135 +244,69 @@ function getMomentumIndicator(thisWeekScore, lastWeekScore) {
 function openWeeklyReview() {
   const thisWeek = getWeekDates(0);
   const lastWeek = getWeekDates(1);
-  
-  const thisWeekScore = calculateWeekScore(thisWeek);
-  const lastWeekScore = calculateWeekScore(lastWeek);
-  
+
+  const thisScore = calculateWeekScore(thisWeek);
+  const lastScore = calculateWeekScore(lastWeek);
+
   const wins = getWeekWins(thisWeek);
   const challenges = getWeekChallenges(thisWeek);
-  const focus = generateWeeklyFocus(thisWeekScore, lastWeekScore);
-  const momentum = getMomentumIndicator(thisWeekScore, lastWeekScore);
-  
+  const focus = generateWeeklyFocus(thisScore, lastScore);
+  const momentum = getMomentumIndicator(thisScore, lastScore);
+
   const html = `
     <h2>📋 Weekly Review</h2>
-    <div style="color:#9CA3AF; margin-bottom:20px;">
-      ${new Date(thisWeek[0]).toLocaleDateString()} - ${new Date(thisWeek[6]).toLocaleDateString()}
+
+    <div style="color:#9CA3AF;margin-bottom:20px;">
+      ${thisWeek[0]} → ${thisWeek[6]}
     </div>
-    
-    <!-- Score Comparison -->
-    <div style="
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:14px;
-      margin-bottom:20px;
-    ">
-      <div style="
-        padding:18px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.16);
-        background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-        text-align:center;
-      ">
-        <div style="font-size:2.5rem; font-weight:900; color:#A78BFA;">${thisWeekScore}</div>
-        <div style="color:#9CA3AF; font-size:0.9rem;">This Week</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div style="padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);text-align:center;">
+        <div style="font-size:2.4rem;font-weight:900;color:#A78BFA;">${thisScore}</div>
+        <div style="color:#9CA3AF;">This Week</div>
       </div>
-      <div style="
-        padding:18px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.16);
-        background:rgba(255,255,255,0.03);
-        text-align:center;
-      ">
-        <div style="font-size:2.5rem; font-weight:900; color:#6B7280;">${lastWeekScore}</div>
-        <div style="color:#9CA3AF; font-size:0.9rem;">Last Week</div>
+
+      <div style="padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);text-align:center;">
+        <div style="font-size:2.4rem;font-weight:900;color:#6B7280;">${lastScore}</div>
+        <div style="color:#9CA3AF;">Last Week</div>
       </div>
     </div>
-    
-    <!-- Momentum -->
-    <div style="
-      padding:14px;
-      margin-bottom:20px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,0.16);
-      background:rgba(255,255,255,0.05);
-      display:flex;
-      align-items:center;
-      gap:12px;
-      justify-content:center;
-    ">
+
+    <div style="padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);display:flex;gap:12px;justify-content:center;margin-bottom:20px;">
       <div style="font-size:2rem;">${momentum.icon}</div>
       <div>
-        <div style="font-weight:800; font-size:1.1rem; color:${momentum.color};">
+        <div style="font-weight:900;color:${momentum.color};font-size:1.1rem;">
           ${momentum.text}
         </div>
-        <div style="color:#9CA3AF; font-size:0.9rem;">
-          ${Math.abs(thisWeekScore - lastWeekScore)} points ${thisWeekScore > lastWeekScore ? 'up' : thisWeekScore < lastWeekScore ? 'down' : 'flat'}
+        <div style="color:#9CA3AF;font-size:0.9rem;">
+          ${Math.abs(thisScore - lastScore)} pts
         </div>
       </div>
     </div>
-    
-    <!-- Wins -->
+
     <div style="margin-bottom:20px;">
-      <div style="font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
-        <span style="font-size:1.3rem;">🏆</span> Wins This Week
-      </div>
-      <div style="
-        padding:14px;
-        border-radius:12px;
-        border:1px solid rgba(34,197,94,0.3);
-        background:rgba(34,197,94,0.08);
-      ">
-        ${wins.map(win => `
-          <div style="margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-            <div style="color:#22C55E;">✓</div>
-            <div>${win}</div>
-          </div>
-        `).join("")}
+      <div style="font-weight:800;margin-bottom:8px;">🏆 Wins</div>
+      <div style="padding:14px;border-radius:12px;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.08);">
+        ${wins.map(w => `<div>✓ ${w}</div>`).join("")}
       </div>
     </div>
-    
-    <!-- Challenges -->
+
     <div style="margin-bottom:20px;">
-      <div style="font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
-        <span style="font-size:1.3rem;">⚠️</span> Areas to Improve
-      </div>
-      <div style="
-        padding:14px;
-        border-radius:12px;
-        border:1px solid rgba(245,158,11,0.3);
-        background:rgba(245,158,11,0.08);
-      ">
-        ${challenges.map(challenge => `
-          <div style="margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-            <div style="color:#F59E0B;">›</div>
-            <div>${challenge}</div>
-          </div>
-        `).join("")}
+      <div style="font-weight:800;margin-bottom:8px;">⚠️ Improve</div>
+      <div style="padding:14px;border-radius:12px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);">
+        ${challenges.map(c => `<div>› ${c}</div>`).join("")}
       </div>
     </div>
-    
-    <!-- Focus for Next Week -->
+
     <div>
-      <div style="font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
-        <span style="font-size:1.3rem;">🎯</span> Focus for Next Week
-      </div>
-      <div style="
-        padding:14px;
-        border-radius:12px;
-        border:1px solid rgba(99,102,241,0.3);
-        background:rgba(99,102,241,0.08);
-      ">
-        ${focus.map(item => `
-          <div style="margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-            <div style="color:#6366F1;">→</div>
-            <div>${item}</div>
-          </div>
-        `).join("")}
+      <div style="font-weight:800;margin-bottom:8px;">🎯 Focus</div>
+      <div style="padding:14px;border-radius:12px;border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);">
+        ${focus.map(f => `<div>→ ${f}</div>`).join("")}
       </div>
     </div>
   `;
-  
+
   openModal(html);
 }
 
-console.log("Weekly Review module loaded");
+console.log("Weekly Review module loaded (synced)");
