@@ -1,5 +1,13 @@
 // ============================================
 // WEEKLY REVIEW MODULE - Automated Summary & Comparison (SYNCED + FIXED)
+// File: features/weeklyReview.js
+//
+// Fixes / upgrades:
+// ✅ Uses LOCAL date keys (YYYY-MM-DD) everywhere (no UTC drift)
+// ✅ Pulls Habits + Mood + Tasks + Weekly Planner into one synced score
+// ✅ Safe calls (won’t crash if a module isn’t loaded)
+// ✅ Exports window.openWeeklyReview so buttons / dashboard can call it
+// ✅ Safe openModal fallback (won’t hard-crash if modal system missing)
 // ============================================
 
 // ---------- DATE HELPERS (LOCAL SAFE) ----------
@@ -19,21 +27,19 @@ function getWeekDates(offset = 0) {
   start.setDate(today.getDate() - day - offset * 7);
 
   const week = [];
-
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     week.push(getLocalDateKey(d));
   }
-
   return week;
 }
 
 // ---------- SAFE HELPERS ----------
 function safeGetDayCompletion(dateStr) {
   try {
-    if (typeof getDayCompletion === "function") {
-      return getDayCompletion(dateStr);
+    if (typeof window.getDayCompletion === "function") {
+      return window.getDayCompletion(dateStr);
     }
   } catch {}
   return { percent: 0, done: 0, total: 0 };
@@ -41,33 +47,54 @@ function safeGetDayCompletion(dateStr) {
 
 function safeGetPlannerCompletion(dateStr) {
   try {
-    if (typeof getPlannerCompletionForDay === "function") {
-      return getPlannerCompletionForDay(dateStr);
+    if (typeof window.getPlannerCompletionForDay === "function") {
+      return window.getPlannerCompletionForDay(dateStr);
     }
   } catch {}
   return { percent: 0, done: 0, total: 0 };
 }
 
+function safeOpenModal(html) {
+  try {
+    if (typeof window.openModal === "function") return window.openModal(html);
+  } catch {}
+  // fallback
+  alert("Modal system not found.");
+}
+
 // ---------- CORE SCORE ----------
 function calculateWeekScore(weekDates) {
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+  const moodData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("moodData") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
-  const scores = weekDates.map(date => {
+  const todoHistory = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("todoHistory") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+
+  const scores = weekDates.map((date) => {
     // Habits
-    const habitPct = safeGetDayCompletion(date).percent;
+    const habitPct = safeGetDayCompletion(date).percent || 0;
 
-    // Mood
-    const energy = moodData[date]?.energy || 0;
-    const energyPct = (energy / 10) * 100;
+    // Mood (Energy 1–10 -> 0–100)
+    const energy = Number(moodData?.[date]?.energy || 0);
+    const energyPct = Math.max(0, Math.min(100, (energy / 10) * 100));
 
     // Tasks
-    const taskPct = todoHistory[date]?.percent || 0;
+    const taskPct = Number(todoHistory?.[date]?.percent || 0);
 
     // Planner
-    const plannerPct = safeGetPlannerCompletion(date).percent;
+    const plannerPct = safeGetPlannerCompletion(date).percent || 0;
 
-    // Weighted score
+    // Weighted score (total = 100%)
     return (
       habitPct * 0.35 +
       energyPct * 0.2 +
@@ -76,9 +103,7 @@ function calculateWeekScore(weekDates) {
     );
   });
 
-  const avg =
-    scores.reduce((a, b) => a + b, 0) / (scores.length || 1);
-
+  const avg = scores.reduce((a, b) => a + b, 0) / (scores.length || 1);
   return Math.round(avg);
 }
 
@@ -86,57 +111,47 @@ function calculateWeekScore(weekDates) {
 function getWeekWins(weekDates) {
   const wins = [];
 
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+  const moodData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("moodData") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
-  // Habit streak days
-  const strongDays = weekDates.filter(d =>
-    safeGetDayCompletion(d).percent >= 80
-  ).length;
+  const todoHistory = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("todoHistory") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
-  if (strongDays >= 4) {
-    wins.push(`${strongDays} days at 80%+ habits`);
-  }
+  // Strong habit days
+  const strongDays = weekDates.filter((d) => safeGetDayCompletion(d).percent >= 80).length;
+  if (strongDays >= 4) wins.push(`${strongDays} days at 80%+ habits`);
 
-  // Energy
-  const highEnergy = weekDates.filter(d =>
-    (moodData[d]?.energy || 0) >= 7
-  ).length;
+  // High energy days
+  const highEnergy = weekDates.filter((d) => (Number(moodData?.[d]?.energy || 0) >= 7)).length;
+  if (highEnergy >= 4) wins.push(`${highEnergy} high-energy days`);
 
-  if (highEnergy >= 4) {
-    wins.push(`${highEnergy} high-energy days`);
-  }
-
-  // Tasks
+  // Tasks avg
   const avgTasks = Math.round(
-    weekDates.reduce(
-      (s, d) => s + (todoHistory[d]?.percent || 0),
-      0
-    ) / 7
+    weekDates.reduce((s, d) => s + Number(todoHistory?.[d]?.percent || 0), 0) / 7
   );
+  if (avgTasks >= 70) wins.push(`${avgTasks}% task completion`);
 
-  if (avgTasks >= 70) {
-    wins.push(`${avgTasks}% task completion`);
-  }
+  // Planner strong days
+  const plannerStrong = weekDates.filter((d) => safeGetPlannerCompletion(d).percent >= 70).length;
+  if (plannerStrong >= 4) wins.push(`${plannerStrong} strong planner days`);
 
-  // Planner
-  const plannerStrong = weekDates.filter(d =>
-    safeGetPlannerCompletion(d).percent >= 70
-  ).length;
-
-  if (plannerStrong >= 4) {
-    wins.push(`${plannerStrong} strong planner days`);
-  }
-
-  // Streak
+  // Habit streak (if your habits module exposes it)
   const streak =
-    typeof calculateCurrentStreak === "function"
-      ? calculateCurrentStreak()
+    typeof window.calculateCurrentStreak === "function"
+      ? window.calculateCurrentStreak()
       : 0;
 
-  if (streak >= 7) {
-    wins.push(`${streak}-day streak active`);
-  }
+  if (streak >= 7) wins.push(`${streak}-day streak active`);
 
   return wins.length ? wins : ["Keep building momentum"];
 }
@@ -145,56 +160,53 @@ function getWeekWins(weekDates) {
 function getWeekChallenges(weekDates) {
   const challenges = [];
 
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
+  const moodData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("moodData") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
   // Low habits
-  const lowHabitDays = weekDates.filter(d =>
-    safeGetDayCompletion(d).percent < 50
-  ).length;
-
-  if (lowHabitDays >= 2) {
-    challenges.push(`${lowHabitDays} low habit days`);
-  }
+  const lowHabitDays = weekDates.filter((d) => safeGetDayCompletion(d).percent < 50).length;
+  if (lowHabitDays >= 2) challenges.push(`${lowHabitDays} low habit days`);
 
   // Low energy
-  const lowEnergy = weekDates.filter(d =>
-    (moodData[d]?.energy || 0) <= 4
-  ).length;
-
-  if (lowEnergy >= 2) {
-    challenges.push(`${lowEnergy} low-energy days`);
-  }
+  const lowEnergy = weekDates.filter((d) => (Number(moodData?.[d]?.energy || 0) <= 4)).length;
+  if (lowEnergy >= 2) challenges.push(`${lowEnergy} low-energy days`);
 
   // Planner gaps
-  const lowPlanner = weekDates.filter(d =>
-    safeGetPlannerCompletion(d).percent < 40
-  ).length;
+  const lowPlanner = weekDates.filter((d) => safeGetPlannerCompletion(d).percent < 40).length;
+  if (lowPlanner >= 2) challenges.push(`${lowPlanner} low-planner days`);
 
-  if (lowPlanner >= 2) {
-    challenges.push(`${lowPlanner} low-planner days`);
-  }
+  // Weakest habit (if habits exist)
+  const habits = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("habits") || "[]");
+    } catch {
+      return [];
+    }
+  })();
 
-  // Weak habit
-  const habits = JSON.parse(localStorage.getItem("habits") || "[]");
-  const completions = JSON.parse(
-    localStorage.getItem("habitCompletions") || "{}"
-  );
+  const completions = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("habitCompletions") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
-  if (habits.length) {
+  if (Array.isArray(habits) && habits.length) {
     const weak = habits
-      .map(h => {
-        const done = weekDates.filter(d =>
-          completions[d]?.[h.id]
-        ).length;
-
+      .map((h) => {
+        const done = weekDates.filter((d) => !!completions?.[d]?.[h.id]).length;
         return { name: h.name, done };
       })
-      .filter(h => h.done < 4)
+      .filter((h) => h.done < 4)
       .sort((a, b) => a.done - b.done)[0];
 
-    if (weak) {
-      challenges.push(`${weak.name}: ${weak.done}/7 days`);
-    }
+    if (weak) challenges.push(`${weak.name}: ${weak.done}/7 days`);
   }
 
   return challenges.length ? challenges : ["No major challenges"];
@@ -204,27 +216,22 @@ function getWeekChallenges(weekDates) {
 function generateWeeklyFocus(thisScore, lastScore) {
   const focus = [];
 
-  if (thisScore < lastScore) {
-    focus.push("Rebuild consistency first");
-  }
+  if (thisScore < lastScore) focus.push("Rebuild consistency first");
+  if (thisScore < 70) focus.push("Lock in top 3 habits daily");
 
-  if (thisScore < 70) {
-    focus.push("Lock in top 3 habits daily");
-  }
+  const moodData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("moodData") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
   const week = getWeekDates(0);
+  const avgEnergy = week.reduce((s, d) => s + Number(moodData?.[d]?.energy || 0), 0) / 7;
 
-  const avgEnergy =
-    week.reduce((s, d) => s + (moodData[d]?.energy || 0), 0) / 7;
-
-  if (avgEnergy < 6) {
-    focus.push("Prioritize sleep & recovery");
-  }
-
-  if (!focus.length) {
-    focus.push("Push for 7/7 elite days");
-  }
+  if (avgEnergy < 6) focus.push("Prioritize sleep & recovery");
+  if (!focus.length) focus.push("Push for 7/7 elite days");
 
   return focus;
 }
@@ -238,6 +245,14 @@ function getMomentumIndicator(thisScore, lastScore) {
   if (diff > -10) return { icon: "➡️", text: "Stable", color: "#9CA3AF" };
 
   return { icon: "📉", text: "Declining", color: "#EF4444" };
+}
+
+function formatDiffText(thisScore, lastScore) {
+  const diff = thisScore - lastScore;
+  const abs = Math.abs(diff);
+  if (diff > 0) return `${abs} pts up`;
+  if (diff < 0) return `${abs} pts down`;
+  return `${abs} pts flat`;
 }
 
 // ---------- UI ----------
@@ -266,7 +281,7 @@ function openWeeklyReview() {
         <div style="color:#9CA3AF;">This Week</div>
       </div>
 
-      <div style="padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);text-align:center;">
+      <div style="padding:18px;border-radius:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);text-align:center;">
         <div style="font-size:2.4rem;font-weight:900;color:#6B7280;">${lastScore}</div>
         <div style="color:#9CA3AF;">Last Week</div>
       </div>
@@ -279,7 +294,7 @@ function openWeeklyReview() {
           ${momentum.text}
         </div>
         <div style="color:#9CA3AF;font-size:0.9rem;">
-          ${Math.abs(thisScore - lastScore)} pts
+          ${formatDiffText(thisScore, lastScore)}
         </div>
       </div>
     </div>
@@ -306,7 +321,10 @@ function openWeeklyReview() {
     </div>
   `;
 
-  openModal(html);
+  safeOpenModal(html);
 }
 
-console.log("Weekly Review module loaded (synced)");
+// Export
+window.openWeeklyReview = openWeeklyReview;
+
+console.log("Weekly Review module loaded (synced + local dates)");
