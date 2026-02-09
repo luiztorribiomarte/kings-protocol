@@ -28,16 +28,22 @@ function showPage(page) {
 
   if (page === "dashboard") {
     renderDashboardCalendarSystem();
+
     if (typeof renderMoodTracker === "function") renderMoodTracker();
     if (typeof renderHabits === "function") renderHabits();
     if (typeof renderSchedule === "function") renderSchedule();
-    renderLifeScore();
-    renderWeeklyGraph();
-    renderDNAProfile();
+    if (typeof renderLifeScore === "function") renderLifeScore();
+
+    // ✅ SAFETY FIX: prevent crash if function is missing
+    if (typeof renderWeeklyGraph === "function") {
+      renderWeeklyGraph();
+    }
+
+    if (typeof renderDNAProfile === "function") renderDNAProfile();
   }
 
   if (page === "journal") {
-    renderJournal();
+    if (typeof renderJournal === "function") renderJournal();
   }
 
   if (page === "looksmaxxing") {
@@ -166,7 +172,6 @@ function renderCalendar() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
 
   let html = "";
@@ -195,7 +200,8 @@ function selectCalendarDay(key) {
 
 function toggleCalendar() {
   calendarOpen = !calendarOpen;
-  document.getElementById("calendarWrap").style.display = calendarOpen ? "block" : "none";
+  document.getElementById("calendarWrap").style.display =
+    calendarOpen ? "block" : "none";
 }
 
 // ---------- DASHBOARD INSERT ----------
@@ -213,7 +219,9 @@ function renderDashboardCalendarSystem() {
     </button>
 
     <div id="calendarWrap" style="display:none;">
-      <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;"></div>
+      <div id="calendarGrid"
+        style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;">
+      </div>
     </div>
   `;
 
