@@ -93,10 +93,32 @@ setInterval(updateTime, 1000);
 updateTime();
 
 // ===============================
+// ✅ LOCAL DAY KEY HELPERS (FIXES UTC DATE DRIFT)
+// ===============================
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function toLocalISODate(date = new Date()) {
+  // Local YYYY-MM-DD (NOT UTC)
+  const y = date.getFullYear();
+  const m = pad2(date.getMonth() + 1);
+  const d = pad2(date.getDate());
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalISODate(dayKey) {
+  // Safe local parsing: "YYYY-MM-DD" -> Date at local midnight
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || ""))) return new Date();
+  const [y, m, d] = String(dayKey).split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+// ===============================
 // 🧠 TASK HISTORY SYSTEM (IMPROVED)
 // ===============================
 function getTodayKey() {
-  return new Date().toISOString().split("T")[0];
+  return toLocalISODate(new Date());
 }
 
 let todos = [];
@@ -248,7 +270,8 @@ function safeParse(raw, fallback) {
 }
 
 function getLocalDayKey(date = new Date()) {
-  return date.toISOString().split("T")[0];
+  // Local YYYY-MM-DD (NOT UTC)
+  return toLocalISODate(date);
 }
 
 function getWeekStartKey(date = new Date()) {
@@ -260,8 +283,7 @@ function getWeekStartKey(date = new Date()) {
 }
 
 function getWeekDatesFromStart(weekStartKey) {
-  const [y, m, d] = weekStartKey.split("-").map(Number);
-  const start = new Date(y, m - 1, d);
+  const start = parseLocalISODate(weekStartKey);
   start.setHours(0, 0, 0, 0);
 
   const days = [];
@@ -273,23 +295,27 @@ function getWeekDatesFromStart(weekStartKey) {
   return days;
 }
 
+function isValidDayKey(k) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(k || ""));
+}
+
 function loadWeeklyPlanner() {
   weeklyPlannerData = safeParse(localStorage.getItem(WEEKLY_PLANNER_KEY), {});
   weeklyPlannerSelectedDay = localStorage.getItem(WEEKLY_PLANNER_SELECTED_DAY_KEY) || null;
 
-  // Ensure selected day defaults to today
+  // Ensure selected day defaults to today (and sanitize)
   const today = getTodayKey();
-  if (!weeklyPlannerSelectedDay) weeklyPlannerSelectedDay = today;
+  if (!isValidDayKey(weeklyPlannerSelectedDay)) weeklyPlannerSelectedDay = today;
 
   // Ensure current week exists
-  const ws = getWeekStartKey(new Date());
+  const ws = getWeekStartKey(parseLocalISODate(weeklyPlannerSelectedDay));
   if (!weeklyPlannerData[ws]) {
     weeklyPlannerData[ws] = { days: {} };
     saveWeeklyPlanner();
   }
 
-  // Ensure today exists inside its week
-  ensureWeeklyPlannerDay(today);
+  // Ensure selected day exists inside its week
+  ensureWeeklyPlannerDay(weeklyPlannerSelectedDay);
 }
 
 function saveWeeklyPlanner() {
@@ -298,7 +324,9 @@ function saveWeeklyPlanner() {
 }
 
 function ensureWeeklyPlannerDay(dayKey) {
-  const dt = new Date(dayKey);
+  if (!isValidDayKey(dayKey)) return;
+
+  const dt = parseLocalISODate(dayKey);
   if (isNaN(dt.getTime())) return;
 
   const ws = getWeekStartKey(dt);
@@ -313,19 +341,22 @@ function ensureWeeklyPlannerDay(dayKey) {
 }
 
 function setWeeklyPlannerSelectedDay(dayKey) {
+  if (!isValidDayKey(dayKey)) dayKey = getTodayKey();
   weeklyPlannerSelectedDay = dayKey;
+
   ensureWeeklyPlannerDay(dayKey);
   saveWeeklyPlanner();
   renderWeeklyPlanner(); // immediate UI refresh
 }
 
 function getSelectedPlannerDayKey() {
-  return weeklyPlannerSelectedDay || getTodayKey();
+  const k = weeklyPlannerSelectedDay || getTodayKey();
+  return isValidDayKey(k) ? k : getTodayKey();
 }
 
 function getPlannerDayData(dayKey) {
   ensureWeeklyPlannerDay(dayKey);
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   return weeklyPlannerData?.[ws]?.days?.[dayKey] || { intentions: "", items: [] };
 }
 
@@ -338,7 +369,7 @@ function getPlannerCompletionForDay(dayKey) {
   return { percent, done, total };
 }
 
-// Export for other modules (Life Engine update will read this)
+// Export for other modules
 window.getPlannerCompletionForDay = getPlannerCompletionForDay;
 window.getSelectedPlannerDayKey = getSelectedPlannerDayKey;
 
@@ -346,11 +377,11 @@ function setPlannerIntentions(value) {
   const dayKey = getSelectedPlannerDayKey();
   ensureWeeklyPlannerDay(dayKey);
 
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   weeklyPlannerData[ws].days[dayKey].intentions = String(value || "");
   saveWeeklyPlanner();
 
-  // Trigger dashboard updates (no refresh needed)
+  // Trigger dashboard updates
   if (typeof renderLifeScore === "function") renderLifeScore();
   if (typeof renderDNAProfile === "function") renderDNAProfile();
   if (typeof renderWeeklyGraph === "function") renderWeeklyGraph();
@@ -371,7 +402,7 @@ function addPlannerItem() {
 
   if (!time || !task) return;
 
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   const day = weeklyPlannerData[ws].days[dayKey];
 
   day.items.push({ time, task, done: false });
@@ -391,7 +422,7 @@ function addPlannerItem() {
 
 function togglePlannerItem(index) {
   const dayKey = getSelectedPlannerDayKey();
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   const day = weeklyPlannerData?.[ws]?.days?.[dayKey];
   if (!day || !Array.isArray(day.items) || !day.items[index]) return;
 
@@ -408,7 +439,7 @@ function togglePlannerItem(index) {
 
 function deletePlannerItem(index) {
   const dayKey = getSelectedPlannerDayKey();
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   const day = weeklyPlannerData?.[ws]?.days?.[dayKey];
   if (!day || !Array.isArray(day.items)) return;
 
@@ -432,7 +463,7 @@ function renderWeeklyPlanner() {
   const dayKey = getSelectedPlannerDayKey() || today;
   ensureWeeklyPlannerDay(dayKey);
 
-  const ws = getWeekStartKey(new Date(dayKey));
+  const ws = getWeekStartKey(parseLocalISODate(dayKey));
   if (!weeklyPlannerData[ws]) weeklyPlannerData[ws] = { days: {} };
   ensureWeeklyPlannerDay(dayKey);
 
@@ -442,7 +473,7 @@ function renderWeeklyPlanner() {
 
   const activeDatePretty = (() => {
     try {
-      return new Date(dayKey).toLocaleDateString(undefined, {
+      return parseLocalISODate(dayKey).toLocaleDateString(undefined, {
         weekday: "long",
         month: "short",
         day: "numeric"
