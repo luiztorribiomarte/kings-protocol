@@ -1,6 +1,7 @@
 // ============================================
-// LIFE ENGINE 7.4 — REAL-TIME SYNC CORE
-// Safe upgrade: no removals, only reactive updates
+// LIFE ENGINE 7.5 — LOCAL-DAY SYNC + LEGACY UTC FALLBACK
+// Fixes: life score / DNA / trend reading 0 due to UTC date keys
+// Safe upgrade: no removals, only more robust date + storage reads
 // ============================================
 
 (function() {
@@ -11,24 +12,62 @@
     return typeof n === "number" && !isNaN(n) ? n : 0;
   }
 
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  // Local YYYY-MM-DD (no UTC drift)
+  function toLocalISODate(date = new Date()) {
+    const y = date.getFullYear();
+    const m = pad2(date.getMonth() + 1);
+    const d = pad2(date.getDate());
+    return `${y}-${m}-${d}`;
+  }
+
+  function parseLocalISODate(dayKey) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || ""))) return new Date();
+    const [y, m, d] = String(dayKey).split("-").map(Number);
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  }
+
+  function shiftDayKey(dayKey, deltaDays) {
+    const dt = parseLocalISODate(dayKey);
+    dt.setDate(dt.getDate() + deltaDays);
+    return toLocalISODate(dt);
+  }
+
   function todayKey() {
-    return new Date().toISOString().split("T")[0];
+    return toLocalISODate(new Date());
   }
 
   function getLastDays(n) {
     const days = [];
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
     for (let i = n - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      days.push(d.toISOString().split("T")[0]);
+      const d = new Date(base);
+      d.setDate(base.getDate() - i);
+      days.push(toLocalISODate(d));
     }
     return days;
   }
 
+  // Legacy-safe read: try exact day, then -1, then +1
+  // (covers older saves that used UTC day keys near midnight)
+  function readDay(obj, dayKey) {
+    if (!obj || typeof obj !== "object") return undefined;
+    if (obj[dayKey] != null) return obj[dayKey];
+    const prev = shiftDayKey(dayKey, -1);
+    if (obj[prev] != null) return obj[prev];
+    const next = shiftDayKey(dayKey, 1);
+    if (obj[next] != null) return obj[next];
+    return undefined;
+  }
+
   function getAllDaysFromStorage() {
-    const habitData = JSON.parse(localStorage.getItem("habitCompletions") || "{}");
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const todoHistory = JSON.parse(localStorage.getItem("todoHistory") || "{}");
+    const habitData = safeParse(localStorage.getItem("habitCompletions"), {});
+    const moodData = safeParse(localStorage.getItem("moodData"), {});
+    const todoHistory = safeParse(localStorage.getItem("todoHistory"), {});
 
     const keys = new Set([
       ...Object.keys(habitData || {}),
@@ -42,18 +81,37 @@
 
   function prettyLabel(dateStr) {
     try {
-      return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dt = parseLocalISODate(dateStr);
+      return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     } catch {
       return dateStr;
+    }
+  }
+
+  function safeParse(raw, fallback) {
+    try {
+      const v = JSON.parse(raw || "");
+      return v && typeof v === "object" ? v : fallback;
+    } catch {
+      return fallback;
     }
   }
 
   // ---------- Core Metrics ----------
   function getHabitPercent(dateKey = todayKey()) {
     try {
+      // Prefer the habits module if available
       if (typeof window.getDayCompletion === "function") {
         const result = window.getDayCompletion(dateKey);
-        return safeNum(result.percent);
+        if (result && typeof result.percent === "number") return safeNum(result.percent);
+
+        // Legacy fallback: if getDayCompletion doesn’t find data due to key drift,
+        // try adjacent day keys
+        const rPrev = window.getDayCompletion(shiftDayKey(dateKey, -1));
+        if (rPrev && typeof rPrev.percent === "number" && rPrev.percent > 0) return safeNum(rPrev.percent);
+
+        const rNext = window.getDayCompletion(shiftDayKey(dateKey, 1));
+        if (rNext && typeof rNext.percent === "number" && rNext.percent > 0) return safeNum(rNext.percent);
       }
     } catch {}
     return 0;
@@ -61,28 +119,31 @@
 
   function getEnergyPercent(dateKey = todayKey()) {
     try {
-      const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-      const energy = moodData?.[dateKey]?.energy ?? 0;
-      return Math.round((energy / 10) * 100);
+      const moodData = safeParse(localStorage.getItem("moodData"), {});
+      const day = readDay(moodData, dateKey) || {};
+      const energy = day.energy ?? 0;
+      return Math.round((safeNum(energy) / 10) * 100);
     } catch {}
     return 0;
   }
 
   function getTaskPercentForDay(dateKey = todayKey()) {
     try {
-      const hist = JSON.parse(localStorage.getItem("todoHistory") || "{}");
-      if (hist?.[dateKey]?.percent != null) return hist[dateKey].percent;
+      const hist = safeParse(localStorage.getItem("todoHistory"), {});
+      const day = readDay(hist, dateKey);
+      if (day && day.percent != null) return safeNum(day.percent);
     } catch {}
 
-    // fallback for today
+    // fallback for today (live todos)
     if (dateKey === todayKey()) {
       try {
-        const todos = JSON.parse(localStorage.getItem("todos") || "[]");
-        if (!todos.length) return 0;
-        const done = todos.filter(t => t.done).length;
+        const todos = safeParse(localStorage.getItem("todos"), []);
+        if (!Array.isArray(todos) || !todos.length) return 0;
+        const done = todos.filter(t => t && t.done).length;
         return Math.round((done / todos.length) * 100);
       } catch {}
     }
+
     return 0;
   }
 
@@ -135,7 +196,12 @@
 
     const discipline = Math.min(100, avgHabit + getStreakBonus());
     const consistency = Math.max(0, 100 - variance);
-    const execution = Math.round((avgHabit + getTaskPercentForDay()) / 2);
+
+    // execution should be based on each day’s tasks, not only today
+    const taskVals = days.map(d => getTaskPercentForDay(d));
+    const avgTasks = Math.round(taskVals.reduce((a, b) => a + b, 0) / (taskVals.length || 1));
+
+    const execution = Math.round((avgHabit + avgTasks) / 2);
     const avg14 = avgHabit;
 
     return { discipline, consistency, execution, avg14 };
@@ -269,6 +335,11 @@
     window.addEventListener(evt, refreshAll);
   });
 
+  // also refresh on visibility change (helps after returning to tab)
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshAll();
+  });
+
   // ---------- Boot ----------
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", refreshAll);
@@ -280,5 +351,5 @@
   window.renderDNAProfile = renderDNAPanel;
   window.renderDashboardTrendChart = renderDashboardTrendChart;
 
-  console.log("Life Engine 7.4 loaded");
+  console.log("Life Engine 7.5 loaded (local-day + legacy fallback)");
 })();
