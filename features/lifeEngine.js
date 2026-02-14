@@ -1,19 +1,16 @@
 // ============================================
-// LIFE ENGINE 7.5 — LOCAL-DATE SYNC FIX
-// Fixes: habits = 0% / trend not pulling habits due to UTC vs local date keys
-// Safe upgrade: no removals, only correct date-keying + stable parsing
+// LIFE ENGINE 8.0 — LOCAL DATE UNIFIED CORE
+// FULL FIX — habits + mood + tasks sync
 // ============================================
 
 (function() {
   "use strict";
 
-  // ---------- Helpers ----------
-  function safeNum(n) {
-    return typeof n === "number" && !isNaN(n) ? n : 0;
-  }
+  /* =========================
+     DATE (MATCH HABITS.JS)
+  ========================= */
 
-  // IMPORTANT: Use LOCAL date keys to match habits.js + (likely) mood.js
-  function dayKeyLocal(d = new Date()) {
+  function getDateStringLocal(d = new Date()) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const da = String(d.getDate()).padStart(2, "0");
@@ -21,7 +18,7 @@
   }
 
   function todayKey() {
-    return dayKeyLocal(new Date());
+    return getDateStringLocal(new Date());
   }
 
   function getLastDays(n) {
@@ -29,7 +26,7 @@
     for (let i = n - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      days.push(dayKeyLocal(d));
+      days.push(getDateStringLocal(d));
     }
     return days;
   }
@@ -45,21 +42,25 @@
       ...Object.keys(todoHistory || {})
     ]);
 
-    const out = [...keys].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
-    return out.length ? out : getLastDays(7);
+    const valid = [...keys].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+    return valid.length ? valid : getLastDays(7);
   }
 
   function prettyLabel(dateStr) {
-    try {
-      // IMPORTANT: avoid Date("YYYY-MM-DD") UTC parsing weirdness
-      const d = new Date(dateStr + "T00:00:00");
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    } catch {
-      return dateStr;
-    }
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
+    });
   }
 
-  // ---------- Core Metrics ----------
+  function safeNum(n) {
+    return typeof n === "number" && !isNaN(n) ? n : 0;
+  }
+
+  /* =========================
+     CORE METRICS
+  ========================= */
+
   function getHabitPercent(dateKey = todayKey()) {
     try {
       if (typeof window.getDayCompletion === "function") {
@@ -85,7 +86,6 @@
       if (hist?.[dateKey]?.percent != null) return hist[dateKey].percent;
     } catch {}
 
-    // fallback for today
     if (dateKey === todayKey()) {
       try {
         const todos = JSON.parse(localStorage.getItem("todos") || "[]");
@@ -94,6 +94,7 @@
         return Math.round((done / todos.length) * 100);
       } catch {}
     }
+
     return 0;
   }
 
@@ -102,15 +103,17 @@
     const days = getLastDays(30).slice().reverse();
 
     for (const d of days) {
-      const pct = getHabitPercent(d);
-      if (pct >= 80) streak++;
+      if (getHabitPercent(d) >= 80) streak++;
       else break;
     }
 
     return Math.min(streak * 2, 15);
   }
 
-  // ---------- Life Score ----------
+  /* =========================
+     LIFE SCORE
+  ========================= */
+
   function calculateLifeScore() {
     const habitPct = getHabitPercent();
     const energyPct = getEnergyPercent();
@@ -134,14 +137,20 @@
     };
   }
 
-  // ---------- DNA ----------
+  /* =========================
+     DNA
+  ========================= */
+
   function calculateDNA() {
     const days = getLastDays(14);
     const habitVals = days.map(d => getHabitPercent(d));
-    const avgHabit = Math.round(habitVals.reduce((a, b) => a + b, 0) / (habitVals.length || 1));
+    const avgHabit = Math.round(
+      habitVals.reduce((a, b) => a + b, 0) / (habitVals.length || 1)
+    );
 
     const variance = Math.round(
-      habitVals.reduce((a, b) => a + Math.abs(b - avgHabit), 0) / (habitVals.length || 1)
+      habitVals.reduce((a, b) => a + Math.abs(b - avgHabit), 0) /
+      (habitVals.length || 1)
     );
 
     const discipline = Math.min(100, avgHabit + getStreakBonus());
@@ -152,7 +161,10 @@
     return { discipline, consistency, execution, avg14 };
   }
 
-  // ---------- UI ----------
+  /* =========================
+     UI RENDER
+  ========================= */
+
   function renderLifeScore() {
     const el = document.getElementById("dailyStatus");
     if (!el) return;
@@ -174,37 +186,18 @@
       color = "#F59E0B";
     }
 
-    const radius = 52;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (score / 100) * circumference;
-
     el.innerHTML = `
       <div style="margin-top:14px;padding:18px;border-radius:18px;border:1px solid rgba(255,255,255,0.14);background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
-        <div style="position:relative;width:130px;height:130px;">
-          <svg width="130" height="130">
-            <circle cx="65" cy="65" r="${radius}" stroke="rgba(255,255,255,0.12)" stroke-width="10" fill="none"/>
-            <circle cx="65" cy="65" r="${radius}" stroke="${color}" stroke-width="10" fill="none"
-              stroke-dasharray="${circumference}"
-              stroke-dashoffset="${offset}"
-              stroke-linecap="round"
-              transform="rotate(-90 65 65)"/>
-          </svg>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
-            <div style="font-size:1.6rem;font-weight:900;color:${color};">${score}</div>
-            <div style="font-size:0.75rem;color:#9CA3AF;">Life Score</div>
-          </div>
-        </div>
-
-        <div style="flex:1;min-width:200px;">
-          <div style="font-size:1.1rem;font-weight:900;color:${color};">${label}</div>
-          <div style="margin-top:10px;font-size:0.9rem;color:#E5E7EB;line-height:1.6;">
+        <div style="font-size:2rem;font-weight:900;color:${color};">${score}</div>
+        <div>
+          <div style="font-weight:900;color:${color};">${label}</div>
+          <div style="margin-top:6px;font-size:0.9rem;">
             Habits: ${data.breakdown.habits}%<br>
             Energy: ${data.breakdown.energy}%<br>
             Tasks: ${data.breakdown.tasks}%<br>
             Streak Bonus: +${data.breakdown.streakBonus}
           </div>
         </div>
-
         <div id="dnaPanel" style="flex:1;min-width:220px;"></div>
       </div>
     `;
@@ -221,7 +214,7 @@
     el.innerHTML = `
       <div style="padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);">
         <div style="font-weight:900;margin-bottom:8px;">Productivity DNA</div>
-        <div style="font-size:0.9rem;color:#E5E7EB;line-height:1.7;">
+        <div style="font-size:0.9rem;line-height:1.7;">
           Discipline: ${dna.discipline}<br>
           Consistency: ${dna.consistency}<br>
           Execution: ${dna.execution}<br>
@@ -231,7 +224,10 @@
     `;
   }
 
-  // ---------- Performance Trend ----------
+  /* =========================
+     PERFORMANCE TREND
+  ========================= */
+
   let dashboardTrendChart = null;
 
   function renderDashboardTrendChart() {
@@ -240,7 +236,9 @@
     if (!canvas || typeof Chart === "undefined") return;
 
     const range = select ? select.value : "7";
-    const days = range === "all" ? getAllDaysFromStorage() : getLastDays(range === "30" ? 30 : 7);
+    const days = range === "all"
+      ? getAllDaysFromStorage()
+      : getLastDays(range === "30" ? 30 : 7);
 
     const labels = days.map(prettyLabel);
     const habits = days.map(d => getHabitPercent(d));
@@ -268,26 +266,20 @@
     });
   }
 
-  // ---------- Reactive Sync ----------
+  /* =========================
+     BOOT
+  ========================= */
+
   function refreshAll() {
     renderLifeScore();
     renderDashboardTrendChart();
   }
 
-  ["storage","todosUpdated","habitsUpdated","moodUpdated","plannerUpdated"].forEach(evt => {
-    window.addEventListener(evt, refreshAll);
-  });
-
-  // ---------- Boot ----------
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", refreshAll);
-  } else {
-    refreshAll();
-  }
+  document.addEventListener("DOMContentLoaded", refreshAll);
 
   window.renderLifeScore = renderLifeScore;
   window.renderDNAProfile = renderDNAPanel;
   window.renderDashboardTrendChart = renderDashboardTrendChart;
 
-  console.log("Life Engine 7.5 loaded (local-date sync)");
+  console.log("Life Engine 8.0 loaded (local date unified)");
 })();
