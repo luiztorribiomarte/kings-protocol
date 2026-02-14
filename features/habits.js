@@ -1,10 +1,9 @@
 /* features/habits.js
-   FULL RESTORE + FIX
-   - Weekly grid
-   - Local dates
-   - UTC migration
-   - Stable API
-   - Trend/Life sync
+   HARD SYNC + STABLE EVENTS
+   FIXES:
+   - Ensures getDayCompletion always works with local YYYY-MM-DD keys
+   - Dispatches habitsUpdated (storage doesn't fire in same tab)
+   - Keeps lifeEngine + trend chart synced
 */
 
 (function () {
@@ -15,24 +14,20 @@
   window.habits = window.habits || [];
   window.habitCompletions = window.habitCompletions || {};
 
-  /* =========================
-     STORAGE
-  ========================= */
+  function fireHabitsUpdated() {
+    // storage event will not fire in the same tab, so we dispatch our own.
+    window.dispatchEvent(new Event("habitsUpdated"));
+  }
 
   function saveHabits() {
     localStorage.setItem("habits", JSON.stringify(window.habits));
+    fireHabitsUpdated();
   }
 
   function saveCompletions() {
-    localStorage.setItem(
-      "habitCompletions",
-      JSON.stringify(window.habitCompletions)
-    );
+    localStorage.setItem("habitCompletions", JSON.stringify(window.habitCompletions));
+    fireHabitsUpdated();
   }
-
-  /* =========================
-     DATES
-  ========================= */
 
   function getDateStringLocal(d = new Date()) {
     const y = d.getFullYear();
@@ -49,279 +44,220 @@
     d.setHours(0, 0, 0, 0);
 
     const out = [];
-
     for (let i = 0; i < 7; i++) {
       const x = new Date(d);
       x.setDate(d.getDate() + i);
       out.push(x);
     }
-
     return out;
   }
 
-  function utcToLocal(key) {
-    return getDateStringLocal(
-      new Date(key + "T00:00:00Z")
-    );
+  function utcToLocalKey(k) {
+    // handles old keys if they were saved as UTC based YYYY-MM-DD
+    return getDateStringLocal(new Date(k + "T00:00:00Z"));
   }
 
-  /* =========================
-     MIGRATION
-  ========================= */
-
-  function migrateUTC() {
-    let fixed = false;
+  function migrateUTCKeysIfNeeded() {
+    const src = window.habitCompletions || {};
     const migrated = {};
+    let changed = false;
 
-    Object.keys(window.habitCompletions || {}).forEach(
-      (k) => {
-        const local = utcToLocal(k);
+    Object.keys(src).forEach((k) => {
+      const local = utcToLocalKey(k);
+      if (!migrated[local]) migrated[local] = {};
+      Object.assign(migrated[local], src[k]);
+      if (local !== k) changed = true;
+    });
 
-        if (!migrated[local]) migrated[local] = {};
-
-        Object.assign(
-          migrated[local],
-          window.habitCompletions[k]
-        );
-
-        if (local !== k) fixed = true;
-      }
-    );
-
-    if (fixed) {
+    if (changed) {
       window.habitCompletions = migrated;
-      saveCompletions();
-      console.log("Habits migrated");
+      localStorage.setItem("habitCompletions", JSON.stringify(window.habitCompletions));
+      console.log("Habits migrated (UTC -> local keys)");
     }
   }
 
-  /* =========================
-     CORE
-  ========================= */
-
-  function isDone(id, date) {
-    return !!(
-      window.habitCompletions?.[date]?.[id]
-    );
+  function isDone(habitId, dateKey) {
+    const k = dateKey;
+    return !!(window.habitCompletions?.[k]?.[habitId]);
   }
 
-  function toggleHabit(id, date) {
-    if (!window.habitCompletions[date]) {
-      window.habitCompletions[date] = {};
-    }
+  function toggleHabit(habitId, dateKey) {
+    const k = dateKey;
 
-    window.habitCompletions[date][id] =
-      !window.habitCompletions[date][id];
+    if (!window.habitCompletions[k]) window.habitCompletions[k] = {};
+    window.habitCompletions[k][habitId] = !window.habitCompletions[k][habitId];
 
     saveCompletions();
-
     renderHabits();
-    syncAll();
+
+    // keep legacy hooks alive too
+    if (typeof window.renderLifeScore === "function") window.renderLifeScore();
+    if (typeof window.renderDashboardTrendChart === "function") window.renderDashboardTrendChart();
+    if (typeof window.renderDNAProfile === "function") window.renderDNAProfile();
+    if (typeof window.renderWeeklyGraph === "function") window.renderWeeklyGraph();
   }
 
-  function getDayCompletion(date) {
+  function getDayCompletion(dateStr = getDateStringLocal()) {
     const habits = window.habits || [];
-    if (!habits.length)
-      return { percent: 0, done: 0, total: 0 };
+    if (!habits.length) return { percent: 0, done: 0, total: 0 };
 
     let done = 0;
-
     habits.forEach((h) => {
-      if (isDone(h.id, date)) done++;
+      if (isDone(h.id, dateStr)) done++;
     });
 
     const total = habits.length;
-
-    return {
-      done,
-      total,
-      percent: total
-        ? Math.round((done / total) * 100)
-        : 0
-    };
+    const percent = total ? Math.round((done / total) * 100) : 0;
+    return { percent, done, total };
   }
 
   function calculateCurrentStreak() {
-    let s = 0;
-    let d = new Date();
+    let streak = 0;
+    let cursor = new Date();
 
     while (true) {
-      const k = getDateStringLocal(d);
-
-      if (getDayCompletion(k).percent >= 80) {
-        s++;
-        d.setDate(d.getDate() - 1);
+      const k = getDateStringLocal(cursor);
+      const pct = getDayCompletion(k).percent;
+      if (pct >= 80) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
       } else break;
     }
-
-    return s;
+    return streak;
   }
-
-  /* =========================
-     SYNC
-  ========================= */
-
-  function syncAll() {
-    window.renderLifeScore?.();
-    window.renderWeeklyGraph?.();
-    window.renderDNAProfile?.();
-    window.renderDashboardTrendChart?.();
-  }
-
-  /* =========================
-     UI
-  ========================= */
 
   function renderHabits() {
     const grid = document.getElementById("habitGrid");
     if (!grid) return;
 
-    const week = getWeekDates();
-    const names = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const week = getWeekDates(new Date());
+    const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const habits = window.habits || [];
 
     let html = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-      <strong>Daily Habits - This Week</strong>
-      <button onclick="openHabitManager()"
-        style="padding:6px 12px;border-radius:10px;">
-        ⚙ Manage
-      </button>
-    </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+        <strong>Daily Habits - This Week</strong>
+        <button onclick="openHabitManager()" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:white;cursor:pointer;">
+          ⚙ Manage
+        </button>
+      </div>
 
-    <table style="width:100%;border-collapse:collapse;">
-    <thead><tr>
-      <th></th>
-      <th>Habit</th>
-      ${week.map((d,i)=>`
-        <th>${names[i]}<br>${d.getDate()}</th>
-      `).join("")}
-    </tr></thead><tbody>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="width:34px;"></th>
+            <th style="text-align:left;padding:12px;">Habit</th>
+            ${week.map((d, i) => `<th style="text-align:center;padding:12px;">${names[i]}<br>${d.getDate()}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
     `;
 
     habits.forEach((h) => {
       html += `<tr>
-        <td>☰</td>
-        <td>${h.icon} ${window.escapeHtml(h.name)}</td>
+        <td style="text-align:center;color:#9CA3AF;">☰</td>
+        <td style="padding:12px;font-weight:600;">${h.icon} ${window.escapeHtml(h.name)}</td>
       `;
 
       week.forEach((d) => {
         const k = getDateStringLocal(d);
         const done = isDone(h.id, k);
-
         html += `
-        <td onclick="toggleHabit('${h.id}','${k}')"
-            style="cursor:pointer;text-align:center;">
-          ${done ? "✅" : "○"}
-        </td>`;
+          <td onclick="toggleHabit('${h.id}','${k}')"
+              style="cursor:pointer;text-align:center;padding:12px;">
+            ${done ? "✅" : "○"}
+          </td>`;
       });
 
       html += `</tr>`;
     });
 
     html += `</tbody></table>`;
-
     grid.innerHTML = html;
   }
 
-  /* =========================
-     MANAGER
-  ========================= */
-
   function openHabitManager() {
+    const habits = window.habits || [];
     window.openModal(`
       <h2>Manage Habits</h2>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <input id="hn" class="form-input" placeholder="Name"/>
-        <input id="hi" class="form-input" placeholder="Emoji" style="width:80px"/>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <input id="hn" placeholder="Habit name" class="form-input" />
+        <input id="hi" placeholder="Emoji" class="form-input" style="width:80px;" />
         <button class="form-submit" onclick="addHabit()">Add</button>
       </div>
 
-      ${(window.habits||[]).map(h=>`
-        <div style="display:flex;justify-content:space-between;padding:6px;">
-          <div>${h.icon} ${window.escapeHtml(h.name)}</div>
-          <button onclick="deleteHabit('${h.id}')"
-            style="color:#EF4444">Delete</button>
-        </div>
-      `).join("")}
+      <div style="max-height:300px; overflow:auto;">
+        ${habits.map(h => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div>${h.icon} ${window.escapeHtml(h.name)}</div>
+            <button onclick="deleteHabit('${h.id}')" style="color:#EF4444; background:none; border:none; cursor:pointer;">Delete</button>
+          </div>
+        `).join("")}
+      </div>
     `);
   }
 
   function addHabit() {
-    const name =
-      document.getElementById("hn")?.value.trim();
+    const name = (document.getElementById("hn")?.value || "").trim();
+    const icon = (document.getElementById("hi")?.value || "").trim() || "✨";
+    if (!name) return alert("Habit name required");
 
-    const icon =
-      document.getElementById("hi")?.value.trim() || "✨";
-
-    if (!name) return alert("Name required");
-
-    window.habits.push({
-      id: "h_" + Date.now(),
-      name,
-      icon
-    });
-
+    window.habits.push({ id: "h_" + Date.now(), name, icon });
     saveHabits();
-    closeModal();
 
+    window.closeModal?.();
     renderHabits();
-    syncAll();
   }
 
   function deleteHabit(id) {
-    window.habits = window.habits.filter(
-      (h) => h.id !== id
-    );
+    if (!confirm("Delete this habit?")) return;
 
-    Object.keys(window.habitCompletions).forEach(
-      (d) => delete window.habitCompletions[d][id]
-    );
+    window.habits = (window.habits || []).filter(h => h.id !== id);
+
+    // remove completion marks for this habit across all days (but keep the day objects)
+    Object.keys(window.habitCompletions || {}).forEach(day => {
+      if (window.habitCompletions?.[day]) delete window.habitCompletions[day][id];
+    });
 
     saveHabits();
     saveCompletions();
 
-    closeModal();
+    window.closeModal?.();
     renderHabits();
-    syncAll();
   }
 
-  /* =========================
-     INIT
-  ========================= */
-
-  function init() {
+  function initHabitsData() {
     try {
-      window.habits =
-        JSON.parse(localStorage.getItem("habits")) || [];
-    } catch {}
+      const savedHabits = JSON.parse(localStorage.getItem("habits") || "[]");
+      window.habits = Array.isArray(savedHabits) ? savedHabits : [];
+    } catch {
+      window.habits = [];
+    }
 
     try {
-      window.habitCompletions =
-        JSON.parse(localStorage.getItem("habitCompletions")) || {};
-    } catch {}
+      const saved = JSON.parse(localStorage.getItem("habitCompletions") || "{}");
+      window.habitCompletions = saved && typeof saved === "object" ? saved : {};
+    } catch {
+      window.habitCompletions = {};
+    }
 
-    migrateUTC();
+    migrateUTCKeysIfNeeded();
 
     if (!window.habits.length) {
       window.habits = [
-        { id: "wake", name: "Wake 7AM", icon: "⏰" },
-        { id: "work", name: "Workout", icon: "💪" },
-        { id: "med", name: "Meditate", icon: "🧘" }
+        { id: "wake", name: "Wake Up At 7 AM", icon: "⏰" },
+        { id: "sun", name: "Morning Sunlight", icon: "☀️" },
+        { id: "skin", name: "Skincare", icon: "🧴" }
       ];
       saveHabits();
     }
   }
 
-  /* =========================
-     EXPORTS
-  ========================= */
-
-  window.initHabitsData = init;
+  // exports
+  window.initHabitsData = initHabitsData;
   window.renderHabits = renderHabits;
   window.toggleHabit = toggleHabit;
-
   window.openHabitManager = openHabitManager;
   window.addHabit = addHabit;
   window.deleteHabit = deleteHabit;
@@ -329,9 +265,16 @@
   window.getDayCompletion = getDayCompletion;
   window.calculateCurrentStreak = calculateCurrentStreak;
 
+  // App registration (ensures init runs)
   if (App) {
-    App.on("dashboard", renderHabits);
+    App.features.habits = { init: initHabitsData, render: renderHabits };
+    App.on("dashboard", function () {
+      // ensure data exists before render
+      initHabitsData();
+      renderHabits();
+      fireHabitsUpdated();
+    });
   }
 
-  console.log("Habits fixed + synced");
+  console.log("Habits module loaded (hard sync events)");
 })();
