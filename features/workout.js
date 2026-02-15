@@ -1,19 +1,19 @@
 // =====================================================
 // KINGS PROTOCOL — WORKOUT SYSTEM (SINGLE FILE, ELITE)
 // File: features/workout.js
-// - Books-style layout (Currently Training / Planned / Completed)
-// - Workouts -> Exercises -> Sets (individual sets with custom weight/reps)
-// - Edit/Delete sets (NO confirm popups)
-// - Move workouts across sections
-// - PRs, streak, weekly stats
-// - Charts: weekly momentum (7/30/all) + exercise progress
-// - SAFE UPGRADE (2026-02-07):
-//   ✅ Fixes potential "toLowerCase of undefined" crash for older data
-//   ✅ Solves infinite scrolling by:
-//      1) Collapsible workout cards (per-workout expand/collapse)
-//      2) Completed pagination ("Load more")
-//      3) Search filter (find workouts/exercises fast)
-// - Safe mount: does not wipe other page features
+//
+// UPDATE (per your request):
+// ✅ Removes "Planned workouts" UI AND planned-status logic (B)
+// ✅ New workouts always start as "current"
+// ✅ Any older workouts saved as "planned" are safely migrated to "current"
+// ✅ Replaces "Workouts completed" endless list with a bottom calendar system:
+//    - Month buttons (Jan–Dec) + Year selector
+//    - Calendar days: green if workout logged, red if not
+//    - Click a day to view workouts performed that day
+//
+// SAFETY:
+// - Does NOT touch other pages/features
+// - Keeps your PRs, charts, streak, stats, modals, search, data model intact
 // =====================================================
 
 (function () {
@@ -90,6 +90,15 @@
     }
   }
 
+  function formatFullDay(isoDay) {
+    try {
+      const d = new Date(isoDay + "T00:00:00");
+      return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return isoDay;
+    }
+  }
+
   function clampNum(n, min, max) {
     const x = Number(n);
     if (!Number.isFinite(x)) return min;
@@ -138,6 +147,7 @@
           out.push({
             workoutId: w?.id,
             workoutName,
+            workoutStatus: w?.status || "current",
             exerciseId: ex?.id,
             exerciseName,
             date,
@@ -154,38 +164,50 @@
     return out;
   }
 
+  function localISOFromParts(y, mIndex, d) {
+    const mm = String(mIndex + 1).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    return `${y}-${mm}-${dd}`;
+  }
+
   // -----------------------------
   // Data model
   // -----------------------------
   function normalizeWorkouts(list) {
     if (!Array.isArray(list)) return [];
 
-    return list.map(w => ({
-      id: w?.id || uuid(),
-      name: normStr(w?.name || "Untitled") || "Untitled",
-      type: normStr(w?.type || ""),
-      status: w?.status || "planned", // planned | current | completed
-      createdAt: Number(w?.createdAt || Date.now()),
-      updatedAt: Number(w?.updatedAt || Date.now()),
-      exercises: Array.isArray(w?.exercises)
-        ? w.exercises.map(ex => ({
-            id: ex?.id || uuid(),
-            name: normStr(ex?.name || "Exercise") || "Exercise",
-            createdAt: Number(ex?.createdAt || Date.now()),
-            updatedAt: Number(ex?.updatedAt || Date.now()),
-            sets: Array.isArray(ex?.sets)
-              ? ex.sets.map(s => ({
-                  id: s?.id || uuid(),
-                  date: dayKey(s?.date || todayISO()),
-                  weight: Number(s?.weight || 0),
-                  reps: Number(s?.reps || 0),
-                  createdAt: Number(s?.createdAt || Date.now()),
-                  updatedAt: Number(s?.updatedAt || Date.now())
-                }))
-              : []
-          }))
-        : []
-    }));
+    return list.map(w => {
+      // 🚫 planned removed: migrate any old "planned" to "current"
+      const rawStatus = normStr(w?.status || "current");
+      const status = rawStatus === "planned" ? "current" : (rawStatus || "current");
+
+      return {
+        id: w?.id || uuid(),
+        name: normStr(w?.name || "Untitled") || "Untitled",
+        type: normStr(w?.type || ""),
+        status: status === "completed" ? "completed" : "current", // enforce only current|completed
+        createdAt: Number(w?.createdAt || Date.now()),
+        updatedAt: Number(w?.updatedAt || Date.now()),
+        exercises: Array.isArray(w?.exercises)
+          ? w.exercises.map(ex => ({
+              id: ex?.id || uuid(),
+              name: normStr(ex?.name || "Exercise") || "Exercise",
+              createdAt: Number(ex?.createdAt || Date.now()),
+              updatedAt: Number(ex?.updatedAt || Date.now()),
+              sets: Array.isArray(ex?.sets)
+                ? ex.sets.map(s => ({
+                    id: s?.id || uuid(),
+                    date: dayKey(s?.date || todayISO()),
+                    weight: Number(s?.weight || 0),
+                    reps: Number(s?.reps || 0),
+                    createdAt: Number(s?.createdAt || Date.now()),
+                    updatedAt: Number(s?.updatedAt || Date.now())
+                  }))
+                : []
+            }))
+          : []
+      };
+    });
   }
 
   function loadWorkouts() {
@@ -197,29 +219,44 @@
   }
 
   function loadUIState() {
+    const now = new Date();
     const s = load(UI_STATE_KEY, {
       exerciseChartExercise: "",
       exerciseChartMetric: "1rm", // 1rm | volume | weight
 
-      // NEW (safe additions)
+      // Search
       searchQuery: "",
-      completedLimit: 10,
-      collapsedWorkouts: {} // { [workoutId]: true/false }
+
+      // Collapsing
+      collapsedWorkouts: {}, // { [workoutId]: true/false }
+
+      // Calendar history (NEW)
+      calendarYear: now.getFullYear(),
+      calendarMonth: now.getMonth(), // 0-11
+      calendarSelectedDay: "" // "YYYY-MM-DD"
     });
 
-    // ensure shape
     if (!s || typeof s !== "object") {
       return {
         exerciseChartExercise: "",
         exerciseChartMetric: "1rm",
         searchQuery: "",
-        completedLimit: 10,
-        collapsedWorkouts: {}
+        collapsedWorkouts: {},
+        calendarYear: now.getFullYear(),
+        calendarMonth: now.getMonth(),
+        calendarSelectedDay: ""
       };
     }
+
     if (typeof s.searchQuery !== "string") s.searchQuery = "";
-    if (!Number.isFinite(Number(s.completedLimit))) s.completedLimit = 10;
     if (!s.collapsedWorkouts || typeof s.collapsedWorkouts !== "object") s.collapsedWorkouts = {};
+
+    const y = Number(s.calendarYear);
+    const m = Number(s.calendarMonth);
+    s.calendarYear = Number.isFinite(y) ? clampNum(y, 1970, 2100) : now.getFullYear();
+    s.calendarMonth = Number.isFinite(m) ? clampNum(m, 0, 11) : now.getMonth();
+    if (typeof s.calendarSelectedDay !== "string") s.calendarSelectedDay = "";
+
     return s;
   }
 
@@ -478,10 +515,79 @@
     };
   }
 
+  // Build day -> workouts summary index (for calendar + day details)
+  function buildDayIndex(workouts) {
+    const index = {}; // { [YYYY-MM-DD]: { workouts: [{id,name,type,status,volume,sets,exercises...}], totalSets,totalVolume } }
+
+    (workouts || []).forEach(w => {
+      const wName = normStr(w?.name) || "Untitled";
+      const wType = normStr(w?.type || "");
+      const wStatus = w?.status === "completed" ? "completed" : "current";
+
+      // Find all sets by date for this workout
+      const byDate = {};
+      (w?.exercises || []).forEach(ex => {
+        const exName = normStr(ex?.name) || "Exercise";
+        (ex?.sets || []).forEach(s => {
+          const d = dayKey(s?.date);
+          if (!byDate[d]) byDate[d] = [];
+          byDate[d].push({
+            exerciseName: exName,
+            setId: s?.id,
+            weight: Number(s?.weight || 0),
+            reps: Number(s?.reps || 0),
+            date: d,
+            volume: calcSetVolume(s)
+          });
+        });
+      });
+
+      Object.keys(byDate).forEach(dk => {
+        const sets = byDate[dk] || [];
+        const totalVolume = sets.reduce((a, s) => a + Number(s.volume || 0), 0);
+
+        if (!index[dk]) index[dk] = { workouts: [], totalSets: 0, totalVolume: 0 };
+
+        index[dk].workouts.push({
+          id: w?.id,
+          name: wName,
+          type: wType,
+          status: wStatus,
+          sets
+        });
+
+        index[dk].totalSets += sets.length;
+        index[dk].totalVolume += totalVolume;
+      });
+    });
+
+    // keep stable order: most recently updated workouts first within a day
+    Object.keys(index).forEach(dk => {
+      const list = index[dk].workouts || [];
+      // cannot rely on updatedAt inside this object; keep as is (insert order)
+      index[dk].workouts = list;
+    });
+
+    return index;
+  }
+
+  function getAvailableYearsFromIndex(dayIndex) {
+    const years = new Set();
+    Object.keys(dayIndex || {}).forEach(k => {
+      const y = Number(String(k).slice(0, 4));
+      if (Number.isFinite(y)) years.add(y);
+    });
+
+    const nowY = new Date().getFullYear();
+    years.add(nowY);
+
+    return [...years].sort((a, b) => b - a);
+  }
+
   // -----------------------------
   // Core actions (no popups)
   // -----------------------------
-  function addWorkout(name, type, status) {
+  function addWorkout(name, type) {
     const n = normStr(name);
     if (!n) return;
 
@@ -490,7 +596,7 @@
       id: uuid(),
       name: n,
       type: normStr(type),
-      status: status || "planned",
+      status: "current", // ✅ planned removed
       createdAt: Date.now(),
       updatedAt: Date.now(),
       exercises: []
@@ -507,10 +613,13 @@
   }
 
   function moveWorkout(id, status) {
+    // enforce only current/completed
+    const next = status === "completed" ? "completed" : "current";
+
     const workouts = loadWorkouts();
     const w = workouts.find(x => x.id === id);
     if (!w) return;
-    w.status = status;
+    w.status = next;
     w.updatedAt = Date.now();
     saveWorkouts(workouts);
     render();
@@ -650,16 +759,16 @@
   }
 
   // -----------------------------
-  // Collapse / Pagination / Search (NEW)
+  // Collapse / Search
   // -----------------------------
   function isCollapsed(workoutId, status) {
     const ui = loadUIState();
     const map = ui.collapsedWorkouts || {};
     if (typeof map[workoutId] === "boolean") return map[workoutId];
 
-    // default behavior:
-    // - current workouts expanded
-    // - planned + completed collapsed (prevents infinite scroll)
+    // default:
+    // - current expanded
+    // - completed collapsed
     return status !== "current";
   }
 
@@ -673,7 +782,7 @@
   function toggleCollapsed(workoutId) {
     const workouts = loadWorkouts();
     const w = workouts.find(x => x.id === workoutId);
-    const status = w?.status || "planned";
+    const status = w?.status || "current";
     const next = !isCollapsed(workoutId, status);
     setCollapsed(workoutId, next);
     render();
@@ -682,15 +791,6 @@
   function setSearchQuery(q) {
     const ui = loadUIState();
     ui.searchQuery = String(q || "");
-    // when searching, show more completed results to reduce “why can’t I find it?”
-    if (ui.searchQuery.trim()) ui.completedLimit = Math.max(Number(ui.completedLimit || 10), 50);
-    saveUIState(ui);
-    render();
-  }
-
-  function loadMoreCompleted() {
-    const ui = loadUIState();
-    ui.completedLimit = clampNum(Number(ui.completedLimit || 10) + 10, 10, 500);
     saveUIState(ui);
     render();
   }
@@ -701,7 +801,6 @@
     const b = lower(workout?.type);
     if (a.includes(qLower) || b.includes(qLower)) return true;
 
-    // check exercises + sets
     const exs = workout?.exercises || [];
     for (const ex of exs) {
       const en = lower(ex?.name);
@@ -713,6 +812,32 @@
       }
     }
     return false;
+  }
+
+  // -----------------------------
+  // Calendar UI state helpers
+  // -----------------------------
+  function setCalendarYear(year) {
+    const ui = loadUIState();
+    ui.calendarYear = clampNum(Number(year), 1970, 2100);
+    // keep month in range
+    ui.calendarMonth = clampNum(Number(ui.calendarMonth), 0, 11);
+    saveUIState(ui);
+    render();
+  }
+
+  function setCalendarMonth(monthIndex) {
+    const ui = loadUIState();
+    ui.calendarMonth = clampNum(Number(monthIndex), 0, 11);
+    saveUIState(ui);
+    render();
+  }
+
+  function setCalendarSelectedDay(dayIso) {
+    const ui = loadUIState();
+    ui.calendarSelectedDay = String(dayIso || "");
+    saveUIState(ui);
+    render();
   }
 
   // -----------------------------
@@ -747,24 +872,31 @@
     const mount = ensureMount();
     if (!mount) return;
 
-    const workoutsAll = loadWorkouts();
+    // Load + migrate older "planned" to "current" safely (no UI)
+    let workoutsAll = loadWorkouts();
+    const hadPlanned = workoutsAll.some(w => normStr(w?.status) === "planned");
+    // normalizeWorkouts already forces planned -> current, but ensure storage is updated once
+    if (hadPlanned) {
+      workoutsAll = workoutsAll.map(w => ({ ...w, status: w.status === "planned" ? "current" : w.status }));
+      saveWorkouts(workoutsAll);
+    }
+
     const ui = loadUIState();
     const q = (ui.searchQuery || "").trim();
     const qLower = q.toLowerCase();
 
     // filter by search query (across ALL statuses)
-    const workouts = qLower ? workoutsAll.filter(w => workoutMatchesQuery(w, qLower)) : workoutsAll;
+    const workoutsFiltered = qLower ? workoutsAll.filter(w => workoutMatchesQuery(w, qLower)) : workoutsAll;
 
-    const current = workouts.filter(w => w.status === "current").sort((a, b) => b.updatedAt - a.updatedAt);
-    const planned = workouts.filter(w => w.status === "planned").sort((a, b) => b.updatedAt - a.updatedAt);
-    let completed = workouts.filter(w => w.status === "completed").sort((a, b) => b.updatedAt - a.updatedAt);
+    const current = workoutsFiltered
+      .filter(w => w.status === "current")
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
 
-    // pagination only when not searching
-    const completedLimit = clampNum(Number(ui.completedLimit || 10), 10, 500);
-    const completedTotal = completed.length;
-    if (!qLower) completed = completed.slice(0, completedLimit);
+    const completed = workoutsFiltered
+      .filter(w => w.status === "completed")
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
 
-    const streak = computeStreak(workoutsAll); // keep streak based on ALL data (not filtered)
+    const streak = computeStreak(workoutsAll); // streak based on ALL data (not filtered)
     const series7 = computeDailySeries(workoutsAll, "7");
     const weeklySets = series7.sets.reduce((a, b) => a + b, 0);
     const weeklyVolume = series7.volume.reduce((a, b) => a + b, 0);
@@ -779,6 +911,16 @@
       ui.exerciseChartExercise = allExercises[0];
       saveUIState(ui);
     }
+
+    // Calendar index (based on ALL workouts, even if search is active)
+    const dayIndex = buildDayIndex(workoutsAll);
+    const years = getAvailableYearsFromIndex(dayIndex);
+    const calendarYear = years.includes(ui.calendarYear) ? ui.calendarYear : (years[0] || new Date().getFullYear());
+    const calendarMonth = clampNum(ui.calendarMonth, 0, 11);
+
+    // If selected day is outside currently viewed month/year, keep it but details will show when clicked
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const weekNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
     mount.innerHTML = `
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
@@ -858,41 +1000,15 @@
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
         <div class="section-title" style="margin:0;">Currently training</div>
         <div style="margin-top:10px;">
-          ${current.length ? current.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No active workouts.</div>`}
+          ${
+            current.length
+              ? current.map(w => renderWorkoutCard(w)).join("")
+              : `<div style="color:#9ca3af;">No active workouts.</div>`
+          }
         </div>
       </div>
 
-      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
-        <div class="section-title" style="margin:0;">Planned workouts</div>
-        <div style="margin-top:10px;">
-          ${planned.length ? planned.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No planned workouts.</div>`}
-        </div>
-      </div>
-
-      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <div class="section-title" style="margin:0;">Workouts completed</div>
-          <div style="color:#9ca3af; font-size:0.9rem;">
-            ${qLower ? `filtered results: ${completedTotal}` : `showing ${Math.min(completedTotal, completedLimit)} of ${completedTotal}`}
-          </div>
-        </div>
-
-        <div style="margin-top:10px;">
-          ${completed.length ? completed.map(w => renderWorkoutCard(w)).join("") : `<div style="color:#9ca3af;">No completed workouts.</div>`}
-        </div>
-
-        ${
-          (!qLower && completedTotal > completedLimit)
-            ? `
-              <div style="margin-top:12px;">
-                <button class="form-submit" id="kpLoadMoreCompletedBtn" style="width:100%; background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">
-                  Load 10 more completed workouts
-                </button>
-              </div>
-            `
-            : ""
-        }
-      </div>
+      <!-- ✅ Planned workouts section REMOVED (per request) -->
 
       <div class="habit-section" style="padding:18px; margin-bottom:18px;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -945,31 +1061,236 @@
           <canvas id="kpExerciseChartCanvas" height="320"></canvas>
         </div>
       </div>
+
+      <!-- ✅ Completed history calendar (bottom) -->
+      <div class="habit-section" style="padding:18px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="section-title" style="margin:0;">Training history</div>
+          <div style="color:#9ca3af; font-size:0.9rem;">green = workout logged • red = no workout</div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <div style="color:#e5e7eb; font-weight:900;">Year</div>
+          <select id="kpCalYear" class="form-input" style="width:auto;">
+            ${years.map(y => `<option value="${y}" ${y === calendarYear ? "selected" : ""}>${y}</option>`).join("")}
+          </select>
+
+          <div style="flex:1;"></div>
+
+          <div style="color:#9ca3af; font-size:0.9rem;">
+            ${
+              qLower
+                ? `Search is active: calendar still reflects ALL workouts.`
+                : `${completed.length} completed workouts (access via dates).`
+            }
+          </div>
+        </div>
+
+        <div style="margin-top:12px; display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:8px;">
+          ${monthNames.map((mn, idx) => {
+            const active = idx === calendarMonth;
+            const bg = active
+              ? "linear-gradient(135deg, rgba(99,102,241,0.9), rgba(236,72,153,0.75))"
+              : "rgba(255,255,255,0.06)";
+            const border = active ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.12)";
+            const color = active ? "white" : "#e5e7eb";
+            return `
+              <button
+                class="form-submit"
+                data-action="calMonth"
+                data-month="${idx}"
+                style="padding:10px 10px; border-radius:14px; background:${bg}; border:${border}; color:${color}; font-weight:900;"
+              >
+                ${mn}
+              </button>
+            `;
+          }).join("")}
+        </div>
+
+        <div style="margin-top:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); border-radius:16px; padding:12px;">
+          <div style="display:grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap:6px; margin-bottom:8px;">
+            ${weekNames.map(n => `<div style="text-align:center; color:#9ca3af; font-weight:900; font-size:0.82rem;">${n}</div>`).join("")}
+          </div>
+
+          <div id="kpCalGrid" style="display:grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap:6px;">
+            ${renderCalendarGrid(calendarYear, calendarMonth, dayIndex, ui.calendarSelectedDay)}
+          </div>
+
+          <div id="kpCalDetails" style="margin-top:12px;">
+            ${renderCalendarDayDetails(ui.calendarSelectedDay, dayIndex)}
+          </div>
+        </div>
+      </div>
     `;
 
     bindTopEvents();
     bindWorkoutCardEvents();
     bindExerciseChartEvents();
+    bindCalendarEvents();
     renderExerciseProgressChart();
+  }
+
+  function renderCalendarGrid(year, monthIndex, dayIndex, selectedDayIso) {
+    const first = new Date(year, monthIndex, 1);
+    const startDow = first.getDay(); // 0=Sun
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+    const cells = [];
+    // leading blanks
+    for (let i = 0; i < startDow; i++) cells.push({ kind: "blank" });
+    // days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = localISOFromParts(year, monthIndex, d);
+      const hasWorkout = !!dayIndex?.[iso];
+      cells.push({ kind: "day", d, iso, hasWorkout });
+    }
+    // trailing blanks to fill final row nicely
+    while (cells.length % 7 !== 0) cells.push({ kind: "blank" });
+
+    const today = todayISO();
+
+    return cells.map(c => {
+      if (c.kind === "blank") {
+        return `<div style="height:44px; border-radius:12px;"></div>`;
+      }
+
+      const isSelected = selectedDayIso && c.iso === selectedDayIso;
+      const isToday = c.iso === today;
+
+      const bg = c.hasWorkout ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.14)";
+      const border = isSelected
+        ? "2px solid rgba(255,255,255,0.85)"
+        : isToday
+          ? "2px solid rgba(99,102,241,0.85)"
+          : "1px solid rgba(255,255,255,0.12)";
+
+      const meta = dayIndex?.[c.iso];
+      const sets = meta?.totalSets || 0;
+      const vol = meta?.totalVolume || 0;
+      const title = c.hasWorkout
+        ? `${c.iso}\n${sets} sets • ${Number(vol).toLocaleString()} volume`
+        : `${c.iso}\nNo workout logged`;
+
+      return `
+        <button
+          class="form-submit"
+          data-action="calDay"
+          data-day="${c.iso}"
+          title="${escapeHtml(title)}"
+          style="
+            height:44px;
+            border-radius:12px;
+            background:${bg};
+            border:${border};
+            font-weight:900;
+            color:white;
+            padding:0;
+          "
+        >
+          ${c.d}
+        </button>
+      `;
+    }).join("");
+  }
+
+  function renderCalendarDayDetails(selectedDayIso, dayIndex) {
+    if (!selectedDayIso) {
+      return `<div style="color:#9ca3af;">Click a day to view what you trained.</div>`;
+    }
+
+    const meta = dayIndex?.[selectedDayIso];
+    if (!meta) {
+      return `
+        <div style="border:1px solid rgba(255,255,255,0.10); background:rgba(0,0,0,0.18); border-radius:14px; padding:12px;">
+          <div style="color:white; font-weight:900;">${escapeHtml(formatFullDay(selectedDayIso))}</div>
+          <div style="color:#9ca3af; margin-top:6px;">No workout logged.</div>
+        </div>
+      `;
+    }
+
+    const totalSets = meta.totalSets || 0;
+    const totalVol = meta.totalVolume || 0;
+
+    return `
+      <div style="border:1px solid rgba(255,255,255,0.10); background:rgba(0,0,0,0.18); border-radius:14px; padding:12px;">
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center;">
+          <div style="color:white; font-weight:900;">${escapeHtml(formatFullDay(selectedDayIso))}</div>
+          <div style="color:#9ca3af; font-size:0.9rem;">${totalSets} sets • ${Number(totalVol).toLocaleString()} volume</div>
+        </div>
+
+        <div style="margin-top:10px;">
+          ${(meta.workouts || []).map(w => {
+            const statusPill = w.status === "current"
+              ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#bbf7d0;">active</span>`
+              : `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(148,163,184,0.25); background:rgba(148,163,184,0.08); color:#e5e7eb;">completed</span>`;
+
+            const sets = w.sets || [];
+            const byEx = {};
+            sets.forEach(s => {
+              const exName = normStr(s.exerciseName) || "Exercise";
+              if (!byEx[exName]) byEx[exName] = [];
+              byEx[exName].push(s);
+            });
+
+            const exNames = Object.keys(byEx).sort((a, b) => a.localeCompare(b));
+            const workoutVol = sets.reduce((a, s) => a + Number(s.volume || 0), 0);
+
+            return `
+              <div style="margin-top:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); border-radius:14px; padding:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                  <div style="flex:1; min-width:220px;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                      <div style="font-weight:900; font-size:1.02rem; color:white;">${escapeHtml(w.name)}</div>
+                      ${statusPill}
+                    </div>
+                    <div style="color:#9ca3af; margin-top:4px;">
+                      ${escapeHtml(w.type || "")}
+                      <span style="margin-left:10px;">• ${sets.length} sets • volume: ${Number(workoutVol || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    ${
+                      w.status === "completed"
+                        ? `<button class="form-submit" data-action="moveWorkout" data-id="${escapeHtml(w.id)}" data-status="current">Re-open</button>`
+                        : `<button class="form-submit" data-action="moveWorkout" data-id="${escapeHtml(w.id)}" data-status="completed">Finish</button>`
+                    }
+                    <button class="form-cancel" data-action="deleteWorkout" data-id="${escapeHtml(w.id)}" style="color:#ef4444;">Delete</button>
+                  </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                  ${exNames.map(exName => {
+                    const rows = byEx[exName] || [];
+                    return `
+                      <div style="margin-top:8px;">
+                        <div style="color:white; font-weight:900;">${escapeHtml(exName)}</div>
+                        <div style="color:#9ca3af; margin-top:4px; font-size:0.9rem;">
+                          ${rows.map(s => `${Number(s.weight || 0)}×${Number(s.reps || 0)}`).join(" • ")}
+                        </div>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
   }
 
   function renderWorkoutCard(workout) {
     const statusPill = workout.status === "current"
       ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#bbf7d0;">active</span>`
-      : workout.status === "planned"
-        ? `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(250,204,21,0.25); background:rgba(250,204,21,0.08); color:#fde68a;">planned</span>`
-        : `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(148,163,184,0.25); background:rgba(148,163,184,0.08); color:#e5e7eb;">completed</span>`;
+      : `<span style="padding:6px 10px; border-radius:999px; font-weight:900; font-size:0.8rem; border:1px solid rgba(148,163,184,0.25); background:rgba(148,163,184,0.08); color:#e5e7eb;">completed</span>`;
 
     const headerBtns = [];
 
-    if (workout.status === "planned") {
-      headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="current">Start</button>`);
-    }
     if (workout.status === "current") {
       headerBtns.push(`<button class="form-submit" data-action="addExercise" data-id="${workout.id}">Add exercise</button>`);
       headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="completed">Finish</button>`);
-    }
-    if (workout.status === "completed") {
+    } else {
       headerBtns.push(`<button class="form-submit" data-action="moveWorkout" data-id="${workout.id}" data-status="current">Re-open</button>`);
     }
 
@@ -1178,11 +1499,6 @@
     if (clear) {
       clear.onclick = () => setSearchQuery("");
     }
-
-    const loadMore = mount.querySelector("#kpLoadMoreCompletedBtn");
-    if (loadMore) {
-      loadMore.onclick = loadMoreCompleted;
-    }
   }
 
   function bindWorkoutCardEvents() {
@@ -1237,7 +1553,6 @@
 
           addSet(wId, eId, weight, reps, date);
 
-          // keep UX tight
           if (weightEl) weightEl.value = "";
           if (repsEl) repsEl.value = "";
           return;
@@ -1282,10 +1597,29 @@
     }
   }
 
+  function bindCalendarEvents() {
+    const mount = byId(MOUNT_ID);
+    if (!mount) return;
+
+    const yearSel = mount.querySelector("#kpCalYear");
+    if (yearSel) {
+      yearSel.onchange = () => setCalendarYear(yearSel.value);
+    }
+
+    mount.querySelectorAll('[data-action="calMonth"]').forEach(btn => {
+      btn.onclick = () => setCalendarMonth(btn.dataset.month);
+    });
+
+    mount.querySelectorAll('[data-action="calDay"]').forEach(btn => {
+      btn.onclick = () => setCalendarSelectedDay(btn.dataset.day);
+    });
+  }
+
   // -----------------------------
   // Modals
   // -----------------------------
   function openAddWorkoutModal() {
+    // ✅ planned removed: no status picker, always current
     openModalSafe(`
       <div class="section-title">Add workout</div>
 
@@ -1297,14 +1631,6 @@
       <div class="form-group">
         <label>Type</label>
         <input id="kpWorkoutType" class="form-input" placeholder="e.g. strength / hypertrophy / conditioning" />
-      </div>
-
-      <div class="form-group">
-        <label>Where should it go?</label>
-        <select id="kpWorkoutStatus" class="form-input">
-          <option value="planned">Planned workouts</option>
-          <option value="current">Currently training</option>
-        </select>
       </div>
 
       <div class="form-actions">
@@ -1322,8 +1648,7 @@
       saveBtn.onclick = () => {
         const name = byId("kpWorkoutName")?.value || "";
         const type = byId("kpWorkoutType")?.value || "";
-        const status = byId("kpWorkoutStatus")?.value || "planned";
-        addWorkout(name, type, status);
+        addWorkout(name, type);
         closeModalSafe();
       };
     }
@@ -1495,44 +1820,19 @@
       data: {
         labels: series.labels,
         datasets: [
-          {
-            label: "Sets",
-            data: series.sets,
-            tension: 0.35,
-            borderWidth: 3,
-            spanGaps: true,
-            yAxisID: "y"
-          },
-          {
-            label: "Volume",
-            data: series.volume,
-            tension: 0.35,
-            borderWidth: 3,
-            spanGaps: true,
-            yAxisID: "y1"
-          }
+          { label: "Sets", data: series.sets, tension: 0.35, borderWidth: 3, spanGaps: true, yAxisID: "y" },
+          { label: "Volume", data: series.volume, tension: 0.35, borderWidth: 3, spanGaps: true, yAxisID: "y1" }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
-        plugins: {
-          legend: { labels: { color: "rgba(255,255,255,0.8)" } }
-        },
+        plugins: { legend: { labels: { color: "rgba(255,255,255,0.8)" } } },
         scales: {
           x: { ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.08)" } },
-          y: {
-            beginAtZero: true,
-            ticks: { color: "rgba(255,255,255,0.65)" },
-            grid: { color: "rgba(255,255,255,0.08)" }
-          },
-          y1: {
-            beginAtZero: true,
-            position: "right",
-            ticks: { color: "rgba(255,255,255,0.65)" },
-            grid: { drawOnChartArea: false }
-          }
+          y: { beginAtZero: true, ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.08)" } },
+          y1: { beginAtZero: true, position: "right", ticks: { color: "rgba(255,255,255,0.65)" }, grid: { drawOnChartArea: false } }
         }
       }
     });
