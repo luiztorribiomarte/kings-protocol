@@ -14,6 +14,11 @@
 // NEW UPDATE (per your latest request):
 // ✅ New exercises added to a workout appear at the TOP of the list (no scrolling)
 //
+// OPTION C (your latest request):
+// ✅ Preset buttons: Push / Pull / Legs / Upper / Lower / Cardio (instant create)
+// ✅ Clone last workout (copies name/type/exercises, NO sets)
+// ✅ Add workout modal auto-fills from last workout
+//
 // SAFETY:
 // - Does NOT touch other pages/features
 // - Keeps your PRs, charts, streak, stats, modals, search, data model intact
@@ -366,6 +371,53 @@
       el.style.transition = "opacity 240ms ease";
       setTimeout(() => el.remove(), 320);
     }, 1800);
+  }
+
+  // -----------------------------
+  // Option C helpers
+  // -----------------------------
+  function getLastWorkout(workouts) {
+    const list = Array.isArray(workouts) ? workouts : [];
+    if (!list.length) return null;
+    return [...list].sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0] || null;
+  }
+
+  function createPresetWorkout(presetLabel) {
+    const label = normStr(presetLabel);
+    if (!label) return;
+
+    // Minimal + predictable: name = label, type = label
+    addWorkout(label, label);
+  }
+
+  function cloneLastWorkout() {
+    const workouts = loadWorkouts();
+    const last = getLastWorkout(workouts);
+    if (!last) {
+      toast("no workout to clone");
+      return;
+    }
+
+    const clonedExercises = (last.exercises || []).map(ex => ({
+      id: uuid(),
+      name: normStr(ex?.name || "Exercise") || "Exercise",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sets: [] // ✅ NO sets
+    }));
+
+    workouts.push({
+      id: uuid(),
+      name: normStr(last.name || "Untitled") || "Untitled",
+      type: normStr(last.type || ""),
+      status: "current",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      exercises: clonedExercises
+    });
+
+    saveWorkouts(workouts);
+    render();
   }
 
   // -----------------------------
@@ -938,8 +990,21 @@
 
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="form-submit" id="kpAddWorkoutBtn">Add workout</button>
+            <button class="form-submit" id="kpCloneLastWorkoutBtn" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">Clone last</button>
             <button class="form-submit" id="kpOpenWeeklyGraphBtn" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.18);">View graph</button>
           </div>
+        </div>
+
+        <!-- Option C: Presets -->
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          ${["Push","Pull","Legs","Upper","Lower","Cardio"].map(p => `
+            <button
+              class="form-submit"
+              data-action="presetWorkout"
+              data-preset="${p}"
+              style="padding:10px 12px; border-radius:14px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); font-weight:900;"
+            >${p}</button>
+          `).join("")}
         </div>
 
         <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -1493,6 +1558,9 @@
     const addBtn = mount.querySelector("#kpAddWorkoutBtn");
     if (addBtn) addBtn.onclick = openAddWorkoutModal;
 
+    const cloneBtn = mount.querySelector("#kpCloneLastWorkoutBtn");
+    if (cloneBtn) cloneBtn.onclick = cloneLastWorkout;
+
     const graphBtn = mount.querySelector("#kpOpenWeeklyGraphBtn");
     if (graphBtn) graphBtn.onclick = () => openWeeklyGraphModal("7");
 
@@ -1505,6 +1573,11 @@
     if (clear) {
       clear.onclick = () => setSearchQuery("");
     }
+
+    // Option C: presets
+    mount.querySelectorAll('[data-action="presetWorkout"]').forEach(btn => {
+      btn.onclick = () => createPresetWorkout(btn.dataset.preset);
+    });
   }
 
   function bindWorkoutCardEvents() {
@@ -1512,8 +1585,14 @@
     if (!mount) return;
 
     mount.querySelectorAll("[data-action]").forEach(btn => {
+      // presetWorkout handled in bindTopEvents (but safe if encountered elsewhere)
       btn.onclick = () => {
         const action = btn.dataset.action;
+
+        if (action === "presetWorkout") {
+          createPresetWorkout(btn.dataset.preset);
+          return;
+        }
 
         if (action === "toggleCollapse") {
           toggleCollapsed(btn.dataset.id);
@@ -1631,17 +1710,22 @@
   // Modals
   // -----------------------------
   function openAddWorkoutModal() {
+    // Option C: auto-fill from last workout
+    const last = getLastWorkout(loadWorkouts());
+    const preName = normStr(last?.name || "");
+    const preType = normStr(last?.type || "");
+
     openModalSafe(`
       <div class="section-title">Add workout</div>
 
       <div class="form-group">
         <label>Name</label>
-        <input id="kpWorkoutName" class="form-input" placeholder="e.g. Push day" />
+        <input id="kpWorkoutName" class="form-input" placeholder="e.g. Push day" value="${escapeHtml(preName)}" />
       </div>
 
       <div class="form-group">
         <label>Type</label>
-        <input id="kpWorkoutType" class="form-input" placeholder="e.g. strength / hypertrophy / conditioning" />
+        <input id="kpWorkoutType" class="form-input" placeholder="e.g. strength / hypertrophy / conditioning" value="${escapeHtml(preType)}" />
       </div>
 
       <div class="form-actions">
@@ -1961,6 +2045,7 @@
     addSet,
     moveWorkout,
     deleteWorkout,
-    toggleCollapsed
+    toggleCollapsed,
+    cloneLastWorkout
   };
 })();
