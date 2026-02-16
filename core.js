@@ -1,10 +1,3 @@
-/* =========================================================
-   MAIN CORE (MERGED + FIXED)
-   - Restores window.App controller (habits/mood rely on this)
-   - Fixes nav highlight mismatch (no more nth-child issues)
-   - Fixes modal overlay (opens in place, no scroll-to-top)
-   - Keeps your Todo History + Weekly Planner exactly intact
-   ========================================================= */
 
 (function () {
   "use strict";
