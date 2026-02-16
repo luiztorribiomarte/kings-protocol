@@ -51,11 +51,13 @@
     <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
 
+        <!-- SCHEDULE -->
         <div class="habit-section">
             <div class="section-title">📅 Today's Schedule</div>
             <div id="scheduleContainer"></div>
         </div>
 
+        <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="daysAt80">0/7</div>
@@ -75,37 +77,25 @@
             </div>
         </div>
 
+        <!-- EMBEDDED CALENDAR -->
         <div class="habit-section">
           <div class="section-title">📅 This Month</div>
           <div id="embeddedCalendar"></div>
         </div>
 
+        <!-- SMART INSIGHTS -->
         <div class="habit-section">
           <div class="section-title">🧠 Smart Insights</div>
           <div id="insightsWidget"></div>
         </div>
 
-        <div id="dailyStatus">Checking today's status…</div>
-
-        <div class="habit-section">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="section-title">📈 Performance Trend</div>
-
-            <select id="trendRange" class="form-input" style="width:auto; padding:6px 10px;">
-              <option value="7">7 Days</option>
-              <option value="30">30 Days</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
-
-          <canvas id="trendChart" height="140"></canvas>
-        </div>
-
+        <!-- MOOD -->
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
             <div id="moodTracker"></div>
         </div>
 
+        <!-- HABITS -->
         <div class="habit-section">
             <div class="section-title">📋 Daily Habits - This Week</div>
             <div id="habitGrid"></div>
@@ -129,8 +119,10 @@
     </div>
 </div>
 
+<!-- Core -->
 <script src="./core.js"></script>
 
+<!-- Features -->
 <script src="./features/habits.js"></script>
 <script src="./features/mood.js"></script>
 <script src="./features/workout.js"></script>
@@ -144,7 +136,6 @@
 <script src="./features/contentHub.js"></script>
 <script src="./features/contentUpgrades.js"></script>
 <script src="./features/youtubeStats.js"></script>
-<script src="./features/lifeEngine.js"></script>
 
 </body>
 </html>
