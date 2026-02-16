@@ -732,5 +732,36 @@
     if (typeof window.renderDNAProfile === "function") window.renderDNAProfile();
   });
 
+  // =====================================================
+  // 🕛 MIDNIGHT / DATE CHANGE WATCHER (FIXES STUCK PLANNER)
+  // =====================================================
+
+  let _kpLastKnownDay = getTodayKey();
+
+  function watchForDateChange() {
+    const now = getTodayKey();
+
+    if (now !== _kpLastKnownDay) {
+      _kpLastKnownDay = now;
+
+      // Force planner to today
+      setWeeklyPlannerSelectedDay(now);
+
+      // Reset daily systems
+      checkDailyTaskReset();
+      checkDailyScheduleReset();
+
+      // Re-render dashboard systems
+      if (typeof window.renderSchedule === "function") window.renderSchedule();
+      if (typeof window.renderLifeScore === "function") window.renderLifeScore();
+      if (typeof window.renderWeeklyGraph === "function") window.renderWeeklyGraph();
+      if (typeof window.renderDNAProfile === "function") window.renderDNAProfile();
+    }
+  }
+
+  // Check every minute
+  setInterval(watchForDateChange, 60000);
+
   console.log("Main core loaded (App restored, nav fixed, modal fixed)");
 })();
+
