@@ -11,6 +11,9 @@
 //    - Calendar days: green if workout logged, red if not
 //    - Click a day to view workouts performed that day
 //
+// NEW UPDATE (per your latest request):
+// ✅ New exercises added to a workout appear at the TOP of the list (no scrolling)
+//
 // SAFETY:
 // - Does NOT touch other pages/features
 // - Keeps your PRs, charts, streak, stats, modals, search, data model intact
@@ -93,7 +96,12 @@
   function formatFullDay(isoDay) {
     try {
       const d = new Date(isoDay + "T00:00:00");
-      return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+      return d.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
     } catch {
       return isoDay;
     }
@@ -179,7 +187,8 @@
     return list.map(w => {
       // 🚫 planned removed: migrate any old "planned" to "current"
       const rawStatus = normStr(w?.status || "current");
-      const status = rawStatus === "planned" ? "current" : (rawStatus || "current");
+      const status =
+        rawStatus === "planned" ? "current" : rawStatus || "current";
 
       return {
         id: w?.id || uuid(),
@@ -249,7 +258,8 @@
     }
 
     if (typeof s.searchQuery !== "string") s.searchQuery = "";
-    if (!s.collapsedWorkouts || typeof s.collapsedWorkouts !== "object") s.collapsedWorkouts = {};
+    if (!s.collapsedWorkouts || typeof s.collapsedWorkouts !== "object")
+      s.collapsedWorkouts = {};
 
     const y = Number(s.calendarYear);
     const m = Number(s.calendarMonth);
@@ -564,7 +574,6 @@
     // keep stable order: most recently updated workouts first within a day
     Object.keys(index).forEach(dk => {
       const list = index[dk].workouts || [];
-      // cannot rely on updatedAt inside this object; keep as is (insert order)
       index[dk].workouts = list;
     });
 
@@ -633,7 +642,8 @@
     const w = workouts.find(x => x.id === workoutId);
     if (!w) return;
 
-    w.exercises.push({
+    // ✅ CHANGE: new exercises go to TOP (newest first)
+    w.exercises.unshift({
       id: uuid(),
       name,
       createdAt: Date.now(),
@@ -710,7 +720,13 @@
     const before = beforePRs.find(p => lower(p.exerciseName) === exLower);
     const after = afterPRs.find(p => lower(p.exerciseName) === exLower);
 
-    if (after && (!before || after.best1RM > before.best1RM || after.bestWeight > before.bestWeight || after.bestVolume > before.bestVolume)) {
+    if (
+      after &&
+      (!before ||
+        after.best1RM > before.best1RM ||
+        after.bestWeight > before.bestWeight ||
+        after.bestVolume > before.bestVolume)
+    ) {
       toast("new PR logged");
     }
 
@@ -806,7 +822,7 @@
       const en = lower(ex?.name);
       if (en.includes(qLower)) return true;
 
-      for (const s of (ex?.sets || [])) {
+      for (const s of ex?.sets || []) {
         const d = lower(s?.date);
         if (d.includes(qLower)) return true;
       }
@@ -820,7 +836,6 @@
   function setCalendarYear(year) {
     const ui = loadUIState();
     ui.calendarYear = clampNum(Number(year), 1970, 2100);
-    // keep month in range
     ui.calendarMonth = clampNum(Number(ui.calendarMonth), 0, 11);
     saveUIState(ui);
     render();
@@ -872,10 +887,8 @@
     const mount = ensureMount();
     if (!mount) return;
 
-    // Load + migrate older "planned" to "current" safely (no UI)
     let workoutsAll = loadWorkouts();
     const hadPlanned = workoutsAll.some(w => normStr(w?.status) === "planned");
-    // normalizeWorkouts already forces planned -> current, but ensure storage is updated once
     if (hadPlanned) {
       workoutsAll = workoutsAll.map(w => ({ ...w, status: w.status === "planned" ? "current" : w.status }));
       saveWorkouts(workoutsAll);
@@ -885,7 +898,6 @@
     const q = (ui.searchQuery || "").trim();
     const qLower = q.toLowerCase();
 
-    // filter by search query (across ALL statuses)
     const workoutsFiltered = qLower ? workoutsAll.filter(w => workoutMatchesQuery(w, qLower)) : workoutsAll;
 
     const current = workoutsFiltered
@@ -896,29 +908,26 @@
       .filter(w => w.status === "completed")
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
 
-    const streak = computeStreak(workoutsAll); // streak based on ALL data (not filtered)
+    const streak = computeStreak(workoutsAll);
     const series7 = computeDailySeries(workoutsAll, "7");
     const weeklySets = series7.sets.reduce((a, b) => a + b, 0);
     const weeklyVolume = series7.volume.reduce((a, b) => a + b, 0);
 
-    const today = computeTodaySummary(workoutsAll); // today summary based on ALL data
-    const prs = computePRs(workoutsAll).slice(0, 8); // PRs based on ALL data
+    const today = computeTodaySummary(workoutsAll);
+    const prs = computePRs(workoutsAll).slice(0, 8);
 
     const allExercises = getAllExerciseNames(workoutsAll);
 
-    // pick a default exercise for chart
     if (!ui.exerciseChartExercise && allExercises.length) {
       ui.exerciseChartExercise = allExercises[0];
       saveUIState(ui);
     }
 
-    // Calendar index (based on ALL workouts, even if search is active)
     const dayIndex = buildDayIndex(workoutsAll);
     const years = getAvailableYearsFromIndex(dayIndex);
     const calendarYear = years.includes(ui.calendarYear) ? ui.calendarYear : (years[0] || new Date().getFullYear());
     const calendarMonth = clampNum(ui.calendarMonth, 0, 11);
 
-    // If selected day is outside currently viewed month/year, keep it but details will show when clicked
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const weekNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -1136,15 +1145,12 @@
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
     const cells = [];
-    // leading blanks
     for (let i = 0; i < startDow; i++) cells.push({ kind: "blank" });
-    // days
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = localISOFromParts(year, monthIndex, d);
       const hasWorkout = !!dayIndex?.[iso];
       cells.push({ kind: "day", d, iso, hasWorkout });
     }
-    // trailing blanks to fill final row nicely
     while (cells.length % 7 !== 0) cells.push({ kind: "blank" });
 
     const today = todayISO();
@@ -1543,9 +1549,15 @@
           const wId = btn.dataset.w;
           const eId = btn.dataset.e;
 
-          const weightEl = mount.querySelector(`[data-role="setWeight"][data-w="${wId}"][data-e="${eId}"]`);
-          const repsEl = mount.querySelector(`[data-role="setReps"][data-w="${wId}"][data-e="${eId}"]`);
-          const dateEl = mount.querySelector(`[data-role="setDate"][data-w="${wId}"][data-e="${eId}"]`);
+          const weightEl = mount.querySelector(
+            `[data-role="setWeight"][data-w="${wId}"][data-e="${eId}"]`
+          );
+          const repsEl = mount.querySelector(
+            `[data-role="setReps"][data-w="${wId}"][data-e="${eId}"]`
+          );
+          const dateEl = mount.querySelector(
+            `[data-role="setDate"][data-w="${wId}"][data-e="${eId}"]`
+          );
 
           const weight = weightEl ? weightEl.value : "";
           const reps = repsEl ? repsEl.value : "";
@@ -1619,7 +1631,6 @@
   // Modals
   // -----------------------------
   function openAddWorkoutModal() {
-    // ✅ planned removed: no status picker, always current
     openModalSafe(`
       <div class="section-title">Add workout</div>
 
@@ -1769,7 +1780,8 @@
   // Weekly graph modal
   // -----------------------------
   function openWeeklyGraphModal(range) {
-    const title = range === "30" ? "Last 30 days" : range === "all" ? "All time" : "Last 7 days";
+    const title =
+      range === "30" ? "Last 30 days" : range === "all" ? "All time" : "Last 7 days";
 
     openModalSafe(`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
@@ -1931,7 +1943,6 @@
     hookShowPage();
     hookNavClicks();
 
-    // render if workout page is already active or user reloads on workout page
     setTimeout(() => {
       if (isWorkoutPageActive()) render();
     }, 120);
@@ -1943,7 +1954,6 @@
     boot();
   }
 
-  // Optional global API (useful for debugging in console)
   window.KPWorkouts = {
     render,
     addWorkout,
