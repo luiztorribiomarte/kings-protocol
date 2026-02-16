@@ -43,7 +43,6 @@
         <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
         <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
         <button class="nav-tab" onclick="showPage('looksmaxxing')">💎 Looksmaxxing</button>
-        <button class="nav-tab" onclick="showPage('journal')">📝 Journal</button>
         <button class="nav-tab" onclick="showPage('visionBoard')">🖼️ Vision Board</button>
         <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
         <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
@@ -52,13 +51,11 @@
     <!-- Dashboard -->
     <div id="dashboardPage" class="page active">
 
-        <!-- SCHEDULE -->
         <div class="habit-section">
             <div class="section-title">📅 Today's Schedule</div>
             <div id="scheduleContainer"></div>
         </div>
 
-        <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="daysAt80">0/7</div>
@@ -78,22 +75,18 @@
             </div>
         </div>
 
-        <!-- EMBEDDED CALENDAR VIEW -->
         <div class="habit-section">
           <div class="section-title">📅 This Month</div>
           <div id="embeddedCalendar"></div>
         </div>
 
-        <!-- Smart Insights -->
         <div class="habit-section">
           <div class="section-title">🧠 Smart Insights</div>
           <div id="insightsWidget"></div>
         </div>
 
-        <!-- LIFE SCORE -->
         <div id="dailyStatus">Checking today's status…</div>
 
-        <!-- PERFORMANCE TREND -->
         <div class="habit-section">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="section-title">📈 Performance Trend</div>
@@ -108,13 +101,11 @@
           <canvas id="trendChart" height="140"></canvas>
         </div>
 
-        <!-- MOOD TRACKER -->
         <div class="habit-section">
             <div class="section-title">😊 Energy & Mood</div>
             <div id="moodTracker"></div>
         </div>
 
-        <!-- HABITS -->
         <div class="habit-section">
             <div class="section-title">📋 Daily Habits - This Week</div>
             <div id="habitGrid"></div>
@@ -125,7 +116,6 @@
     <!-- Other Pages -->
     <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
     <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
-    <div id="journalPage" class="page"><div id="journalContainer"></div></div>
     <div id="visionBoardPage" class="page"><div id="visionBoardContainer"></div></div>
     <div id="contentPage" class="page"><div id="contentContainer"></div></div>
     <div id="booksPage" class="page"><div id="booksContainer"></div></div>
@@ -143,7 +133,6 @@
 
 <script src="./features/habits.js"></script>
 <script src="./features/mood.js"></script>
-
 <script src="./features/workout.js"></script>
 <script src="./features/looksmaxxing.js"></script>
 <script src="./features/insights.js"></script>
@@ -156,7 +145,6 @@
 <script src="./features/contentUpgrades.js"></script>
 <script src="./features/youtubeStats.js"></script>
 <script src="./features/lifeEngine.js"></script>
-
 
 </body>
 </html>
