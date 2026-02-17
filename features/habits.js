@@ -6,6 +6,8 @@
   window.habits = window.habits || [];
   window.habitCompletions = window.habitCompletions || {};
 
+  let habitsInitialized = false;
+
   function fireHabitsUpdated() {
     window.dispatchEvent(new Event("habitsUpdated"));
   }
@@ -30,6 +32,7 @@
   function getWeekDates(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay();
+
     d.setDate(d.getDate() - day);
     d.setHours(0, 0, 0, 0);
 
@@ -107,6 +110,7 @@
         cursor.setDate(cursor.getDate() - 1);
       } else break;
     }
+
     return streak;
   }
 
@@ -131,7 +135,9 @@
           <tr>
             <th style="width:34px;"></th>
             <th style="text-align:left;padding:12px;">Habit</th>
-            ${week.map((d, i) => `<th style="text-align:center;padding:12px;">${names[i]}<br>${d.getDate()}</th>`).join("")}
+            ${week.map((d, i) =>
+              `<th style="text-align:center;padding:12px;">${names[i]}<br>${d.getDate()}</th>`
+            ).join("")}
           </tr>
         </thead>
         <tbody>
@@ -146,6 +152,7 @@
       week.forEach((d) => {
         const k = getDateStringLocal(d);
         const done = isDone(h.id, k);
+
         html += `
           <td onclick="toggleHabit('${h.id}','${k}')"
               style="cursor:pointer;text-align:center;padding:12px;">
@@ -162,13 +169,16 @@
 
   function openHabitManager() {
     const habits = window.habits || [];
+
     window.openModal(`
       <h2>Manage Habits</h2>
+
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <input id="hn" placeholder="Habit name" class="form-input" />
         <input id="hi" placeholder="Emoji" class="form-input" style="width:80px;" />
         <button class="form-submit" onclick="addHabit()">Add</button>
       </div>
+
       <div style="max-height:300px; overflow:auto;">
         ${habits.map(h => `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
@@ -183,9 +193,15 @@
   function addHabit() {
     const name = (document.getElementById("hn")?.value || "").trim();
     const icon = (document.getElementById("hi")?.value || "").trim() || "✨";
+
     if (!name) return alert("Habit name required");
 
-    window.habits.push({ id: "h_" + Date.now(), name, icon });
+    window.habits.push({
+      id: "h_" + Date.now(),
+      name,
+      icon
+    });
+
     saveHabits();
     window.closeModal?.();
     renderHabits();
@@ -208,18 +224,23 @@
   }
 
   function initHabitsData() {
+    if (habitsInitialized) return;
+    habitsInitialized = true;
+
     try {
-      const savedHabitsRaw = localStorage.getItem("habits");
-      if (savedHabitsRaw === null) {
+      const raw = localStorage.getItem("habits");
+
+      if (raw === null) {
         window.habits = [
           { id: "wake", name: "Wake Up At 7 AM", icon: "⏰" },
           { id: "sun", name: "Morning Sunlight", icon: "☀️" },
           { id: "skin", name: "Skincare", icon: "🧴" }
         ];
+
         saveHabits();
       } else {
-        const savedHabits = JSON.parse(savedHabitsRaw);
-        window.habits = Array.isArray(savedHabits) ? savedHabits : [];
+        const parsed = JSON.parse(raw);
+        window.habits = Array.isArray(parsed) ? parsed : [];
       }
     } catch {
       window.habits = [];
@@ -246,7 +267,9 @@
 
   if (App) {
     App.features.habits = { init: initHabitsData, render: renderHabits };
+
     App.on("dashboard", function () {
+      initHabitsData();
       renderHabits();
       fireHabitsUpdated();
     });
