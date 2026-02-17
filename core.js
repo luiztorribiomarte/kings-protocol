@@ -14,7 +14,11 @@
     },
     trigger(page) {
       (this.events[page] || []).forEach((fn) => {
-        try { fn(); } catch (e) { console.error(e); }
+        try {
+          fn();
+        } catch (e) {
+          console.error("App trigger error:", e);
+        }
       });
     }
   };
@@ -29,12 +33,42 @@
   }
   window.escapeHtml = escapeHtml;
 
+  function openModal(html) {
+    const modal = document.getElementById("modal");
+    const modalBody = document.getElementById("modalBody");
+    if (!modal || !modalBody) return;
+
+    modal.style.position = "fixed";
+    modal.style.inset = "0";
+    modal.style.zIndex = "99999";
+    modal.style.display = "flex";
+    modal.style.alignItems = "center";
+    modal.style.justifyContent = "center";
+
+    document.body.style.overflow = "hidden";
+    modalBody.innerHTML = html;
+  }
+
+  function closeModal() {
+    const modal = document.getElementById("modal");
+    if (modal) modal.style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+
   function updateTime() {
     const now = new Date();
     const timeEl = document.getElementById("currentTime");
     const dateEl = document.getElementById("currentDate");
 
-    if (timeEl) timeEl.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (timeEl)
+      timeEl.textContent = now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+
     if (dateEl)
       dateEl.textContent = now.toLocaleDateString(undefined, {
         weekday: "short",
@@ -42,6 +76,7 @@
         day: "numeric"
       });
   }
+
   setInterval(updateTime, 1000);
   updateTime();
 
@@ -50,7 +85,13 @@
   }
 
   function toLocalISODate(date = new Date()) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    return (
+      date.getFullYear() +
+      "-" +
+      pad2(date.getMonth() + 1) +
+      "-" +
+      pad2(date.getDate())
+    );
   }
 
   function parseLocalISODate(dayKey) {
@@ -63,12 +104,21 @@
     return toLocalISODate(new Date());
   }
 
+  function findTabForPage(page) {
+    return [...document.querySelectorAll(".nav-tab")].find((t) =>
+      (t.getAttribute("onclick") || "").includes(page)
+    );
+  }
+
   function showPage(page) {
     document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
     document.querySelectorAll(".nav-tab").forEach((b) => b.classList.remove("active"));
 
     const el = document.getElementById(page + "Page");
     if (el) el.classList.add("active");
+
+    const tab = findTabForPage(page);
+    if (tab) tab.classList.add("active");
 
     localStorage.setItem("currentPage", page);
 
@@ -88,6 +138,8 @@
 
   window.showPage = showPage;
 
+  /* ================= TASK HISTORY ================= */
+
   let todos = [];
   let todoHistory = {};
   let lastTodoDate = null;
@@ -103,7 +155,7 @@
 
     if (lastTodoDate && lastTodoDate !== today) {
       if (todos.length) {
-        const done = todos.filter(t => t.done).length;
+        const done = todos.filter((t) => t.done).length;
 
         todoHistory[lastTodoDate] = {
           percent: Math.round((done / todos.length) * 100),
@@ -127,56 +179,10 @@
     checkDailyTaskReset();
   }
 
-  function renderTodos() {
-    const list = document.getElementById("todoList");
-    if (!list) return;
-
-    list.innerHTML = "";
-
-    if (!todos.length) {
-      list.innerHTML = `<div style="color:#9CA3AF;">No tasks yet today.</div>`;
-      return;
-    }
-
-    todos.forEach((t, i) => {
-      const row = document.createElement("div");
-
-      row.innerHTML = `
-        <span onclick="toggleTodo(${i})"
-        style="cursor:pointer;${t.done ? "text-decoration:line-through;color:#6B7280" : ""}">
-        ${escapeHtml(t.text)}</span>
-        <button onclick="deleteTodo(${i})">✕</button>
-      `;
-
-      list.appendChild(row);
-    });
-  }
-
-  window.addTodo = function () {
-    const input = document.getElementById("todoInput");
-    if (!input?.value.trim()) return;
-
-    todos.push({ text: input.value.trim(), done: false });
-    input.value = "";
-    saveTodos();
-    renderTodos();
-  };
-
-  window.toggleTodo = function (i) {
-    if (!todos[i]) return;
-    todos[i].done = !todos[i].done;
-    saveTodos();
-    renderTodos();
-  };
-
-  window.deleteTodo = function (i) {
-    todos.splice(i, 1);
-    saveTodos();
-    renderTodos();
-  };
-
   window.todos = todos;
   window.todoHistory = todoHistory;
+
+  /* ================= WEEKLY PLANNER ================= */
 
   const WEEKLY_PLANNER_KEY = "weeklyPlannerData";
   const WEEKLY_PLANNER_SELECTED_DAY_KEY = "weeklyPlannerSelectedDay";
@@ -185,95 +191,163 @@
   let weeklyPlannerSelectedDay = null;
 
   function safeParse(raw, fallback) {
-    try { return JSON.parse(raw) || fallback; } catch { return fallback; }
+    try {
+      return JSON.parse(raw) || fallback;
+    } catch {
+      return fallback;
+    }
   }
 
-  function getWeekStartKey(date = new Date()) {
+  function getWeekStartKey(date) {
     const d = new Date(date);
     d.setDate(d.getDate() - d.getDay());
     return toLocalISODate(d);
   }
 
-  function isValidDayKey(k) {
-    return /^\d{4}-\d{2}-\d{2}$/.test(k);
+  function ensureWeeklyPlannerDay(dayKey) {
+    if (!dayKey) return;
+
+    const ws = getWeekStartKey(parseLocalISODate(dayKey));
+
+    if (!weeklyPlannerData[ws])
+      weeklyPlannerData[ws] = { days: {} };
+
+    if (!weeklyPlannerData[ws].days[dayKey])
+      weeklyPlannerData[ws].days[dayKey] = { intentions: "", items: [] };
   }
 
   function saveWeeklyPlanner() {
     localStorage.setItem(WEEKLY_PLANNER_KEY, JSON.stringify(weeklyPlannerData));
-    localStorage.setItem(WEEKLY_PLANNER_SELECTED_DAY_KEY, weeklyPlannerSelectedDay);
+    localStorage.setItem(
+      WEEKLY_PLANNER_SELECTED_DAY_KEY,
+      weeklyPlannerSelectedDay
+    );
   }
 
-  function ensureWeeklyPlannerDay(dayKey) {
-    if (!isValidDayKey(dayKey)) return;
-
-    const ws = getWeekStartKey(parseLocalISODate(dayKey));
-
-    if (!weeklyPlannerData[ws]) weeklyPlannerData[ws] = { days: {} };
-
-    if (!weeklyPlannerData[ws].days[dayKey]) {
-      weeklyPlannerData[ws].days[dayKey] = { intentions: "", items: [] };
-    }
-  }
-
-  // ==============================
-  // ✅ FIXED REAL-TIME DATE SYNC
-  // ==============================
   function loadWeeklyPlanner() {
-    weeklyPlannerData = safeParse(localStorage.getItem(WEEKLY_PLANNER_KEY), {});
-    weeklyPlannerSelectedDay = localStorage.getItem(WEEKLY_PLANNER_SELECTED_DAY_KEY);
+    weeklyPlannerData = safeParse(
+      localStorage.getItem(WEEKLY_PLANNER_KEY),
+      {}
+    );
 
     const today = getTodayKey();
 
+    let saved = localStorage.getItem(WEEKLY_PLANNER_SELECTED_DAY_KEY);
+
+    // ✅ FORCE SYNC TO TODAY IF OLD
+    if (!saved || saved !== today) {
+      saved = today;
+      localStorage.setItem(WEEKLY_PLANNER_SELECTED_DAY_KEY, today);
+    }
+
+    weeklyPlannerSelectedDay = saved;
+
+    ensureWeeklyPlannerDay(saved);
+  }
+
+  function setWeeklyPlannerSelectedDay(dayKey) {
+    weeklyPlannerSelectedDay = dayKey || getTodayKey();
+
+    ensureWeeklyPlannerDay(weeklyPlannerSelectedDay);
+    saveWeeklyPlanner();
+    renderWeeklyPlanner();
+  }
+
+  function getSelectedPlannerDayKey() {
+    return weeklyPlannerSelectedDay || getTodayKey();
+  }
+
+  function getPlannerDayData(dayKey) {
+    ensureWeeklyPlannerDay(dayKey);
+
+    const ws = getWeekStartKey(parseLocalISODate(dayKey));
+
+    return (
+      weeklyPlannerData?.[ws]?.days?.[dayKey] || {
+        intentions: "",
+        items: []
+      }
+    );
+  }
+
+  function getPlannerCompletionForDay(dayKey) {
+    const items = getPlannerDayData(dayKey).items || [];
+    const done = items.filter((i) => i.done).length;
+
+    return {
+      done,
+      total: items.length,
+      percent: items.length
+        ? Math.round((done / items.length) * 100)
+        : 0
+    };
+  }
+
+  window.getPlannerCompletionForDay = getPlannerCompletionForDay;
+
+  function renderWeeklyPlanner() {
+    const container = document.getElementById("scheduleContainer");
+    if (!container) return;
+
+    const today = getTodayKey();
+
+    // ✅ AUTO-CORRECT IF DRIFTED
     if (weeklyPlannerSelectedDay !== today) {
       weeklyPlannerSelectedDay = today;
-    }
-
-    if (!isValidDayKey(weeklyPlannerSelectedDay)) {
-      weeklyPlannerSelectedDay = today;
-    }
-
-    const ws = getWeekStartKey(parseLocalISODate(weeklyPlannerSelectedDay));
-
-    if (!weeklyPlannerData[ws]) {
-      weeklyPlannerData[ws] = { days: {} };
       saveWeeklyPlanner();
     }
 
-    ensureWeeklyPlannerDay(weeklyPlannerSelectedDay);
-  }
+    const dayKey = weeklyPlannerSelectedDay;
 
-  function renderWeeklyPlanner() {
-    const el = document.getElementById("scheduleContainer");
-    if (!el) return;
+    ensureWeeklyPlannerDay(dayKey);
 
-    const key = weeklyPlannerSelectedDay;
-    const data = weeklyPlannerData[getWeekStartKey(parseLocalISODate(key))].days[key];
+    const data = getPlannerDayData(dayKey);
+    const completion = getPlannerCompletionForDay(dayKey);
 
-    el.innerHTML = `
-      <div>
-        <h3>Weekly Planner</h3>
-        <div>${key}</div>
+    container.innerHTML = `
+      <div style="padding:16px">
+        <div style="font-weight:900">Weekly Planner</div>
+
+        <div style="margin:6px 0;color:#9CA3AF">
+          ${dayKey} • ${completion.percent}%
+        </div>
+
         <textarea
+          class="form-input"
+          style="width:100%;min-height:80px"
           oninput="setPlannerIntentions(this.value)"
-          class="form-input">${escapeHtml(data.intentions)}</textarea>
+        >${escapeHtml(data.intentions)}</textarea>
       </div>
     `;
   }
 
-  window.setPlannerIntentions = function (v) {
-    const key = weeklyPlannerSelectedDay;
-    ensureWeeklyPlannerDay(key);
+  window.setWeeklyPlannerSelectedDay = setWeeklyPlannerSelectedDay;
+  window.renderWeeklyPlanner = renderWeeklyPlanner;
 
-    const ws = getWeekStartKey(parseLocalISODate(key));
-
-    weeklyPlannerData[ws].days[key].intentions = v;
-    saveWeeklyPlanner();
+  function renderSchedule() {
     renderWeeklyPlanner();
-  };
+  }
 
-  window.renderSchedule = function () {
-    renderWeeklyPlanner();
-  };
+  window.renderSchedule = renderSchedule;
+
+  /* ================= AUTO DATE ROLLOVER ================= */
+
+  let lastKnownDate = getTodayKey();
+
+  setInterval(() => {
+    const now = getTodayKey();
+
+    if (now !== lastKnownDate) {
+      lastKnownDate = now;
+
+      loadWeeklyPlanner();
+      renderWeeklyPlanner();
+      window.renderLifeScore?.();
+      window.renderDashboardTrendChart?.();
+    }
+  }, 60000);
+
+  /* ================= BOOT ================= */
 
   document.addEventListener("DOMContentLoaded", () => {
     checkDailyTaskReset();
@@ -286,6 +360,7 @@
     showPage(lastPage);
 
     renderSchedule();
+
     window.renderLifeScore?.();
     window.renderWeeklyGraph?.();
     window.renderDNAProfile?.();
