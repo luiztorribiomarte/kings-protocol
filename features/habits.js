@@ -1,11 +1,3 @@
-/* features/habits.js
-   HARD SYNC + STABLE EVENTS
-   FIXES:
-   - Ensures getDayCompletion always works with local YYYY-MM-DD keys
-   - Dispatches habitsUpdated (storage doesn't fire in same tab)
-   - Keeps lifeEngine + trend chart synced
-*/
-
 (function () {
   "use strict";
 
@@ -15,7 +7,6 @@
   window.habitCompletions = window.habitCompletions || {};
 
   function fireHabitsUpdated() {
-    // storage event will not fire in the same tab, so we dispatch our own.
     window.dispatchEvent(new Event("habitsUpdated"));
   }
 
@@ -39,7 +30,6 @@
   function getWeekDates(date = new Date()) {
     const d = new Date(date);
     const day = d.getDay();
-
     d.setDate(d.getDate() - day);
     d.setHours(0, 0, 0, 0);
 
@@ -53,7 +43,6 @@
   }
 
   function utcToLocalKey(k) {
-    // handles old keys if they were saved as UTC based YYYY-MM-DD
     return getDateStringLocal(new Date(k + "T00:00:00Z"));
   }
 
@@ -72,25 +61,20 @@
     if (changed) {
       window.habitCompletions = migrated;
       localStorage.setItem("habitCompletions", JSON.stringify(window.habitCompletions));
-      console.log("Habits migrated (UTC -> local keys)");
     }
   }
 
   function isDone(habitId, dateKey) {
-    const k = dateKey;
-    return !!(window.habitCompletions?.[k]?.[habitId]);
+    return !!(window.habitCompletions?.[dateKey]?.[habitId]);
   }
 
   function toggleHabit(habitId, dateKey) {
-    const k = dateKey;
-
-    if (!window.habitCompletions[k]) window.habitCompletions[k] = {};
-    window.habitCompletions[k][habitId] = !window.habitCompletions[k][habitId];
+    if (!window.habitCompletions[dateKey]) window.habitCompletions[dateKey] = {};
+    window.habitCompletions[dateKey][habitId] = !window.habitCompletions[dateKey][habitId];
 
     saveCompletions();
     renderHabits();
 
-    // keep legacy hooks alive too
     if (typeof window.renderLifeScore === "function") window.renderLifeScore();
     if (typeof window.renderDashboardTrendChart === "function") window.renderDashboardTrendChart();
     if (typeof window.renderDNAProfile === "function") window.renderDNAProfile();
@@ -180,13 +164,11 @@
     const habits = window.habits || [];
     window.openModal(`
       <h2>Manage Habits</h2>
-
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <input id="hn" placeholder="Habit name" class="form-input" />
         <input id="hi" placeholder="Emoji" class="form-input" style="width:80px;" />
         <button class="form-submit" onclick="addHabit()">Add</button>
       </div>
-
       <div style="max-height:300px; overflow:auto;">
         ${habits.map(h => `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
@@ -205,7 +187,6 @@
 
     window.habits.push({ id: "h_" + Date.now(), name, icon });
     saveHabits();
-
     window.closeModal?.();
     renderHabits();
   }
@@ -213,11 +194,10 @@
   function deleteHabit(id) {
     if (!confirm("Delete this habit?")) return;
 
-    window.habits = (window.habits || []).filter(h => h.id !== id);
+    window.habits = window.habits.filter(h => h.id !== id);
 
-    // remove completion marks for this habit across all days (but keep the day objects)
     Object.keys(window.habitCompletions || {}).forEach(day => {
-      if (window.habitCompletions?.[day]) delete window.habitCompletions[day][id];
+      delete window.habitCompletions[day][id];
     });
 
     saveHabits();
@@ -229,8 +209,18 @@
 
   function initHabitsData() {
     try {
-      const savedHabits = JSON.parse(localStorage.getItem("habits") || "[]");
-      window.habits = Array.isArray(savedHabits) ? savedHabits : [];
+      const savedHabitsRaw = localStorage.getItem("habits");
+      if (savedHabitsRaw === null) {
+        window.habits = [
+          { id: "wake", name: "Wake Up At 7 AM", icon: "⏰" },
+          { id: "sun", name: "Morning Sunlight", icon: "☀️" },
+          { id: "skin", name: "Skincare", icon: "🧴" }
+        ];
+        saveHabits();
+      } else {
+        const savedHabits = JSON.parse(savedHabitsRaw);
+        window.habits = Array.isArray(savedHabits) ? savedHabits : [];
+      }
     } catch {
       window.habits = [];
     }
@@ -243,38 +233,22 @@
     }
 
     migrateUTCKeysIfNeeded();
-
-    if (!window.habits.length) {
-      window.habits = [
-        { id: "wake", name: "Wake Up At 7 AM", icon: "⏰" },
-        { id: "sun", name: "Morning Sunlight", icon: "☀️" },
-        { id: "skin", name: "Skincare", icon: "🧴" }
-      ];
-      saveHabits();
-    }
   }
 
-  // exports
   window.initHabitsData = initHabitsData;
   window.renderHabits = renderHabits;
   window.toggleHabit = toggleHabit;
   window.openHabitManager = openHabitManager;
   window.addHabit = addHabit;
   window.deleteHabit = deleteHabit;
-
   window.getDayCompletion = getDayCompletion;
   window.calculateCurrentStreak = calculateCurrentStreak;
 
-  // App registration (ensures init runs)
   if (App) {
     App.features.habits = { init: initHabitsData, render: renderHabits };
     App.on("dashboard", function () {
-      // ensure data exists before render
-      initHabitsData();
       renderHabits();
       fireHabitsUpdated();
     });
   }
-
-  console.log("Habits module loaded (hard sync events)");
 })();
