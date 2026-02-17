@@ -1,7 +1,3 @@
-/* =========================================================
-   MAIN CORE — WEEKLY PLANNER UPGRADE
-========================================================= */
-
 (function () {
   "use strict";
 
@@ -13,207 +9,270 @@
       this.events[page].push(fn);
     },
     trigger(page) {
-      (this.events[page] || []).forEach(fn => {
-        try { fn(); } catch(e){}
+      (this.events[page] || []).forEach((fn) => {
+        try { fn(); } catch {}
       });
     }
   };
 
-  function escapeHtml(str){
-    return String(str||"")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#39;");
-  }
-  window.escapeHtml = escapeHtml;
+  window.showPage = function (page) {
+    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+    document.querySelectorAll(".nav-tab").forEach((b) => b.classList.remove("active"));
 
-  function pad2(n){ return String(n).padStart(2,"0"); }
-
-  function toLocalISODate(d=new Date()){
-    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  }
-
-  function parseLocalISODate(k){
-    const [y,m,d]=k.split("-").map(Number);
-    return new Date(y,m-1,d);
-  }
-
-  function getTodayKey(){ return toLocalISODate(new Date()); }
-
-  /* ================= WEEKLY PLANNER ================= */
-
-  const KEY="weeklyPlannerData";
-  const SEL="weeklyPlannerSelectedDay";
-
-  let plannerData={};
-  let selectedDay=null;
-
-  function safeParse(raw,fallback){
-    try{ return JSON.parse(raw)||fallback; }
-    catch{ return fallback; }
-  }
-
-  function getWeekStartKey(date){
-    const d=new Date(date);
-    d.setHours(0,0,0,0);
-    d.setDate(d.getDate()-d.getDay());
-    return toLocalISODate(d);
-  }
-
-  function ensureDay(dayKey){
-    const ws=getWeekStartKey(parseLocalISODate(dayKey));
-    if(!plannerData[ws]) plannerData[ws]={days:{}};
-    if(!plannerData[ws].days[dayKey])
-      plannerData[ws].days[dayKey]={intentions:"",items:[]};
-  }
-
-  function savePlanner(){
-    localStorage.setItem(KEY,JSON.stringify(plannerData));
-    localStorage.setItem(SEL,selectedDay);
-  }
-
-  function loadPlanner(){
-    plannerData=safeParse(localStorage.getItem(KEY),{});
-    selectedDay=localStorage.getItem(SEL)||getTodayKey();
-    selectedDay=getTodayKey();
-    ensureDay(selectedDay);
-  }
-
-  function setSelected(dayKey){
-    selectedDay=dayKey;
-    ensureDay(dayKey);
-    savePlanner();
-    renderPlanner();
-    window.renderLifeScore?.();
-    window.renderDNAProfile?.();
-    window.renderWeeklyGraph?.();
-  }
-
-  function getCompletion(dayKey){
-    ensureDay(dayKey);
-    const ws=getWeekStartKey(parseLocalISODate(dayKey));
-    const items=plannerData[ws].days[dayKey].items;
-    const done=items.filter(i=>i.done).length;
-    return {
-      done,
-      total:items.length,
-      percent:items.length?Math.round(done/items.length*100):0
+    const map = {
+      dashboard: 1,
+      workout: 2,
+      looksmaxxing: 3,
+      visionBoard: 4,
+      content: 5,
+      books: 6
     };
+
+    const pageId = page + "Page";
+    const el = document.getElementById(pageId);
+    if (el) el.classList.add("active");
+
+    const tab = document.querySelector(`.nav-tab:nth-child(${map[page]})`);
+    if (tab) tab.classList.add("active");
+
+    localStorage.setItem("currentPage", page);
+    window.App.trigger(page);
+
+    if (page === "dashboard") {
+      window.renderSchedule?.();
+      window.renderLifeScore?.();
+      window.renderWeeklyGraph?.();
+      window.renderDNAProfile?.();
+      window.renderMoodTracker?.();
+      window.renderHabits?.();
+      window.renderInsightsWidget?.();
+      window.renderEmbeddedCalendar?.();
+    }
+  };
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function todayKey(d = new Date()) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function parseKey(k) {
+    const [y, m, d] = String(k || "").split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+  }
+  function esc(s) {
+    return String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
   }
 
-  window.getPlannerCompletionForDay=getCompletion;
+  const STORE = "weeklyPlannerData";
+  let kpPlanner = safeObj(localStorage.getItem(STORE), {});
+  let selected = todayKey();
 
-  function addTask(){
-    const taskInput=document.getElementById("plannerTask");
-    const timeInput=document.getElementById("plannerTime");
-    if(!taskInput||!taskInput.value.trim()) return;
+  function safeObj(raw, fallback) {
+    try {
+      const v = JSON.parse(raw || "null");
+      return v && typeof v === "object" ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  }
 
-    ensureDay(selectedDay);
-    const ws=getWeekStartKey(parseLocalISODate(selectedDay));
-    const day=plannerData[ws].days[selectedDay];
+  function savePlanner() {
+    localStorage.setItem(STORE, JSON.stringify(kpPlanner));
+  }
 
-    day.items.push({
-      task:taskInput.value.trim(),
-      time:(timeInput?.value||""),
-      done:false
+  function weekStartKey(dayK) {
+    const d = parseKey(dayK);
+    d.setDate(d.getDate() - d.getDay());
+    return todayKey(d);
+  }
+
+  function ensureDay(dayK) {
+    const ws = weekStartKey(dayK);
+    if (!kpPlanner[ws]) kpPlanner[ws] = { days: {} };
+    if (!kpPlanner[ws].days[dayK]) kpPlanner[ws].days[dayK] = { intentions: "", tasks: [] };
+  }
+
+  function getDay(dayK) {
+    ensureDay(dayK);
+    const ws = weekStartKey(dayK);
+    return kpPlanner[ws].days[dayK];
+  }
+
+  function completion(dayK) {
+    const day = getDay(dayK);
+    const t = Array.isArray(day.tasks) ? day.tasks : [];
+    const done = t.filter((x) => x && x.done).length;
+    return t.length ? Math.round((done / t.length) * 100) : 0;
+  }
+
+  function sortTasks(tasks) {
+    const toKey = (t) => {
+      const s = String(t?.start || "");
+      const e = String(t?.end || "");
+      const has = s || e ? "0" : "1";
+      return `${has}|${s || "99:99"}|${e || "99:99"}|${String(t?.text || "").toLowerCase()}`;
+    };
+    tasks.sort((a, b) => toKey(a).localeCompare(toKey(b)));
+  }
+
+  window.selectPlannerDay = function (k) {
+    selected = /^\d{4}-\d{2}-\d{2}$/.test(String(k)) ? k : todayKey();
+    renderPlanner();
+  };
+
+  window.setPlannerIntentions = function (value) {
+    const day = getDay(selected);
+    day.intentions = String(value || "");
+    savePlanner();
+    window.renderLifeScore?.();
+  };
+
+  window.addPlannerTask = function () {
+    const textEl = document.getElementById("plannerTask");
+    const startEl = document.getElementById("plannerStart");
+    const endEl = document.getElementById("plannerEnd");
+
+    const text = (textEl?.value || "").trim();
+    const start = (startEl?.value || "").trim();
+    const end = (endEl?.value || "").trim();
+
+    if (!text) return;
+
+    const day = getDay(selected);
+    const tasks = Array.isArray(day.tasks) ? day.tasks : (day.tasks = []);
+
+    tasks.push({
+      text,
+      start: start || "",
+      end: end || "",
+      done: false
     });
 
-    day.items.sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+    sortTasks(tasks);
 
-    taskInput.value="";
-    if(timeInput) timeInput.value="";
+    if (textEl) textEl.value = "";
+    if (startEl) startEl.value = "";
+    if (endEl) endEl.value = "";
 
     savePlanner();
     renderPlanner();
     window.renderLifeScore?.();
-    window.renderDNAProfile?.();
-    window.renderWeeklyGraph?.();
-  }
+  };
 
-  function toggleTask(i){
-    const ws=getWeekStartKey(parseLocalISODate(selectedDay));
-    const day=plannerData[ws].days[selectedDay];
-    day.items[i].done=!day.items[i].done;
+  window.togglePlannerTask = function (i) {
+    const day = getDay(selected);
+    const tasks = Array.isArray(day.tasks) ? day.tasks : [];
+    if (!tasks[i]) return;
+    tasks[i].done = !tasks[i].done;
     savePlanner();
     renderPlanner();
     window.renderLifeScore?.();
-  }
+  };
 
-  function deleteTask(i){
-    const ws=getWeekStartKey(parseLocalISODate(selectedDay));
-    plannerData[ws].days[selectedDay].items.splice(i,1);
+  window.deletePlannerTask = function (i) {
+    const day = getDay(selected);
+    const tasks = Array.isArray(day.tasks) ? day.tasks : [];
+    tasks.splice(i, 1);
     savePlanner();
     renderPlanner();
     window.renderLifeScore?.();
-  }
+  };
 
-  function renderPlanner(){
+  window.renderSchedule = function () {
+    renderPlanner();
+  };
 
-    const container=document.getElementById("scheduleContainer");
-    if(!container) return;
+  let dragFromIndex = null;
 
-    const today=getTodayKey();
-    ensureDay(selectedDay);
+  function renderPlanner() {
+    const box = document.getElementById("scheduleContainer");
+    if (!box) return;
 
-    const ws=getWeekStartKey(parseLocalISODate(selectedDay));
-    const start=parseLocalISODate(ws);
+    ensureDay(selected);
 
-    const week=[];
-    for(let i=0;i<7;i++){
-      const d=new Date(start);
-      d.setDate(start.getDate()+i);
-      week.push(d);
-    }
+    const ws = weekStartKey(selected);
+    const base = parseKey(ws);
+    const days = [...Array(7)].map((_, i) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      return todayKey(d);
+    });
 
-    const dayData=plannerData[ws].days[selectedDay];
-    const completion=getCompletion(selectedDay);
-    const names=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const day = getDay(selected);
+    const tasks = Array.isArray(day.tasks) ? day.tasks : (day.tasks = []);
+    const pct = completion(selected);
 
-    container.innerHTML=`
-      <div style="padding:16px">
-
-        <div style="font-weight:900">Weekly Planner</div>
-        <div style="color:#9CA3AF;margin-bottom:8px">
-          ${selectedDay} • ${completion.percent}%
+    box.innerHTML = `
+      <div style="
+        padding:16px;
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,0.14);
+        background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      ">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+          <div style="font-weight:900; font-size:1.05rem;">Weekly Planner</div>
+          <div style="color:#9CA3AF; font-size:0.85rem;">${pct}%</div>
         </div>
 
-        <textarea
-          class="form-input"
-          style="width:100%;min-height:70px;margin-bottom:10px"
-          oninput="
-            plannerData['${ws}'].days['${selectedDay}'].intentions=this.value;
-            savePlanner();
-          "
-        >${escapeHtml(dayData.intentions)}</textarea>
-
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="plannerTime" type="time" class="form-input" style="width:110px"/>
-          <input id="plannerTask" class="form-input" style="flex:1" placeholder="Add task..."/>
-          <button class="form-submit" onclick="addTask()">Add</button>
+        <div style="color:#E5E7EB; font-weight:800; margin-bottom:10px;">
+          ${selected}
+          <span style="color:#9CA3AF; font-weight:700; margin-left:8px;">• ${pct}%</span>
         </div>
 
-        <div id="taskList"></div>
+        <div style="margin-bottom:12px;">
+          <div style="color:#9CA3AF; font-size:0.85rem; margin-bottom:6px;">Intentions</div>
+          <textarea id="plannerIntentions" class="form-input"
+            style="min-height:90px; width:100%; resize:vertical;"
+            placeholder="Write your intention for this day..."
+          >${esc(day.intentions || "")}</textarea>
+        </div>
 
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px">
-          ${week.map((d,i)=>{
-            const dk=toLocalISODate(d);
-            const isToday=dk===today;
-            const isActive=dk===selectedDay;
-            const pct=getCompletion(dk).percent;
-            return`
-              <div onclick="setSelected('${dk}')"
+        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+          <input id="plannerStart" type="time" class="form-input" style="width:120px;" />
+          <input id="plannerEnd" type="time" class="form-input" style="width:120px;" />
+          <input id="plannerTask" class="form-input" placeholder="Task..." style="flex:1; min-width:220px;" />
+          <button class="form-submit" onclick="addPlannerTask()">Add</button>
+        </div>
+
+        <div style="color:#9CA3AF; font-size:0.82rem; margin-bottom:10px;">
+          Drag tasks to reorder. Time is optional (start/end).
+        </div>
+
+        <div id="plannerTasks"></div>
+
+        <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; margin-top:14px;">
+          ${days.map((d) => {
+            const isActive = d === selected;
+            const isToday = d === todayKey();
+            const bg = isActive
+              ? "linear-gradient(135deg, rgba(99,102,241,0.9), rgba(236,72,153,0.75))"
+              : "rgba(255,255,255,0.05)";
+            const border = isToday ? "2px solid rgba(99,102,241,0.9)" : "1px solid rgba(255,255,255,0.14)";
+            const dt = parseKey(d);
+            const name = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dt.getDay()];
+            const num = dt.getDate();
+            const p = completion(d);
+
+            return `
+              <div data-day="${d}"
                 style="
                   cursor:pointer;
-                  padding:8px;
-                  border-radius:10px;
-                  border:${isToday?"2px solid #6366F1":"1px solid rgba(255,255,255,0.15)"};
-                  background:${isActive?"rgba(99,102,241,0.25)":"rgba(255,255,255,0.05)"};
-                  text-align:center;">
-                <div style="font-size:0.8rem;color:#9CA3AF">${names[i]}</div>
-                <div style="font-weight:900">${d.getDate()}</div>
-                <div style="font-size:0.7rem;color:#9CA3AF">${pct}%</div>
+                  padding:10px 8px;
+                  border-radius:14px;
+                  border:${border};
+                  background:${bg};
+                  text-align:center;
+                  transition:transform 0.12s ease;
+                "
+                onmouseover="this.style.transform='scale(1.03)'"
+                onmouseout="this.style.transform='scale(1)'"
+                title="${d}"
+              >
+                <div style="font-weight:900; font-size:0.82rem; color:${isActive ? "white" : "#9CA3AF"};">${name}</div>
+                <div style="font-weight:900; font-size:1.05rem; margin-top:2px; color:${isActive ? "white" : "#E5E7EB"};">${num}</div>
+                <div style="margin-top:6px; font-size:0.72rem; color:${isActive ? "rgba(255,255,255,0.9)" : "#9CA3AF"};">${p}%</div>
               </div>
             `;
           }).join("")}
@@ -221,46 +280,103 @@
       </div>
     `;
 
-    const list=document.getElementById("taskList");
-    if(!list) return;
+    const intent = document.getElementById("plannerIntentions");
+    if (intent) {
+      intent.addEventListener("input", (e) => window.setPlannerIntentions(e.target.value));
+    }
 
-    if(!dayData.items.length){
-      list.innerHTML=`<div style="color:#9CA3AF">No tasks yet.</div>`;
+    const grid = box.querySelector('[style*="grid-template-columns: repeat(7"]')?.parentElement;
+    box.querySelectorAll("[data-day]").forEach((btn) => {
+      btn.addEventListener("click", () => window.selectPlannerDay(btn.dataset.day));
+    });
+
+    const list = document.getElementById("plannerTasks");
+    if (!list) return;
+
+    if (!tasks.length) {
+      list.innerHTML = `<div style="color:#9CA3AF;">No tasks for this day yet.</div>`;
       return;
     }
 
-    list.innerHTML="";
-    dayData.items.forEach((item,i)=>{
-      const row=document.createElement("div");
-      row.style.display="flex";
-      row.style.gap="10px";
-      row.style.alignItems="center";
-      row.style.marginBottom="6px";
+    list.innerHTML = tasks.map((t, i) => {
+      const timeLabel = t.start && t.end ? `${esc(t.start)}–${esc(t.end)}` : (t.start ? esc(t.start) : (t.end ? esc(t.end) : ""));
+      const timeCell = timeLabel ? timeLabel : "";
 
-      row.innerHTML=`
-        <div style="min-width:60px;color:#6366F1;font-weight:900">${escapeHtml(item.time||"")}</div>
-        <span onclick="toggleTask(${i})"
-          style="flex:1;cursor:pointer;
-          ${item.done?"text-decoration:line-through;color:#6B7280;":"color:#E5E7EB;"}">
-          ${escapeHtml(item.task)}
-        </span>
-        <button onclick="deleteTask(${i})"
-          style="background:none;border:none;color:#EF4444;cursor:pointer">✕</button>
+      return `
+        <div class="kp-task" draggable="true" data-index="${i}"
+          style="
+            display:flex;
+            gap:12px;
+            align-items:center;
+            margin-bottom:8px;
+            padding:10px;
+            border-radius:10px;
+            border:1px solid rgba(255,255,255,0.1);
+            background:${t.done ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.02)"};
+          "
+        >
+          <div style="width:88px; font-weight:900; color:#6366F1;">${timeCell}</div>
+
+          <span
+            style="cursor:pointer; flex:1; ${t.done ? "text-decoration:line-through; color:#6B7280;" : "color:#E5E7EB;"}"
+            onclick="togglePlannerTask(${i})"
+          >${esc(t.text)}</span>
+
+          <button onclick="deletePlannerTask(${i})" style="background:none; border:none; color:#EF4444; cursor:pointer;">✕</button>
+        </div>
       `;
-      list.appendChild(row);
+    }).join("");
+
+    list.querySelectorAll(".kp-task").forEach((row) => {
+      row.addEventListener("dragstart", (e) => {
+        dragFromIndex = Number(row.dataset.index);
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", String(dragFromIndex)); } catch {}
+        row.style.opacity = "0.6";
+      });
+
+      row.addEventListener("dragend", () => {
+        row.style.opacity = "1";
+        dragFromIndex = null;
+      });
+
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      });
+
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const to = Number(row.dataset.index);
+        const from = dragFromIndex;
+
+        if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return;
+
+        const dayObj = getDay(selected);
+        const arr = Array.isArray(dayObj.tasks) ? dayObj.tasks : [];
+        const item = arr.splice(from, 1)[0];
+        arr.splice(to, 0, item);
+
+        savePlanner();
+        renderPlanner();
+        window.renderLifeScore?.();
+      });
     });
   }
 
-  window.setSelected=setSelected;
-  window.addTask=addTask;
-  window.toggleTask=toggleTask;
-  window.deleteTask=deleteTask;
-  window.renderSchedule=renderPlanner;
+  document.addEventListener("DOMContentLoaded", () => {
+    selected = todayKey();
 
-  document.addEventListener("DOMContentLoaded",()=>{
-    loadPlanner();
-    showPage(localStorage.getItem("currentPage")||"dashboard");
+    const lastPage = localStorage.getItem("currentPage") || "dashboard";
+    window.showPage(lastPage);
+
+    window.initHabitsData?.();
+    window.initMoodData?.();
+
     renderPlanner();
-  });
 
+    window.renderLifeScore?.();
+    window.renderWeeklyGraph?.();
+    window.renderDNAProfile?.();
+  });
 })();
