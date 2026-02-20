@@ -14,12 +14,76 @@
   "use strict";
 
   const STORAGE_KEY = "booksData";
-  const HISTORY_KEY = "booksProgressHistory"; // per-book progress snapshots + daily deltas
-  const GAME_KEY = "booksGamification";       // xp, achievements, etc
+  const HISTORY_KEY = "booksProgressHistory";
+  const GAME_KEY = "booksGamification";
   const MOUNT_ID = "booksMount";
 
   let chart = null;
   let monthlyChart = null;
+
+  // --------------------------------------------------
+  // MODAL HELPERS — use global modal if available,
+  // otherwise fall back to a simple inline modal so
+  // "Modal system missing" never fires.
+  // --------------------------------------------------
+  function openModal(html) {
+    // Prefer the global modal wired up in index.html
+    if (typeof window.openModal === "function" && window.openModal !== openModal) {
+      window.openModal(html);
+      return;
+    }
+
+    // Fallback: use the #modal element directly
+    const modalEl = document.getElementById("modal");
+    const bodyEl  = document.getElementById("modalBody");
+    if (modalEl && bodyEl) {
+      bodyEl.innerHTML = html;
+      modalEl.style.display = "flex";
+      return;
+    }
+
+    // Last resort: simple overlay
+    let overlay = document.getElementById("_booksModalOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "_booksModalOverlay";
+      overlay.style.cssText = `
+        position:fixed; inset:0; z-index:9999;
+        background:rgba(0,0,0,0.75);
+        display:flex; align-items:center; justify-content:center;
+      `;
+      overlay.onclick = e => { if (e.target === overlay) closeModal(); };
+      document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+      <div style="
+        background:#1a1a2e; border-radius:16px; padding:28px;
+        max-width:600px; width:90%; max-height:80vh; overflow-y:auto;
+        border:1px solid rgba(255,255,255,0.15); color:white; position:relative;
+      ">
+        <span onclick="(function(){document.getElementById('_booksModalOverlay').style.display='none'})()"
+          style="position:absolute; top:14px; right:18px; cursor:pointer; font-size:1.4rem; color:#9CA3AF;">✕</span>
+        ${html}
+      </div>
+    `;
+    overlay.style.display = "flex";
+  }
+
+  function closeModal() {
+    // Try global first
+    if (typeof window.closeModal === "function" && window.closeModal !== closeModal) {
+      window.closeModal();
+      return;
+    }
+    // Fallback elements
+    const modalEl = document.getElementById("modal");
+    if (modalEl) { modalEl.style.display = "none"; return; }
+    const overlay = document.getElementById("_booksModalOverlay");
+    if (overlay) overlay.style.display = "none";
+  }
+
+  // --------------------------------------------------
 
   function getContainer() {
     return document.getElementById("booksContainer");
@@ -114,13 +178,12 @@
     const game = loadGame();
     if (!game.xp) game.xp = 0;
     if (!Array.isArray(game.achievements)) game.achievements = [];
-    if (!Array.isArray(game.milestones)) game.milestones = []; // optional future log
+    if (!Array.isArray(game.milestones)) game.milestones = [];
     saveGame(game);
     return game;
   }
 
   function levelFromXP(xp) {
-    // 500 pages = 1 level
     return Math.floor((xp || 0) / 500) + 1;
   }
 
@@ -132,14 +195,6 @@
   }
 
   function computeAchievements(game, stats) {
-    // Stats used:
-    // stats.totalPagesReadAllTime
-    // stats.totalBooksRead
-    // stats.currentStreak
-    // stats.bestStreak
-    // stats.monthPages (current month)
-    // stats.daysReadThisMonth
-
     const pages = stats.totalPagesReadAllTime || 0;
     const books = stats.totalBooksRead || 0;
     const streak = stats.currentStreak || 0;
@@ -172,7 +227,7 @@
   }
 
   // =====================================================
-  // INSIGHTS ENGINE (NO EXTERNAL API)
+  // INSIGHTS ENGINE
   // =====================================================
 
   function weekdayName(dayMs) {
@@ -180,14 +235,10 @@
   }
 
   function computeInsights(historyDailyTotals) {
-    // historyDailyTotals: array of {day, pages}
     if (!historyDailyTotals.length) {
-      return [
-        "No reading data yet. Log pages for a few days and insights will appear."
-      ];
+      return ["No reading data yet. Log pages for a few days and insights will appear."];
     }
 
-    // Best weekday
     const byWeekday = {};
     historyDailyTotals.forEach(x => {
       const wd = weekdayName(x.day);
@@ -200,18 +251,15 @@
     let bestAvg = 0;
     Object.keys(byWeekday).forEach(k => {
       const avg = byWeekday[k].total / byWeekday[k].days;
-      if (avg > bestAvg) {
-        bestAvg = avg;
-        bestDay = k;
-      }
+      if (avg > bestAvg) { bestAvg = avg; bestDay = k; }
     });
 
-    // Consistency
     const daysRead = historyDailyTotals.filter(x => x.pages > 0).length;
-    const spanDays = Math.max(1, Math.round((historyDailyTotals[historyDailyTotals.length - 1].day - historyDailyTotals[0].day) / 86400000) + 1);
+    const spanDays = Math.max(1, Math.round(
+      (historyDailyTotals[historyDailyTotals.length - 1].day - historyDailyTotals[0].day) / 86400000
+    ) + 1);
     const consistency = Math.round((daysRead / spanDays) * 100);
 
-    // Momentum (last 7 vs previous 7)
     const last14 = historyDailyTotals.slice(-14);
     const last7 = last14.slice(-7).reduce((a, b) => a + b.pages, 0);
     const prev7 = last14.slice(0, Math.max(0, last14.length - 7)).reduce((a, b) => a + b.pages, 0);
@@ -219,10 +267,7 @@
 
     const insights = [];
 
-    if (bestDay) {
-      insights.push(`Your strongest reading day is ${bestDay} (avg ${bestAvg.toFixed(1)} pages).`);
-    }
-
+    if (bestDay) insights.push(`Your strongest reading day is ${bestDay} (avg ${bestAvg.toFixed(1)} pages).`);
     insights.push(`Consistency: you read on about ${consistency}% of days in your tracked range.`);
 
     if (historyDailyTotals.length >= 14) {
@@ -233,17 +278,12 @@
       insights.push("Track at least 14 days for momentum insights.");
     }
 
-    // Micro-coaching suggestion
     const avgPerReadDay = Math.round(
       historyDailyTotals.reduce((a, b) => a + b.pages, 0) / Math.max(1, daysRead)
     );
-    if (avgPerReadDay < 10) {
-      insights.push("Try a 10-page minimum daily rule for a week.");
-    } else if (avgPerReadDay < 25) {
-      insights.push("You’re in a good zone. Push 5 extra pages on your best weekday.");
-    } else {
-      insights.push("High output. Consider tracking notes/highlights to compound learning.");
-    }
+    if (avgPerReadDay < 10) insights.push("Try a 10-page minimum daily rule for a week.");
+    else if (avgPerReadDay < 25) insights.push("You're in a good zone. Push 5 extra pages on your best weekday.");
+    else insights.push("High output. Consider tracking notes/highlights to compound learning.");
 
     return insights.slice(0, 5);
   }
@@ -253,7 +293,6 @@
   // =====================================================
 
   function buildDailyTotals(history) {
-    // Sum across all books: pages read per day
     const map = {};
     history.forEach(h => {
       const d = Number(h.day);
@@ -266,20 +305,17 @@
   }
 
   function computeStreak(dailyTotals) {
-    // streak: consecutive days ending today where pages > 0
     const today = todayKey();
     const map = {};
     dailyTotals.forEach(x => { map[x.day] = x.pages; });
 
     let streak = 0;
     let cursor = today;
-
     while (map[cursor] > 0) {
       streak += 1;
       cursor -= 86400000;
     }
 
-    // best streak in history
     let best = 0;
     let run = 0;
     const sorted = dailyTotals.slice().sort((a, b) => a.day - b.day);
@@ -293,9 +329,6 @@
   }
 
   function computeMonthlyAnalytics(history) {
-    // returns:
-    // - monthTotals: [{month, pages}]
-    // - thisMonth: {pages, daysRead, avg}
     const monthMap = {};
     const dayMapThisMonth = {};
 
@@ -319,9 +352,7 @@
     const pagesThisMonth = monthMap[nowMonth] || 0;
     const avg = daysRead ? (pagesThisMonth / daysRead) : 0;
 
-    const monthTotals = Object.keys(monthMap)
-      .sort()
-      .map(m => ({ month: m, pages: monthMap[m] }));
+    const monthTotals = Object.keys(monthMap).sort().map(m => ({ month: m, pages: monthMap[m] }));
 
     return {
       monthTotals,
@@ -379,8 +410,6 @@
   Books.deleteBook = function (id) {
     const books = loadBooks().filter(b => b.id !== id);
     saveBooks(books);
-
-    // Keep history; it’s useful. (You can add a purge later if you want.)
     renderBooks();
   };
 
@@ -394,7 +423,6 @@
 
     const current = clamp(newPage, 0, book.totalPages || 999999);
 
-    // Find last known page for this book (any day)
     const prevEntry = history
       .filter(h => h.bookId === id)
       .sort((a, b) => a.day - b.day)
@@ -402,30 +430,20 @@
 
     const prevPage = prevEntry ? Number(prevEntry.page || 0) : Number(book.currentPage || 0);
 
-    // If user provided "pages read today", prioritize it as the delta
     let delta = 0;
-
     if (dailyPagesOptional !== undefined && dailyPagesOptional !== null && String(dailyPagesOptional).trim() !== "") {
       delta = Math.max(0, Number(dailyPagesOptional) || 0);
     } else {
       delta = Math.max(0, current - prevPage);
     }
 
-    // If there is already an entry for today, update it (no duplicates)
     const todayEntry = history.find(h => h.bookId === id && Number(h.day) === t);
 
     if (todayEntry) {
-      // Adjust delta: keep it safe and non-negative
-      // We treat delta as "pages read today", not necessarily (current - yesterday).
       todayEntry.page = current;
       todayEntry.delta = delta;
     } else {
-      history.push({
-        bookId: id,
-        day: t,
-        page: current,
-        delta
-      });
+      history.push({ bookId: id, day: t, page: current, delta });
     }
 
     saveHistory(history);
@@ -433,14 +451,12 @@
     book.currentPage = current;
     book.updatedAt = Date.now();
 
-    // Auto-finish guard
     if (book.totalPages && book.currentPage >= book.totalPages) {
       book.status = "read";
     }
 
     saveBooks(books);
 
-    // Gamification XP = pages read (delta)
     const game = ensureGameDefaults();
     game.xp += delta;
     saveGame(game);
@@ -453,12 +469,7 @@
     const book = books.find(b => b.id === id);
     if (!book) return;
 
-    const entry = {
-      id: uuid(),
-      text: String(text || "").trim(),
-      createdAt: Date.now()
-    };
-
+    const entry = { id: uuid(), text: String(text || "").trim(), createdAt: Date.now() };
     if (!entry.text) return;
 
     if (type === "note") book.notes = Array.isArray(book.notes) ? book.notes : [];
@@ -475,8 +486,6 @@
   Books.viewKnowledge = function (id) {
     const book = loadBooks().find(b => b.id === id);
     if (!book) return;
-
-    if (typeof openModal !== "function") return;
 
     const notes = (book.notes || []).slice().reverse();
     const highlights = (book.highlights || []).slice().reverse();
@@ -531,7 +540,6 @@
     const game = ensureGameDefaults();
     const lvl = levelFromXP(game.xp);
 
-    // achievements update
     computeAchievements(game, {
       totalPagesReadAllTime: pagesAll,
       totalBooksRead: booksReadCount,
@@ -718,8 +726,6 @@
   }
 
   function openAddBookModal() {
-    if (typeof openModal !== "function") return alert("Modal system missing.");
-
     openModal(`
       <div class="section-title">Add Book</div>
 
@@ -748,27 +754,32 @@
 
       <div class="form-actions">
         <button class="form-submit" id="saveBook">Save</button>
-        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+        <button class="form-cancel" id="cancelBook">Cancel</button>
       </div>
     `);
 
-    document.getElementById("saveBook").onclick = () => {
-      Books.addBook(
-        document.getElementById("bookTitle").value,
-        document.getElementById("bookAuthor").value,
-        document.getElementById("bookPages").value,
-        document.getElementById("bookStatus").value
-      );
-      closeModal();
-    };
+    setTimeout(() => {
+      const saveBtn = document.getElementById("saveBook");
+      const cancelBtn = document.getElementById("cancelBook");
+
+      if (saveBtn) saveBtn.onclick = () => {
+        Books.addBook(
+          document.getElementById("bookTitle")?.value,
+          document.getElementById("bookAuthor")?.value,
+          document.getElementById("bookPages")?.value,
+          document.getElementById("bookStatus")?.value
+        );
+        closeModal();
+      };
+
+      if (cancelBtn) cancelBtn.onclick = closeModal;
+    }, 50);
   }
 
   function openProgressModal(id) {
     const books = loadBooks();
     const book = books.find(b => b.id === id);
     if (!book) return;
-
-    if (typeof openModal !== "function") return;
 
     openModal(`
       <div class="section-title">Update Progress</div>
@@ -788,25 +799,30 @@
 
       <div class="form-actions">
         <button class="form-submit" id="updateProgress">Update</button>
-        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+        <button class="form-cancel" id="cancelProgress">Cancel</button>
       </div>
     `);
 
-    document.getElementById("updateProgress").onclick = () => {
-      Books.updateProgress(
-        id,
-        document.getElementById("progressPage").value,
-        document.getElementById("pagesToday").value
-      );
-      closeModal();
-    };
+    setTimeout(() => {
+      const updateBtn = document.getElementById("updateProgress");
+      const cancelBtn = document.getElementById("cancelProgress");
+
+      if (updateBtn) updateBtn.onclick = () => {
+        Books.updateProgress(
+          id,
+          document.getElementById("progressPage")?.value,
+          document.getElementById("pagesToday")?.value
+        );
+        closeModal();
+      };
+
+      if (cancelBtn) cancelBtn.onclick = closeModal;
+    }, 50);
   }
 
   function openKnowledgeModal(id, type) {
     const book = loadBooks().find(b => b.id === id);
     if (!book) return;
-
-    if (typeof openModal !== "function") return;
 
     const title = type === "note" ? "Add Note" : "Add Highlight";
 
@@ -821,20 +837,25 @@
 
       <div class="form-actions">
         <button class="form-submit" id="saveKnowledge">Save</button>
-        <button class="form-cancel" onclick="closeModal()">Cancel</button>
+        <button class="form-cancel" id="cancelKnowledge">Cancel</button>
       </div>
     `);
 
-    document.getElementById("saveKnowledge").onclick = () => {
-      Books.addKnowledge(id, type, document.getElementById("knowledgeText").value);
-      closeModal();
-    };
+    setTimeout(() => {
+      const saveBtn = document.getElementById("saveKnowledge");
+      const cancelBtn = document.getElementById("cancelKnowledge");
+
+      if (saveBtn) saveBtn.onclick = () => {
+        Books.addKnowledge(id, type, document.getElementById("knowledgeText")?.value);
+        closeModal();
+      };
+
+      if (cancelBtn) cancelBtn.onclick = closeModal;
+    }, 50);
   }
 
   function openAchievementsModal() {
     const game = ensureGameDefaults();
-    if (typeof openModal !== "function") return;
-
     const list = (game.achievements || []).slice().reverse();
 
     openModal(`
@@ -887,13 +908,11 @@
       },
       options: {
         responsive: true,
-        scales: {
-          y: { beginAtZero: true }
-        }
+        scales: { y: { beginAtZero: true } }
       }
     });
 
-    select.onchange = renderBooks; // re-render so the chart always follows the selected book cleanly
+    select.onchange = renderBooks;
   }
 
   function renderMonthlyChart() {
@@ -906,7 +925,6 @@
     const history = loadHistory();
     const monthly = computeMonthlyAnalytics(history);
 
-    // show last 8 months max (clean)
     const last = monthly.monthTotals.slice(-8);
     const labels = last.map(x => x.month);
     const data = last.map(x => x.pages);
@@ -925,9 +943,7 @@
       },
       options: {
         responsive: true,
-        scales: {
-          y: { beginAtZero: true }
-        }
+        scales: { y: { beginAtZero: true } }
       }
     });
   }
