@@ -70,23 +70,22 @@
   }
 
   // -----------------------------
-  // HABITS — reads from getDayCompletion API (set by habits.js)
+  // HABITS — always reads raw localStorage for reliability
+  // (avoids timing issues where getDayCompletion fires before habits init)
   // -----------------------------
   function getHabitsPercent(dayKey) {
-    try {
-      if (typeof window.getDayCompletion === "function") {
-        const r = window.getDayCompletion(dayKey);
-        if (r && typeof r.percent === "number") {
-          return clamp(r.percent, 0, 100);
-        }
-      }
-    } catch {}
-
-    // Fallback: read raw storage directly
+    // Always read directly from storage — most reliable regardless of init order
     try {
       const habits = safeParse(localStorage.getItem("habits"), []);
       const completions = safeParse(localStorage.getItem("habitCompletions"), {});
-      if (!Array.isArray(habits) || !habits.length) return 0;
+      if (!Array.isArray(habits) || !habits.length) {
+        // Last resort: try the live API
+        if (typeof window.getDayCompletion === "function") {
+          const r = window.getDayCompletion(dayKey);
+          if (r && typeof r.percent === "number") return clamp(r.percent, 0, 100);
+        }
+        return 0;
+      }
       const done = habits.filter(h => completions?.[dayKey]?.[h.id]).length;
       return Math.round((done / habits.length) * 100);
     } catch {}
@@ -95,37 +94,35 @@
   }
 
   // -----------------------------
-  // TASKS
+  // TASKS — reads from weeklyPlannerData (core.js format)
+  // Structure: { [weekStartKey]: { days: { [YYYY-MM-DD]: { tasks: [...] } } } }
   // -----------------------------
   function getTasksPercent(dayKey) {
-    let t = 0, p = 0;
+    let best = 0;
 
-    try {
-      const h = window.todoHistory || safeParse(localStorage.getItem("todoHistory"), {});
-      if (h?.[dayKey]?.percent) t = h[dayKey].percent;
-    } catch {}
-
-    try {
-      if (window.getPlannerCompletionForDay) {
-        p = window.getPlannerCompletionForDay(dayKey)?.percent || 0;
-      }
-    } catch {}
-
-    // Also check weekly planner data (core.js format)
+    // 1. Weekly planner (core.js) — the primary task store
     try {
       const plannerRaw = safeParse(localStorage.getItem("weeklyPlannerData"), {});
-      // Find the week that contains dayKey
+      // weeklyPlannerData keys are week-start dates, each has a .days sub-object
       for (const weekKey of Object.keys(plannerRaw)) {
         const dayData = plannerRaw[weekKey]?.days?.[dayKey];
         if (dayData && Array.isArray(dayData.tasks) && dayData.tasks.length) {
           const done = dayData.tasks.filter(x => x && x.done).length;
           const pct = Math.round((done / dayData.tasks.length) * 100);
-          p = Math.max(p, pct);
+          if (pct > best) best = pct;
         }
       }
     } catch {}
 
-    return Math.max(t, p);
+    // 2. todoHistory fallback
+    try {
+      const h = safeParse(localStorage.getItem("todoHistory"), {});
+      if (typeof h?.[dayKey]?.percent === "number" && h[dayKey].percent > best) {
+        best = h[dayKey].percent;
+      }
+    } catch {}
+
+    return best;
   }
 
   // -----------------------------
