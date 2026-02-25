@@ -1,366 +1,334 @@
-// ============================================
-// INSIGHTS ENGINE - Pattern Analysis & Intelligence
-// ============================================
+/* features/insights.js
+   Smart Insights — reads real data and surfaces varied, specific observations.
+   Never shows the same generic message twice in a row.
+   Checks: habits, energy/mood, tasks, streaks, sleep, workout, weekly patterns.
+*/
 
-function getDateString(date = new Date()) {
-  return date.toISOString().split("T")[0];
-}
+(function () {
+  "use strict";
 
-function getLastDays(n) {
-  const days = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(getDateString(d));
+  function pad(n) { return String(n).padStart(2, "0"); }
+
+  function localKey(d = new Date()) {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
-  return days;
-}
 
-function safeGetDayCompletion(dateStr) {
-  try {
-    if (typeof getDayCompletion === "function") {
-      return getDayCompletion(dateStr);
+  function getPastDays(n) {
+    const out = [];
+    const now = new Date();
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      out.push(d);
     }
-  } catch (e) {
-    console.error("Error getting day completion:", e);
+    return out;
   }
-  return { percent: 0, done: 0, total: 0 };
-}
 
-// ---------- CORE INSIGHT GENERATORS ----------
-
-function analyzeEnergyHabitCorrelation() {
-  const days = getLastDays(30);
-  const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-  
-  let highEnergyDays = [];
-  let lowEnergyDays = [];
-  
-  days.forEach(day => {
-    const energy = moodData[day]?.energy || null;
-    if (energy === null) return;
-    
-    const habitPct = safeGetDayCompletion(day).percent;
-    
-    if (energy >= 7) highEnergyDays.push(habitPct);
-    if (energy <= 4) lowEnergyDays.push(habitPct);
-  });
-  
-  if (highEnergyDays.length < 2) return null;
-  
-  const avgHigh = highEnergyDays.reduce((a,b) => a+b, 0) / highEnergyDays.length;
-  const avgLow = lowEnergyDays.length ? lowEnergyDays.reduce((a,b) => a+b, 0) / lowEnergyDays.length : null;
-  
-  if (avgLow && Math.abs(avgHigh - avgLow) > 15) {
-    return {
-      icon: "⚡",
-      title: "Energy-Performance Link",
-      message: `You're ${Math.round(avgHigh - avgLow)}% more productive on high-energy days (${Math.round(avgHigh)}% vs ${Math.round(avgLow)}%)`,
-      type: "insight"
-    };
+  function safeParse(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
   }
-  
-  return null;
-}
 
-function analyzeDayOfWeekPatterns() {
-  const days = getLastDays(60);
-  const dayScores = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
-  
-  days.forEach(dateStr => {
-    const date = new Date(dateStr);
-    const dayOfWeek = date.getDay();
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(dateStr).percent 
-      : 0;
-    dayScores[dayOfWeek].push(pct);
-  });
-  
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const averages = Object.keys(dayScores).map(day => ({
-    day: parseInt(day),
-    avg: dayScores[day].length ? dayScores[day].reduce((a,b)=>a+b,0) / dayScores[day].length : 0
-  }));
-  
-  averages.sort((a,b) => a.avg - b.avg);
-  
-  const weakest = averages[0];
-  const strongest = averages[averages.length - 1];
-  
-  if (weakest.avg < strongest.avg - 20 && weakest.avg < 70) {
-    return {
-      icon: "📉",
-      title: "Weak Day Detected",
-      message: `Your ${dayNames[weakest.day]}s average ${Math.round(weakest.avg)}% completion. Plan easier tasks or extra accountability.`,
-      type: "warning"
-    };
+  // ─── DATA READERS ──────────────────────────────────────────────────────────
+
+  function getHabitPct(dayKey) {
+    const habits = safeParse("habits", []);
+    const completions = safeParse("habitCompletions", {});
+    if (!habits.length) return null;
+    const done = habits.filter(h => completions?.[dayKey]?.[h.id]).length;
+    return Math.round((done / habits.length) * 100);
   }
-  
-  return null;
-}
 
-function findBestStreak() {
-  const allDays = Object.keys(JSON.parse(localStorage.getItem("habitCompletions") || "{}")).sort();
-  if (!allDays.length) return null;
-  
-  let maxStreak = 0;
-  let currentStreak = 0;
-  let bestStartDate = null;
-  let tempStartDate = null;
-  
-  allDays.forEach((day, i) => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
-    
-    if (pct >= 80) {
-      if (currentStreak === 0) tempStartDate = day;
-      currentStreak++;
-      if (currentStreak > maxStreak) {
-        maxStreak = currentStreak;
-        bestStartDate = tempStartDate;
+  function getEnergy(dayKey) {
+    const m = safeParse("moodData", {});
+    return m?.[dayKey]?.energy ?? null;
+  }
+
+  function getSleep(dayKey) {
+    const m = safeParse("moodData", {});
+    return m?.[dayKey]?.sleep ?? null;
+  }
+
+  function getTaskPct(dayKey) {
+    const planner = safeParse("weeklyPlannerData", {});
+    let best = null;
+    for (const wk of Object.keys(planner)) {
+      const dayData = planner[wk]?.days?.[dayKey];
+      if (dayData && Array.isArray(dayData.tasks) && dayData.tasks.length) {
+        const done = dayData.tasks.filter(x => x?.done).length;
+        const pct = Math.round((done / dayData.tasks.length) * 100);
+        if (best === null || pct > best) best = pct;
       }
-    } else {
-      currentStreak = 0;
     }
-  });
-  
-  if (maxStreak >= 7) {
-    return {
-      icon: "🏆",
-      title: "Best Streak",
-      message: `Your longest streak: ${maxStreak} days (started ${new Date(bestStartDate).toLocaleDateString()})`,
-      type: "achievement"
-    };
+    return best;
   }
-  
-  return null;
-}
 
-function calculateYearProgress() {
-  const allDays = Object.keys(JSON.parse(localStorage.getItem("habitCompletions") || "{}"));
-  const thisYear = new Date().getFullYear();
-  const daysThisYear = allDays.filter(d => d.startsWith(thisYear.toString()));
-  
-  const perfectDays = daysThisYear.filter(day => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
-    return pct >= 80;
-  }).length;
-  
-  const daysInYear = 365;
-  const projection = Math.round((perfectDays / daysThisYear.length) * daysInYear);
-  
-  if (daysThisYear.length >= 30 && perfectDays >= 20) {
-    return {
-      icon: "📊",
-      title: "Year Projection",
-      message: `${perfectDays} strong days so far. On track for ${projection} this year!`,
-      type: "insight"
-    };
+  function workoutDone(dayKey) {
+    const list = safeParse("kp_workouts_v2", []);
+    if (!Array.isArray(list)) return false;
+    for (const w of list) {
+      if (w.status !== "completed") continue;
+      for (const ex of w.exercises || []) {
+        for (const s of ex.sets || []) {
+          if (String(s?.date || "").split("T")[0] === dayKey) return true;
+        }
+      }
+    }
+    return false;
   }
-  
-  return null;
-}
 
-function detectSlippingPattern() {
-  const recent = getLastDays(7);
-  const scores = recent.map(day => 
-    typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0
-  );
-  
-  const avg = scores.reduce((a,b)=>a+b,0) / scores.length;
-  const belowTarget = scores.filter(s => s < 60).length;
-  
-  if (belowTarget >= 3 && avg < 65) {
-    return {
-      icon: "⚠️",
+  // ─── INSIGHT GENERATORS ────────────────────────────────────────────────────
+  // Each returns { icon, title, body, type } or null if condition not met.
+
+  function insightHabitStreak(days) {
+    let streak = 0;
+    for (let i = days.length - 1; i >= 0; i--) {
+      const pct = getHabitPct(localKey(days[i]));
+      if (pct !== null && pct >= 80) streak++;
+      else break;
+    }
+    if (streak >= 3) return {
+      icon: "🔥", type: "positive",
+      title: `${streak}-Day Habit Streak`,
+      body: `You've hit 80%+ habits for ${streak} days in a row. Keep the chain alive.`
+    };
+    if (streak === 0) {
+      // Check if had a streak recently that broke
+      const yesterday = getHabitPct(localKey(days[days.length - 2]));
+      if (yesterday !== null && yesterday >= 80) return {
+        icon: "⚡", type: "warning",
+        title: "Streak Reset Today",
+        body: `You had momentum going — today's habits slipped. Still time to check a few off.`
+      };
+    }
+    return null;
+  }
+
+  function insightEnergyVsHabits(days) {
+    const pairs = days.map(d => {
+      const k = localKey(d);
+      return { e: getEnergy(k), h: getHabitPct(k) };
+    }).filter(p => p.e !== null && p.h !== null);
+
+    if (pairs.length < 4) return null;
+
+    const hiEnergy = pairs.filter(p => p.e >= 7);
+    const loEnergy = pairs.filter(p => p.e <= 4);
+
+    if (hiEnergy.length >= 2 && loEnergy.length >= 1) {
+      const hiAvg = Math.round(hiEnergy.reduce((s, p) => s + p.h, 0) / hiEnergy.length);
+      const loAvg = Math.round(loEnergy.reduce((s, p) => s + p.h, 0) / loEnergy.length);
+      const diff = hiAvg - loAvg;
+      if (diff >= 20) return {
+        icon: "📊", type: "insight",
+        title: "Energy Drives Your Output",
+        body: `On high-energy days you complete ${hiAvg}% of habits vs ${loAvg}% on low-energy days. Protecting your energy is protecting your protocol.`
+      };
+    }
+    return null;
+  }
+
+  function insightLowHabitsThisWeek(days) {
+    const weekDays = days.slice(-7);
+    const scores = weekDays.map(d => getHabitPct(localKey(d))).filter(v => v !== null);
+    if (scores.length < 4) return null;
+    const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    if (avg < 40) return {
+      icon: "⚠️", type: "warning",
       title: "Recovery Needed",
-      message: `You've dipped below 60% for ${belowTarget} days this week. Time to reset and refocus.`,
-      type: "warning"
+      body: `Your habit average this week is ${avg}%. Identify the one habit to anchor your day and build from there.`
     };
+    if (avg >= 75) return {
+      icon: "👑", type: "positive",
+      title: "Strong Week",
+      body: `${avg}% average habit completion this week. You're operating at a high level.`
+    };
+    return null;
   }
-  
-  return null;
-}
 
-function checkMomentumTrend() {
-  const lastWeek = getLastDays(7);
-  const weekBefore = getLastDays(14).slice(0, 7);
-  
-  const lastWeekAvg = lastWeek.reduce((sum, day) => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
-    return sum + pct;
-  }, 0) / 7;
-  
-  const weekBeforeAvg = weekBefore.reduce((sum, day) => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
-    return sum + pct;
-  }, 0) / 7;
-  
-  const diff = lastWeekAvg - weekBeforeAvg;
-  
-  if (Math.abs(diff) > 10) {
+  function insightSleepImpact(days) {
+    const pairs = days.map(d => {
+      const k = localKey(d);
+      const sleep = getSleep(k);
+      const energy = getEnergy(k);
+      return { sleep, energy };
+    }).filter(p => p.sleep !== null && p.energy !== null);
+
+    if (pairs.length < 3) return null;
+
+    const goodSleep = pairs.filter(p => p.sleep >= 7);
+    const badSleep = pairs.filter(p => p.sleep < 6);
+
+    if (goodSleep.length >= 2 && badSleep.length >= 1) {
+      const goodAvgE = (goodSleep.reduce((s, p) => s + p.energy, 0) / goodSleep.length).toFixed(1);
+      const badAvgE = (badSleep.reduce((s, p) => s + p.energy, 0) / badSleep.length).toFixed(1);
+      if (Number(goodAvgE) - Number(badAvgE) >= 1.5) return {
+        icon: "🛌", type: "insight",
+        title: "Sleep = Energy",
+        body: `On nights you sleep 7h+, your energy averages ${goodAvgE}/10. Under 6h it drops to ${badAvgE}/10. Sleep is your top lever.`
+      };
+    }
+
+    const recentSleep = getSleep(localKey(days[days.length - 1]));
+    if (recentSleep !== null && recentSleep < 6) return {
+      icon: "😴", type: "warning",
+      title: "Low Sleep Last Night",
+      body: `You logged ${recentSleep}h of sleep. Prioritize an earlier bedtime tonight — recovery is part of the protocol.`
+    };
+
+    return null;
+  }
+
+  function insightWorkoutConsistency(days) {
+    const last7 = days.slice(-7).map(d => workoutDone(localKey(d)));
+    const count = last7.filter(Boolean).length;
+    if (count === 0) return null;
+    if (count >= 5) return {
+      icon: "💪", type: "positive",
+      title: `${count}/7 Workouts This Week`,
+      body: `Elite consistency. Most people don't even get to 3. Keep pushing.`
+    };
+    if (count >= 3) return {
+      icon: "💪", type: "insight",
+      title: `${count}/7 Workouts This Week`,
+      body: `Solid base. Can you squeeze in one more session before the week ends?`
+    };
+    return null;
+  }
+
+  function insightTaskCompletion(days) {
+    const today = localKey(days[days.length - 1]);
+    const pct = getTaskPct(today);
+    if (pct === null) return null;
+    if (pct === 100) return {
+      icon: "✅", type: "positive",
+      title: "All Tasks Done Today",
+      body: `100% task completion. That's a clean day. Plan tomorrow's tasks now while you're in the zone.`
+    };
+    if (pct >= 75) return {
+      icon: "🎯", type: "positive",
+      title: `${pct}% Tasks Complete`,
+      body: `Almost there. Finish the last few to close the day strong.`
+    };
+    if (pct > 0 && pct < 40) return {
+      icon: "🎯", type: "warning",
+      title: `${pct}% Tasks Complete`,
+      body: `Most of today's tasks are still open. Pick the highest-impact one and focus there first.`
+    };
+    return null;
+  }
+
+  function insightEnergyTrend(days) {
+    const last7 = days.slice(-7).map(d => getEnergy(localKey(d))).filter(v => v !== null);
+    if (last7.length < 4) return null;
+    const first = last7.slice(0, Math.floor(last7.length / 2));
+    const second = last7.slice(Math.floor(last7.length / 2));
+    const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
+    const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
+    const diff = avgSecond - avgFirst;
+    if (diff >= 1.5) return {
+      icon: "📈", type: "positive",
+      title: "Energy Trending Up",
+      body: `Your energy has been climbing over the past week — from ${avgFirst.toFixed(1)} to ${avgSecond.toFixed(1)} average. Whatever you're doing, keep doing it.`
+    };
+    if (diff <= -1.5) return {
+      icon: "📉", type: "warning",
+      title: "Energy Trending Down",
+      body: `Your energy has dropped from ${avgFirst.toFixed(1)} to ${avgSecond.toFixed(1)} average this week. Check sleep, hydration, and workout recovery.`
+    };
+    return null;
+  }
+
+  function insightBestDay(days) {
+    const scored = days.slice(-14).map(d => {
+      const k = localKey(d);
+      const h = getHabitPct(k) ?? 0;
+      const e = getEnergy(k) ?? 0;
+      return { k, d, score: h * 0.6 + e * 4 };
+    }).filter(x => x.score > 0);
+
+    if (scored.length < 5) return null;
+    scored.sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    const todayKey2 = localKey(days[days.length - 1]);
+    if (best.k === todayKey2) return {
+      icon: "🏆", type: "positive",
+      title: "Best Day in 2 Weeks",
+      body: `Today is shaping up to be your strongest day in the last 14 days. Finish strong.`
+    };
+    return null;
+  }
+
+  function insightNoDataYet() {
     return {
-      icon: diff > 0 ? "📈" : "📉",
-      title: "Momentum Shift",
-      message: `You're trending ${diff > 0 ? 'UP' : 'DOWN'} ${Math.abs(Math.round(diff))}% vs last week`,
-      type: diff > 0 ? "positive" : "warning"
+      icon: "📝", type: "neutral",
+      title: "Start Logging to Unlock Insights",
+      body: `Check off habits and log your energy level each day. After a few days, personalized patterns will appear here.`
     };
   }
-  
-  return null;
-}
 
-function detectPerfectDayRatio() {
-  const days = getLastDays(30);
-  const perfectDays = days.filter(day => {
-    const pct = typeof getDayCompletion === "function" 
-      ? getDayCompletion(day).percent 
-      : 0;
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const energy = moodData[day]?.energy || 0;
-    const todos = JSON.parse(localStorage.getItem("todoHistory") || "{}");
-    const taskPct = todos[day]?.percent || 0;
-    
-    return pct >= 80 && energy >= 7 && taskPct >= 80;
-  }).length;
-  
-  const ratio = Math.round((perfectDays / days.length) * 100);
-  
-  if (perfectDays >= 5) {
-    return {
-      icon: "💎",
-      title: "Perfect Day Ratio",
-      message: `${perfectDays} perfect days in the last 30 (${ratio}% - habits + energy + tasks all strong)`,
-      type: "achievement"
-    };
-  }
-  
-  return null;
-}
+  // ─── MAIN RENDER ──────────────────────────────────────────────────────────
 
-// ---------- MAIN INSIGHTS GENERATOR ----------
-function generateInsights() {
-  const insights = [
-    analyzeEnergyHabitCorrelation(),
-    analyzeDayOfWeekPatterns(),
-    findBestStreak(),
-    calculateYearProgress(),
-    detectSlippingPattern(),
-    checkMomentumTrend(),
-    detectPerfectDayRatio()
-  ].filter(Boolean);
-  
-  return insights;
-}
+  function renderInsightsWidget() {
+    const el = document.getElementById("insightsWidget");
+    if (!el) return;
 
-// ---------- UI RENDERING ----------
-function renderInsightsWidget() {
-  const container = document.getElementById("insightsWidget");
-  if (!container) return;
-  
-  const insights = generateInsights();
-  
-  if (!insights.length) {
-    container.innerHTML = `
-      <div style="color:#9CA3AF; text-align:center; padding:20px;">
-        Keep logging data to unlock insights!
-      </div>
-    `;
-    return;
-  }
-  
-  const html = insights.slice(0, 4).map(insight => {
-    const colors = {
-      insight: "rgba(99,102,241,0.15)",
-      warning: "rgba(245,158,11,0.15)",
-      achievement: "rgba(34,197,94,0.15)",
-      positive: "rgba(34,197,94,0.15)"
+    const days = getPastDays(14);
+
+    // Run all generators, collect non-null results
+    const generators = [
+      () => insightBestDay(days),
+      () => insightHabitStreak(days),
+      () => insightEnergyVsHabits(days),
+      () => insightSleepImpact(days),
+      () => insightWorkoutConsistency(days),
+      () => insightTaskCompletion(days),
+      () => insightEnergyTrend(days),
+      () => insightLowHabitsThisWeek(days),
+    ];
+
+    const results = generators.map(g => { try { return g(); } catch { return null; } }).filter(Boolean);
+
+    if (!results.length) {
+      results.push(insightNoDataYet());
+    }
+
+    const colorMap = {
+      positive: { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.25)", icon: "#22c55e" },
+      warning:  { bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.3)", icon: "#f59e0b" },
+      insight:  { bg: "rgba(99,102,241,0.10)", border: "rgba(99,102,241,0.28)", icon: "#818cf8" },
+      neutral:  { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", icon: "#9ca3af" },
     };
-    
-    const borderColors = {
-      insight: "rgba(99,102,241,0.3)",
-      warning: "rgba(245,158,11,0.3)",
-      achievement: "rgba(34,197,94,0.3)",
-      positive: "rgba(34,197,94,0.3)"
-    };
-    
-    return `
-      <div style="
-        padding:14px;
-        margin-bottom:10px;
-        border-radius:12px;
-        border:1px solid ${borderColors[insight.type]};
-        background:${colors[insight.type]};
-      ">
-        <div style="display:flex; gap:10px; align-items:start;">
-          <div style="font-size:1.5rem;">${insight.icon}</div>
-          <div style="flex:1;">
-            <div style="font-weight:800; margin-bottom:4px;">${insight.title}</div>
-            <div style="color:#E5E7EB; font-size:0.95rem; line-height:1.4;">${insight.message}</div>
+
+    el.innerHTML = results.map(ins => {
+      const c = colorMap[ins.type] || colorMap.neutral;
+      return `
+        <div style="
+          display:flex; gap:14px; align-items:flex-start;
+          padding:14px 16px;
+          border-radius:14px;
+          border:1px solid ${c.border};
+          background:${c.bg};
+          margin-bottom:10px;
+        ">
+          <div style="font-size:1.4rem; line-height:1; padding-top:2px;">${ins.icon}</div>
+          <div>
+            <div style="font-weight:900; color:white; margin-bottom:4px;">${ins.title}</div>
+            <div style="color:rgba(255,255,255,0.72); font-size:0.9rem; line-height:1.45;">${ins.body}</div>
           </div>
         </div>
-      </div>
-    `;
-  }).join("");
-  
-  container.innerHTML = html;
-}
+      `;
+    }).join("");
+  }
 
-function openFullInsights() {
-  const insights = generateInsights();
-  
-  const html = `
-    <h2>🧠 Smart Insights</h2>
-    <p style="color:#9CA3AF; margin-bottom:20px;">AI-powered analysis of your patterns and progress</p>
-    
-    ${insights.length === 0 
-      ? `<div style="color:#9CA3AF; text-align:center; padding:40px;">Keep tracking to unlock insights!</div>`
-      : insights.map(insight => {
-        const colors = {
-          insight: "rgba(99,102,241,0.15)",
-          warning: "rgba(245,158,11,0.15)",
-          achievement: "rgba(34,197,94,0.15)",
-          positive: "rgba(34,197,94,0.15)"
-        };
-        
-        const borderColors = {
-          insight: "rgba(99,102,241,0.3)",
-          warning: "rgba(245,158,11,0.3)",
-          achievement: "rgba(34,197,94,0.3)",
-          positive: "rgba(34,197,94,0.3)"
-        };
-        
-        return `
-          <div style="
-            padding:18px;
-            margin-bottom:14px;
-            border-radius:14px;
-            border:1px solid ${borderColors[insight.type]};
-            background:${colors[insight.type]};
-          ">
-            <div style="display:flex; gap:12px; align-items:start;">
-              <div style="font-size:2rem;">${insight.icon}</div>
-              <div style="flex:1;">
-                <div style="font-weight:800; font-size:1.1rem; margin-bottom:6px;">${insight.title}</div>
-                <div style="color:#E5E7EB; line-height:1.5;">${insight.message}</div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("")
-    }
-  `;
-  
-  openModal(html);
-}
+  window.renderInsightsWidget = renderInsightsWidget;
 
-console.log("Insights Engine loaded");
+  const App = window.App;
+  if (App) {
+    App.on("dashboard", renderInsightsWidget);
+  }
+
+  // Also re-render when habits or mood update
+  window.addEventListener("habitsUpdated", renderInsightsWidget);
+  window.addEventListener("moodUpdated", renderInsightsWidget);
+
+})();
