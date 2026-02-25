@@ -31,44 +31,24 @@
 
   function getWeekDates(date = new Date()) {
     const d = new Date(date);
-    const day = d.getDay();
-
-    d.setDate(d.getDate() - day);
     d.setHours(0, 0, 0, 0);
+
+    // Find Sunday of this week
+    const sunday = new Date(d);
+    sunday.setDate(d.getDate() - d.getDay());
 
     const out = [];
     for (let i = 0; i < 7; i++) {
-      const x = new Date(d);
-      x.setDate(d.getDate() + i);
+      const x = new Date(sunday);
+      x.setDate(sunday.getDate() + i); // always increment from sunday, not from d
       out.push(x);
     }
     return out;
   }
 
-  // FIX: use local midnight (no "Z") so the date never shifts back a day in EST
-  function utcToLocalKey(k) {
-    return getDateStringLocal(new Date(k + "T00:00:00"));
-  }
-
-  function migrateUTCKeysIfNeeded() {
-    const src = window.habitCompletions || {};
-    const migrated = {};
-    let changed = false;
-
-    Object.keys(src).forEach((k) => {
-      // Only migrate valid YYYY-MM-DD keys
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
-      const local = utcToLocalKey(k);
-      if (!migrated[local]) migrated[local] = {};
-      Object.assign(migrated[local], src[k]);
-      if (local !== k) changed = true;
-    });
-
-    if (changed) {
-      window.habitCompletions = migrated;
-      localStorage.setItem("habitCompletions", JSON.stringify(window.habitCompletions));
-    }
-  }
+  // Intentionally empty — old UTC migration was causing the day-shift bug.
+  // Keys are always saved as local YYYY-MM-DD.
+  function migrateUTCKeysIfNeeded() {}
 
   function isDone(habitId, dateKey) {
     return !!(window.habitCompletions?.[dateKey]?.[habitId]);
