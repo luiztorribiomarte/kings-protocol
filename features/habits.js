@@ -45,8 +45,9 @@
     return out;
   }
 
+  // FIX: use local midnight (no "Z") so the date never shifts back a day in EST
   function utcToLocalKey(k) {
-    return getDateStringLocal(new Date(k + "T00:00:00Z"));
+    return getDateStringLocal(new Date(k + "T00:00:00"));
   }
 
   function migrateUTCKeysIfNeeded() {
@@ -55,6 +56,8 @@
     let changed = false;
 
     Object.keys(src).forEach((k) => {
+      // Only migrate valid YYYY-MM-DD keys
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
       const local = utcToLocalKey(k);
       if (!migrated[local]) migrated[local] = {};
       Object.assign(migrated[local], src[k]);
@@ -146,7 +149,7 @@
     habits.forEach((h) => {
       html += `<tr>
         <td style="text-align:center;color:#9CA3AF;">☰</td>
-        <td style="padding:12px;font-weight:600;">${h.icon} ${window.escapeHtml(h.name)}</td>
+        <td style="padding:12px;font-weight:600;">${h.icon} ${window.escapeHtml ? window.escapeHtml(h.name) : h.name}</td>
       `;
 
       week.forEach((d) => {
@@ -182,7 +185,7 @@
       <div style="max-height:300px; overflow:auto;">
         ${habits.map(h => `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <div>${h.icon} ${window.escapeHtml(h.name)}</div>
+            <div>${h.icon} ${window.escapeHtml ? window.escapeHtml(h.name) : h.name}</div>
             <button onclick="deleteHabit('${h.id}')" style="color:#EF4444; background:none; border:none; cursor:pointer;">Delete</button>
           </div>
         `).join("")}
