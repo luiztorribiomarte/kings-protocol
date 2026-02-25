@@ -46,7 +46,7 @@
       window.renderMoodTracker?.();
       window.renderHabits?.();
       window.renderInsightsWidget?.();
-      window.renderEmbeddedCalendar?.();
+      // window.renderEmbeddedCalendar — removed (calendar deleted)
     }
   };
 
@@ -143,13 +143,7 @@
     const day = getDay(selected);
     const tasks = Array.isArray(day.tasks) ? day.tasks : (day.tasks = []);
 
-    tasks.push({
-      text,
-      start: start || "",
-      end: end || "",
-      done: false
-    });
-
+    tasks.push({ text, start: start || "", end: end || "", done: false });
     sortTasks(tasks);
 
     if (textEl) textEl.value = "";
@@ -285,7 +279,6 @@
       intent.addEventListener("input", (e) => window.setPlannerIntentions(e.target.value));
     }
 
-    const grid = box.querySelector('[style*="grid-template-columns: repeat(7"]')?.parentElement;
     box.querySelectorAll("[data-day]").forEach((btn) => {
       btn.addEventListener("click", () => window.selectPlannerDay(btn.dataset.day));
     });
@@ -299,29 +292,25 @@
     }
 
     list.innerHTML = tasks.map((t, i) => {
-      const timeLabel = t.start && t.end ? `${esc(t.start)}–${esc(t.end)}` : (t.start ? esc(t.start) : (t.end ? esc(t.end) : ""));
-      const timeCell = timeLabel ? timeLabel : "";
+      const timeLabel = t.start && t.end
+        ? `${esc(t.start)}–${esc(t.end)}`
+        : (t.start ? esc(t.start) : (t.end ? esc(t.end) : ""));
 
       return `
         <div class="kp-task" draggable="true" data-index="${i}"
           style="
-            display:flex;
-            gap:12px;
-            align-items:center;
-            margin-bottom:8px;
-            padding:10px;
+            display:flex; gap:12px; align-items:center;
+            margin-bottom:8px; padding:10px;
             border-radius:10px;
             border:1px solid rgba(255,255,255,0.1);
             background:${t.done ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.02)"};
           "
         >
-          <div style="width:88px; font-weight:900; color:#6366F1;">${timeCell}</div>
-
+          <div style="width:88px; font-weight:900; color:#6366F1;">${timeLabel}</div>
           <span
             style="cursor:pointer; flex:1; ${t.done ? "text-decoration:line-through; color:#6B7280;" : "color:#E5E7EB;"}"
             onclick="togglePlannerTask(${i})"
           >${esc(t.text)}</span>
-
           <button onclick="deletePlannerTask(${i})" style="background:none; border:none; color:#EF4444; cursor:pointer;">✕</button>
         </div>
       `;
@@ -334,29 +323,23 @@
         try { e.dataTransfer.setData("text/plain", String(dragFromIndex)); } catch {}
         row.style.opacity = "0.6";
       });
-
       row.addEventListener("dragend", () => {
         row.style.opacity = "1";
         dragFromIndex = null;
       });
-
       row.addEventListener("dragover", (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
       });
-
       row.addEventListener("drop", (e) => {
         e.preventDefault();
         const to = Number(row.dataset.index);
         const from = dragFromIndex;
-
         if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return;
-
         const dayObj = getDay(selected);
         const arr = Array.isArray(dayObj.tasks) ? dayObj.tasks : [];
         const item = arr.splice(from, 1)[0];
         arr.splice(to, 0, item);
-
         savePlanner();
         renderPlanner();
         window.renderLifeScore?.();
@@ -366,15 +349,11 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     selected = todayKey();
-
     const lastPage = localStorage.getItem("currentPage") || "dashboard";
     window.showPage(lastPage);
-
     window.initHabitsData?.();
     window.initMoodData?.();
-
     renderPlanner();
-
     window.renderLifeScore?.();
     window.renderWeeklyGraph?.();
     window.renderDNAProfile?.();
