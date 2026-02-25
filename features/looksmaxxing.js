@@ -1,1099 +1,666 @@
-// ============================================
-// LOOKSMAXXING MODULE v3.0 (RPG x Elite Masculine)
+/* features/looksmaxxing.js — KINGS PROTOCOL
+   5 tabs: Facial & Neck | Skin & Grooming | Posture | Conditioning | Progress
+   All data saved to localStorage under looksmaxxCompletions[dateKey][itemId]
+*/
 
+(function () {
+  "use strict";
 
-let looksData = {
-  routines: [],
-  measurements: [],
-  photos: [],
-  goals: [],
-  checkIns: [],
-  weightLogs: [],
-  jawNeckLogs: {},
-  streaks: {
-    routines: {},
-    jaw: { count: 0, lastDate: null },
-    neck: { count: 0, lastDate: null }
-  },
-  settings: {
-    mode: "bulk" // bulk | cut | maintain
-  },
-  meta: {
-    lastActiveDate: null,
-    lastWeeklySummaryDate: null,
-    ui: {
-      forceExpanded: false
+  const App = window.App;
+  const STORE_COMPLETIONS = "looksmaxxCompletions";
+  const STORE_NECK        = "looksmaxxNeckLog";
+  const STORE_SPRINT      = "looksmaxxSprintLog";
+  const STORE_NOTES       = "looksmaxxWeeklyNotes";
+
+  let activeTab = "facial";
+
+  // ─── STORAGE HELPERS ──────────────────────────────────────────────────────
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+
+  function todayKey(d = new Date()) {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  function safeParse(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; }
+    catch { return fallback; }
+  }
+
+  function getCompletions() { return safeParse(STORE_COMPLETIONS, {}); }
+  function saveCompletions(data) { localStorage.setItem(STORE_COMPLETIONS, JSON.stringify(data)); }
+
+  function isChecked(itemId, dateKey = todayKey()) {
+    return !!(getCompletions()?.[dateKey]?.[itemId]);
+  }
+
+  function toggleItem(itemId, dateKey = todayKey()) {
+    const data = getCompletions();
+    if (!data[dateKey]) data[dateKey] = {};
+    data[dateKey][itemId] = !data[dateKey][itemId];
+    saveCompletions(data);
+    renderLooksmaxxing();
+  }
+  window.lmToggle = toggleItem;
+
+  function getStreak(itemId) {
+    const data = getCompletions();
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const k = todayKey(d);
+      if (data?.[k]?.[itemId]) streak++;
+      else break;
     }
-  }
-};
-
-// ---------- INIT ----------
-function initLooksMaxxing() {
-  const saved = localStorage.getItem("looksMaxxingData");
-  if (saved) {
-    try {
-      looksData = JSON.parse(saved) || looksData;
-    } catch {}
+    return streak;
   }
 
-  // SAFETY GUARDS (do not crash, stay backward compatible)
-  if (!looksData) looksData = {};
-  if (!looksData.routines) looksData.routines = [];
-  if (!looksData.measurements) looksData.measurements = [];
-  if (!looksData.photos) looksData.photos = [];
-  if (!looksData.goals) looksData.goals = [];
-  if (!looksData.checkIns) looksData.checkIns = [];
-  if (!looksData.weightLogs) looksData.weightLogs = [];
-  if (!looksData.jawNeckLogs) looksData.jawNeckLogs = {};
-
-  if (!looksData.streaks) looksData.streaks = {};
-  if (!looksData.streaks.routines) looksData.streaks.routines = {};
-  if (!looksData.streaks.jaw) looksData.streaks.jaw = { count: 0, lastDate: null };
-  if (!looksData.streaks.neck) looksData.streaks.neck = { count: 0, lastDate: null };
-
-  if (!looksData.settings) looksData.settings = {};
-  if (!looksData.settings.mode) looksData.settings.mode = "bulk";
-
-  if (!looksData.meta) looksData.meta = {};
-  if (!looksData.meta.lastActiveDate) looksData.meta.lastActiveDate = null;
-  if (!looksData.meta.lastWeeklySummaryDate) looksData.meta.lastWeeklySummaryDate = null;
-  if (!looksData.meta.ui) looksData.meta.ui = {};
-  if (typeof looksData.meta.ui.forceExpanded !== "boolean") looksData.meta.ui.forceExpanded = false;
-
-  // defaults
-  if (looksData.routines.length === 0) {
-    looksData.routines = [
-      { id: "skincare_am", category: "Face", name: "Morning Skincare", frequency: "daily", lastDone: null },
-      { id: "skincare_pm", category: "Face", name: "Night Skincare", frequency: "daily", lastDone: null },
-      { id: "haircut", category: "Style", name: "Haircut", frequency: "monthly", lastDone: null },
-      { id: "beard", category: "Style", name: "Beard Trim", frequency: "weekly", lastDone: null },
-      { id: "posture", category: "Body", name: "Posture Check", frequency: "daily", lastDone: null },
-      { id: "workout", category: "Body", name: "Workout", frequency: "daily", lastDone: null }
-    ];
-    saveLooksData();
-  }
-}
-
-function saveLooksData() {
-  localStorage.setItem("looksMaxxingData", JSON.stringify(looksData));
-}
-
-function getTodayKey() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function addDaysKey(baseKey, deltaDays) {
-  const d = new Date(baseKey + "T00:00:00");
-  d.setDate(d.getDate() + deltaDays);
-  return d.toISOString().split("T")[0];
-}
-
-function getYesterdayKey() {
-  return addDaysKey(getTodayKey(), -1);
-}
-
-function daysBetweenKeys(aKey, bKey) {
-  // absolute day difference between YYYY-MM-DD
-  const a = new Date(aKey + "T00:00:00");
-  const b = new Date(bKey + "T00:00:00");
-  const ms = Math.abs(b - a);
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
-
-function markActive() {
-  looksData.meta.lastActiveDate = getTodayKey();
-  saveLooksData();
-}
-
-// ---------- SANITIZE ----------
-function escapeHtml(str) {
-  return String(str || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-// ---------- STREAK HELPERS ----------
-function updateRoutineStreak(routineId, completed) {
-  const today = getTodayKey();
-  const yesterday = getYesterdayKey();
-  const streak = looksData.streaks.routines[routineId] || { count: 0, lastDate: null };
-
-  if (!completed) {
-    streak.count = 0;
-    streak.lastDate = null;
-  } else {
-    if (streak.lastDate === yesterday) streak.count += 1;
-    else streak.count = 1;
-    streak.lastDate = today;
-  }
-
-  looksData.streaks.routines[routineId] = streak;
-}
-
-function updateJawNeckStreak(type, completed) {
-  const today = getTodayKey();
-  const yesterday = getYesterdayKey();
-  const streak = looksData.streaks[type];
-
-  if (!completed) {
-    streak.count = 0;
-    streak.lastDate = null;
-  } else {
-    if (streak.lastDate === yesterday) streak.count += 1;
-    else streak.count = 1;
-    streak.lastDate = today;
-  }
-}
-
-// ---------- DAILY COMPLETION (for explanations + missed-day detection) ----------
-function getDayCompletion(dayKey) {
-  const routines = looksData.routines || [];
-  const totalRoutines = routines.length || 1;
-  const doneRoutines = routines.filter(r => r && r.lastDone === dayKey).length;
-
-  const jawNeck = looksData.jawNeckLogs[dayKey] || { jaw: false, neck: false };
-  const jawNeckDone = (jawNeck.jaw ? 1 : 0) + (jawNeck.neck ? 1 : 0);
-  const jawNeckTotal = 2;
-
-  const weightLogged = (looksData.weightLogs || []).some(w => w && w.date === dayKey) ? 1 : 0;
-  const weightTotal = 1;
-
-  const total = totalRoutines + jawNeckTotal + weightTotal;
-  const done = doneRoutines + jawNeckDone + weightLogged;
-
-  const percent = Math.round((done / total) * 100);
-  return {
-    percent,
-    doneRoutines,
-    totalRoutines,
-    jawDone: !!jawNeck.jaw,
-    neckDone: !!jawNeck.neck,
-    weightLogged: !!weightLogged
-  };
-}
-
-// ---------- MODE-AWARE WEIGHT TREND ----------
-function getWeightTrendModeAware() {
-  const mode = looksData.settings.mode || "bulk";
-  const logs = (looksData.weightLogs || []).slice(-7);
-  if (logs.length < 2) return { status: "Not enough data", delta: 0, mode };
-
-  const first = logs[0].weight;
-  const last = logs[logs.length - 1].weight;
-  const delta = +(last - first).toFixed(1);
-
-  // Thresholds kept conservative (signal, not noise)
-  const goodUp = delta > 0.5;
-  const flat = delta >= -0.5 && delta <= 0.5;
-  const goodDown = delta < -0.5;
-
-  let status = "Stalled";
-
-  if (mode === "bulk") {
-    status = goodUp ? "On Track" : goodDown ? "Off Track" : "Stalled";
-  } else if (mode === "cut") {
-    status = goodDown ? "On Track" : goodUp ? "Off Track" : "Stalled";
-  } else {
-    // maintain
-    status = flat ? "On Track" : (goodUp || goodDown) ? "Off Track" : "Stalled";
-  }
-
-  return { status, delta, mode };
-}
-
-// ---------- RPG STATS ----------
-function calculateLooksStats() {
-  const today = getTodayKey();
-
-  const routines = looksData.routines || [];
-  const routineDone = routines.filter(r => r && r.lastDone === today).length;
-  const routineTotal = routines.length || 1;
-  const routineScore = Math.round((routineDone / routineTotal) * 100);
-
-  const todayJawData = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-  const jawDone = todayJawData.jaw ? 1 : 0;
-  const neckDone = todayJawData.neck ? 1 : 0;
-  const jawScore = Math.round(((jawDone + neckDone) / 2) * 100);
-
-  const trend = getWeightTrendModeAware();
-
-  // Body score is mostly trend + consistency
-  let bodyScore = 50;
-  if (trend.status === "On Track") bodyScore = 80;
-  if (trend.status === "Off Track") bodyScore = 30;
-
-  const face = Math.min(100, Math.round((routineScore + jawScore) / 2));
-  const body = Math.min(100, Math.round((bodyScore + routineScore) / 2));
-  const style = Math.min(100, routineScore);
-  const discipline = Math.min(100, Math.round((routineScore + bodyScore) / 2));
-  const aura = Math.min(100, Math.round((face + body + discipline) / 3));
-  const looksScore = Math.round((face + body + style + discipline + aura) / 5);
-
-  return { face, body, style, discipline, aura, looksScore, routineScore, jawScore, trend };
-}
-
-// ---------- CONFIDENCE INDEX ----------
-function getConfidenceIndex() {
-  const today = getTodayKey();
-  const yesterday = getYesterdayKey();
-
-  const t = getDayCompletion(today).percent;
-  const y = getDayCompletion(yesterday).percent;
-
-  const routineStreaks = Object.values(looksData.streaks.routines || []).map(s => s?.count || 0);
-  const bestRoutineStreak = routineStreaks.length ? Math.max(...routineStreaks) : 0;
-
-  const jawStreak = looksData.streaks.jaw?.count || 0;
-  const neckStreak = looksData.streaks.neck?.count || 0;
-
-  // Composite (0-100-ish)
-  const streakPower = Math.min(40, (bestRoutineStreak * 3) + (jawStreak * 2) + (neckStreak * 2));
-  const adherencePower = Math.min(60, Math.round((t / 100) * 60));
-  const score = Math.min(100, streakPower + adherencePower);
-
-  // Direction
-  let direction = "Stable";
-  if (t > y + 10) direction = "Rising";
-  if (t < y - 10) direction = "Dropping";
-
-  return { score, direction, todayPercent: t, yesterdayPercent: y };
-}
-
-// ---------- ARCHETYPE MODE ----------
-function getArchetype() {
-  // based on last 14 days adherence + streaks
-  const today = getTodayKey();
-  const days = [];
-  for (let i = 0; i < 14; i++) days.push(addDaysKey(today, -i));
-
-  const percents = days.map(k => getDayCompletion(k).percent);
-  const avg = Math.round(percents.reduce((a, b) => a + b, 0) / percents.length);
-
-  const routineStreaks = Object.values(looksData.streaks.routines || []).map(s => s?.count || 0);
-  const bestStreak = routineStreaks.length ? Math.max(...routineStreaks) : 0;
-
-  // Identify recent “comeback”
-  const last3 = percents.slice(0, 3);
-  const prev3 = percents.slice(3, 6);
-  const comeback = (last3.reduce((a, b) => a + b, 0) / 3) - (prev3.reduce((a, b) => a + b, 0) / 3);
-
-  if (avg >= 75 && bestStreak >= 4) return "The Disciplined";
-  if (comeback >= 15) return "The Resurgent";
-  if (avg >= 55) return "The Builder";
-  return "The Inconsistent";
-}
-
-// ---------- WEEKLY CHECK-INS ----------
-function getThisWeekCheckIns() {
-  if (!looksData.checkIns) return 0;
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  return looksData.checkIns.filter(c => new Date(c.date) >= weekAgo).length;
-}
-
-function isWeeklySummaryDue() {
-  const today = getTodayKey();
-  const last = looksData.meta.lastWeeklySummaryDate;
-  if (!last) return true;
-  return daysBetweenKeys(last, today) >= 7;
-}
-
-function generateWeeklyIdentitySummary() {
-  const today = getTodayKey();
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(addDaysKey(today, -i));
-
-  const completion = days.map(k => getDayCompletion(k).percent);
-  const avg = Math.round(completion.reduce((a, b) => a + b, 0) / completion.length);
-
-  const routinesHit = days.reduce((acc, k) => acc + (looksData.routines || []).filter(r => r && r.lastDone === k).length, 0);
-  const jawHits = days.reduce((acc, k) => acc + ((looksData.jawNeckLogs[k]?.jaw) ? 1 : 0), 0);
-  const neckHits = days.reduce((acc, k) => acc + ((looksData.jawNeckLogs[k]?.neck) ? 1 : 0), 0);
-  const weightHits = days.reduce((acc, k) => acc + ((looksData.weightLogs || []).some(w => w && w.date === k) ? 1 : 0), 0);
-
-  const archetype = getArchetype();
-
-  const bullets = [
-    `Average adherence: ${avg}%`,
-    `Routines completed: ${routinesHit}`,
-    `Jaw sessions: ${jawHits} · Neck sessions: ${neckHits}`,
-    `Weight logs: ${weightHits}`,
-    `Identity this week: ${archetype}`
-  ];
-
-  return bullets;
-}
-
-function logWeeklyCheckIn() {
-  const today = getTodayKey();
-  const summary = generateWeeklyIdentitySummary();
-
-  looksData.checkIns = looksData.checkIns || [];
-  looksData.checkIns.push({ date: today, summary });
-
-  looksData.meta.lastWeeklySummaryDate = today;
-  markActive();
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- HEAT METER (last 7 days) ----------
-function heat(count, max) {
-  const n = Math.max(0, Math.min(max, count));
-  if (n === 0) return "—";
-  return "🔥".repeat(n);
-}
-
-function getHeatMeter() {
-  const today = getTodayKey();
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(addDaysKey(today, -i));
-
-  // Face: Face category routines done (count)
-  const faceDone = days.reduce((acc, k) => {
-    return acc + (looksData.routines || []).filter(r => r && r.category === "Face" && r.lastDone === k).length;
-  }, 0);
-
-  // Body: Body category routines + weight logs
-  const bodyDone = days.reduce((acc, k) => {
-    const bodyR = (looksData.routines || []).filter(r => r && r.category === "Body" && r.lastDone === k).length;
-    const w = (looksData.weightLogs || []).some(x => x && x.date === k) ? 1 : 0;
-    return acc + bodyR + w;
-  }, 0);
-
-  // Style: Style routines
-  const styleDone = days.reduce((acc, k) => {
-    return acc + (looksData.routines || []).filter(r => r && r.category === "Style" && r.lastDone === k).length;
-  }, 0);
-
-  // Discipline: total completion average converted to 0..5 flames
-  const avg = Math.round(days.map(k => getDayCompletion(k).percent).reduce((a, b) => a + b, 0) / 7);
-  const disciplineFlames = Math.max(0, Math.min(5, Math.round(avg / 20)));
-
-  // Convert raw counts to 0..5 flames (cap)
-  return {
-    face: heat(Math.min(5, Math.round(faceDone / 3)), 5),
-    body: heat(Math.min(5, Math.round(bodyDone / 4)), 5),
-    style: heat(Math.min(5, Math.round(styleDone / 2)), 5),
-    discipline: heat(disciplineFlames, 5)
-  };
-}
-
-// ---------- 30-DAY NARRATIVE ----------
-function getThirtyDayNarrative() {
-  const today = getTodayKey();
-
-  // Need at least 10 days of meaningful data to avoid garbage output
-  const days = [];
-  for (let i = 0; i < 30; i++) days.push(addDaysKey(today, -i));
-
-  const percents = days.map(k => getDayCompletion(k).percent);
-  const dataPoints = percents.filter(p => p > 0).length;
-
-  if (dataPoints < 10) return null;
-
-  const avg = Math.round(percents.reduce((a, b) => a + b, 0) / percents.length);
-
-  // Compare first 10 vs last 10
-  const first10 = percents.slice(-10);
-  const last10 = percents.slice(0, 10);
-  const avgFirst = Math.round(first10.reduce((a, b) => a + b, 0) / first10.length);
-  const avgLast = Math.round(last10.reduce((a, b) => a + b, 0) / last10.length);
-
-  const diff = avgLast - avgFirst;
-  const direction = diff > 5 ? "up" : diff < -5 ? "down" : "flat";
-
-  return {
-    avg,
-    avgFirst,
-    avgLast,
-    diff,
-    direction
-  };
-}
-
-// ---------- MISSED-DAY EXPLANATION ----------
-function getMissedDayMessage() {
-  const today = getTodayKey();
-  const yesterday = getYesterdayKey();
-  const t = getDayCompletion(today).percent;
-  const y = getDayCompletion(yesterday).percent;
-
-  if (y === 0) return null; // no baseline
-  if (t >= y - 5) return null; // not slipping enough to comment
-
-  return `Momentum dipped today (${t}% vs ${y}% yesterday). Tomorrow’s focus will prioritize the easiest high-leverage wins.`;
-}
-
-// ---------- DIFFICULTY SCALING + ONE THING LOCK ----------
-function getDifficultyLevel() {
-  // based on last 7 days average adherence
-  const today = getTodayKey();
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(addDaysKey(today, -i));
-  const avg = Math.round(days.map(k => getDayCompletion(k).percent).reduce((a, b) => a + b, 0) / 7);
-
-  if (avg >= 75) return "hard";
-  if (avg >= 50) return "normal";
-  return "easy";
-}
-
-function getRoutineCandidates(category, today) {
-  return (looksData.routines || [])
-    .filter(r => r && r.category === category && r.lastDone !== today)
-    .sort((a, b) => {
-      const af = a.frequency === "daily" ? 0 : 1;
-      const bf = b.frequency === "daily" ? 0 : 1;
-      return af - bf;
-    });
-}
-
-function getTodaysFocus() {
-  const today = getTodayKey();
-  const difficulty = getDifficultyLevel();
-
-  const jawNeck = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-  const weightLoggedToday = (looksData.weightLogs || []).some(w => w && w.date === today);
-
-  const facePick = getRoutineCandidates("Face", today)[0] || null;
-  const bodyPick = getRoutineCandidates("Body", today)[0] || null;
-
-  // Discipline action priority
-  const styleCandidates = getRoutineCandidates("Style", today);
-  let disciplinePick = null;
-
-  if (!weightLoggedToday) {
-    disciplinePick = { type: "weight", label: "Log Body Weight" };
-  } else if (!jawNeck.jaw) {
-    disciplinePick = { type: "jaw", label: "Jaw Training" };
-  } else if (!jawNeck.neck) {
-    disciplinePick = { type: "neck", label: "Neck Training" };
-  } else if (styleCandidates.length) {
-    disciplinePick = { type: "routine", routineId: styleCandidates[0].id, label: styleCandidates[0].name };
-  }
-
-  const allRoutinesDone = (looksData.routines || []).every(r => !r || r.lastDone === today);
-  const doneEverything = allRoutinesDone && !!jawNeck.jaw && !!jawNeck.neck && weightLoggedToday;
-
-  // One Thing Lock (when struggling)
-  const missedMsg = getMissedDayMessage();
-  const oneThingLock = (difficulty === "easy") || !!missedMsg;
-
-  if (doneEverything) {
-    return {
-      difficulty,
-      oneThingLock: false,
-      items: [
-        { label: "Maintain posture + hydration", action: null, done: true, kind: "win" },
-        { label: "Get sunlight + 10 min walk", action: null, done: true, kind: "win" },
-        { label: "Sleep target: 7–9 hours", action: null, done: true, kind: "win" }
-      ]
-    };
-  }
-
-  const items = [];
-
-  // EASY = emphasize simplest leverage (skin + weight + jaw/neck)
-  // HARD = can include extra optional style as bonus if already strong
-  if (facePick) {
-    items.push({
-      label: facePick.name,
-      done: facePick.lastDone === today,
-      kind: "routine",
-      action: () => markRoutineDone(facePick.id)
-    });
-  } else {
-    items.push({ label: "Face routine complete", done: true, kind: "info", action: null });
-  }
-
-  if (!oneThingLock) {
-    if (bodyPick) {
-      items.push({
-        label: bodyPick.name,
-        done: bodyPick.lastDone === today,
-        kind: "routine",
-        action: () => markRoutineDone(bodyPick.id)
-      });
-    } else {
-      items.push({ label: "Body routine complete", done: true, kind: "info", action: null });
+  function getWeekCount(itemId) {
+    const data = getCompletions();
+    let count = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      if (data?.[todayKey(d)]?.[itemId]) count++;
     }
-  } else {
-    // One Thing Lock replaces body with a single high-leverage item
-    // Choose the most missing, most leverage
-    if (!weightLoggedToday) {
-      items.push({ label: "Log Body Weight", done: false, kind: "weight", action: () => focusWeightInput() });
-    } else if (!jawNeck.jaw) {
-      items.push({ label: "Jaw Training", done: false, kind: "jaw", action: () => toggleJawNeck("jaw") });
-    } else if (!jawNeck.neck) {
-      items.push({ label: "Neck Training", done: false, kind: "neck", action: () => toggleJawNeck("neck") });
-    } else if (bodyPick) {
-      items.push({ label: bodyPick.name, done: false, kind: "routine", action: () => markRoutineDone(bodyPick.id) });
-    } else {
-      items.push({ label: "Posture Check", done: true, kind: "info", action: null });
-    }
+    return count;
   }
 
-  if (disciplinePick) {
-    if (disciplinePick.type === "weight") {
-      items.push({
-        label: disciplinePick.label,
-        done: weightLoggedToday,
-        kind: "weight",
-        action: () => focusWeightInput()
-      });
-    } else if (disciplinePick.type === "jaw") {
-      items.push({
-        label: disciplinePick.label,
-        done: !!jawNeck.jaw,
-        kind: "jaw",
-        action: () => toggleJawNeck("jaw")
-      });
-    } else if (disciplinePick.type === "neck") {
-      items.push({
-        label: disciplinePick.label,
-        done: !!jawNeck.neck,
-        kind: "neck",
-        action: () => toggleJawNeck("neck")
-      });
-    } else if (disciplinePick.type === "routine" && disciplinePick.routineId) {
-      items.push({
-        label: disciplinePick.label,
-        done: false,
-        kind: "routine",
-        action: () => markRoutineDone(disciplinePick.routineId)
-      });
-    }
-  } else {
-    items.push({ label: "Discipline actions complete", done: true, kind: "info", action: null });
-  }
+  // ─── CHECKLIST RENDERER ───────────────────────────────────────────────────
 
-  // HARD mode bonus (optional 4th item displayed as “Bonus”)
-  let bonus = null;
-  if (difficulty === "hard") {
-    const styleLeft = getRoutineCandidates("Style", today);
-    if (styleLeft.length) {
-      bonus = { label: `Bonus: ${styleLeft[0].name}`, done: false, kind: "routine", action: () => markRoutineDone(styleLeft[0].id) };
-    }
-  }
+  function renderChecklist(items, dateKey = todayKey()) {
+    return items.map(item => {
+      const checked = isChecked(item.id, dateKey);
+      const streak = getStreak(item.id);
+      const freq = item.freq || "";
+      const weekCount = item.weeklyTarget ? getWeekCount(item.id) : null;
 
-  return { difficulty, oneThingLock, items: items.slice(0, 3), bonus };
-}
+      return `
+        <div onclick="lmToggle('${item.id}')" style="
+          display:flex; align-items:flex-start; gap:14px;
+          padding:14px 16px; border-radius:14px; cursor:pointer;
+          border:1px solid ${checked ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"};
+          background:${checked ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)"};
+          margin-bottom:8px; transition:all 0.15s;
+        ">
+          <div style="
+            width:22px; height:22px; border-radius:6px; flex-shrink:0; margin-top:1px;
+            border:2px solid ${checked ? "#22c55e" : "rgba(255,255,255,0.2)"};
+            background:${checked ? "#22c55e" : "transparent"};
+            display:flex; align-items:center; justify-content:center;
+            font-size:0.75rem; color:white; font-weight:900;
+          ">${checked ? "✓" : ""}</div>
 
-function runLooksFocusAction(index) {
-  try {
-    const pack = getTodaysFocus();
-    const item = pack.items[index];
-    if (item && typeof item.action === "function") item.action();
-  } catch (e) {
-    console.error("Looks focus action error:", e);
-  }
-}
-
-function runLooksFocusBonus() {
-  try {
-    const pack = getTodaysFocus();
-    if (pack.bonus && typeof pack.bonus.action === "function") pack.bonus.action();
-  } catch (e) {
-    console.error("Looks bonus action error:", e);
-  }
-}
-
-// ---------- UI HELPERS ----------
-function focusWeightInput() {
-  const input = document.getElementById("weightInput");
-  if (input) input.focus();
-}
-
-function setMode(mode) {
-  const allowed = ["bulk", "cut", "maintain"];
-  if (!allowed.includes(mode)) return;
-  looksData.settings.mode = mode;
-  markActive();
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-function setForceExpanded(v) {
-  looksData.meta.ui.forceExpanded = !!v;
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- RENDER: FOCUS ----------
-function renderTodaysFocus() {
-  const pack = getTodaysFocus();
-  const focus = pack.items || [];
-  const missedMsg = getMissedDayMessage();
-
-  const rows = focus.map((item, idx) => {
-    const done = !!item.done;
-    const bg = done ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.05)";
-    const border = done ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(255,255,255,0.10)";
-    const mark = done ? "✅" : "○";
-    const cursor = item.action ? "cursor:pointer;" : "cursor:default;";
-    const click = item.action ? `onclick="runLooksFocusAction(${idx})"` : "";
-
-    return `
-      <div ${click} style="padding:10px; border-radius:12px; background:${bg}; border:${border}; ${cursor} display:flex; align-items:center; justify-content:space-between;">
-        <div style="display:flex; gap:10px; align-items:center;">
-          <div style="width:22px; text-align:center; font-weight:900;">${mark}</div>
-          <div style="opacity:0.9;">
-            <div style="font-weight:800;">${escapeHtml(item.label)}</div>
-            <div style="color:#9CA3AF; font-size:0.9rem;">
-              ${pack.oneThingLock ? "One Thing Lock" : "Today’s Focus"} · Difficulty: ${pack.difficulty}
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-weight:800; color:${checked ? "#86efac" : "#e5e7eb"};">${item.name}</span>
+              ${freq ? `<span style="font-size:0.72rem; padding:2px 8px; border-radius:20px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-weight:700;">${freq}</span>` : ""}
+              ${streak >= 3 ? `<span style="font-size:0.72rem; color:#f59e0b; font-weight:800;">🔥 ${streak}d</span>` : ""}
+              ${weekCount !== null ? `<span style="font-size:0.72rem; color:#9ca3af;">${weekCount}/${item.weeklyTarget}x this week</span>` : ""}
             </div>
+            ${item.detail ? `<div style="font-size:0.82rem; color:#6b7280; margin-top:3px; line-height:1.4;">${item.detail}</div>` : ""}
           </div>
         </div>
-        <div style="color:#A78BFA; font-weight:800;">${done ? "COMPLETE" : "DO THIS"}</div>
+      `;
+    }).join("");
+  }
+
+  // ─── SECTION HEADER ───────────────────────────────────────────────────────
+
+  function sectionHeader(title, subtitle = "") {
+    return `
+      <div style="margin:20px 0 12px;">
+        <div style="font-weight:900; font-size:1rem; color:#e5e7eb; letter-spacing:0.04em; text-transform:uppercase;">${title}</div>
+        ${subtitle ? `<div style="font-size:0.82rem; color:#6b7280; margin-top:2px;">${subtitle}</div>` : ""}
       </div>
     `;
-  }).join("");
+  }
 
-  const bonus = pack.bonus
-    ? `
-      <div onclick="runLooksFocusBonus()" style="padding:10px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px dashed rgba(167,139,250,0.5); cursor:pointer;">
-        <div style="font-weight:800; color:#A78BFA;">${escapeHtml(pack.bonus.label)}</div>
-        <div style="color:#9CA3AF; font-size:0.9rem;">Optional bonus for momentum</div>
-      </div>
-    `
-    : "";
-
-  const missed = missedMsg
-    ? `<div style="margin-top:10px; color:#F59E0B; font-size:0.95rem;">${escapeHtml(missedMsg)}</div>`
-    : "";
-
-  return `
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🎯 Today’s Focus</div>
-      <div style="display:grid; gap:10px;">
-        ${rows}
-        ${bonus}
-      </div>
-      <div style="margin-top:10px; color:#9CA3AF; font-size:0.95rem;">
-        Win the day by completing these. Consistency beats intensity.
-      </div>
-      ${missed}
-    </div>
-  `;
-}
-
-// ---------- RENDER: MODE + WEIGHT ----------
-function renderModeSelector() {
-  const mode = looksData.settings.mode || "bulk";
-  return `
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-      <div style="color:#9CA3AF; font-weight:700;">Mode</div>
-      <select class="form-input" style="width:auto; padding:6px 10px;" onchange="setMode(this.value)">
-        <option value="bulk" ${mode === "bulk" ? "selected" : ""}>Bulk</option>
-        <option value="cut" ${mode === "cut" ? "selected" : ""}>Cut</option>
-        <option value="maintain" ${mode === "maintain" ? "selected" : ""}>Maintain</option>
-      </select>
-    </div>
-  `;
-}
-
-function renderWeightHistory() {
-  const last = (looksData.weightLogs || []).slice(-5).reverse();
-  if (!last.length) return `<div style="color:#9CA3AF;">No weight logs yet.</div>`;
-  return last.map(w => `<div>${escapeHtml(w.date)}: <strong>${escapeHtml(w.weight)} lbs</strong></div>`).join("");
-}
-
-function logWeight() {
-  const input = document.getElementById("weightInput");
-  const weight = parseFloat(input?.value);
-  if (!weight) return;
-
-  looksData.weightLogs.push({ date: getTodayKey(), weight });
-  if (input) input.value = "";
-
-  markActive();
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- RENDER: JAW & NECK ----------
-function renderJawNeck() {
-  const today = getTodayKey();
-  const log = looksData.jawNeckLogs[today] || { jaw: false, neck: false };
-
-  const jawStreak = looksData.streaks.jaw?.count || 0;
-  const neckStreak = looksData.streaks.neck?.count || 0;
-
-  return `
-    <div style="display:grid; gap:8px;">
-      <div onclick="toggleJawNeck('jaw')" style="padding:10px; border-radius:10px; background:${log.jaw ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer;">
-        🦷 Jaw Training ${log.jaw ? "✅" : "○"}
-        ${jawStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${jawStreak}-day streak</div>` : ""}
-      </div>
-      <div onclick="toggleJawNeck('neck')" style="padding:10px; border-radius:10px; background:${log.neck ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer;">
-        💪 Neck Training ${log.neck ? "✅" : "○"}
-        ${neckStreak ? `<div style="font-size:0.9rem;color:#F59E0B;">🔥 ${neckStreak}-day streak</div>` : ""}
-      </div>
-    </div>
-  `;
-}
-
-function toggleJawNeck(type) {
-  const today = getTodayKey();
-  if (!looksData.jawNeckLogs[today]) looksData.jawNeckLogs[today] = { jaw: false, neck: false };
-
-  looksData.jawNeckLogs[today][type] = !looksData.jawNeckLogs[today][type];
-  updateJawNeckStreak(type, looksData.jawNeckLogs[today][type]);
-
-  markActive();
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- RENDER: ROUTINES ----------
-function renderRoutinesGrid() {
-  const el = document.getElementById("routinesGrid");
-  if (!el) return;
-
-  const today = getTodayKey();
-  const categories = [...new Set((looksData.routines || []).map(r => r?.category).filter(Boolean))];
-
-  el.innerHTML = categories.map(cat => {
-    const routines = (looksData.routines || []).filter(r => r && r.category === cat);
+  function warningCard(text) {
     return `
-      <div style="margin-bottom:12px;">
-        <div style="font-weight:700; color:#A78BFA; margin-bottom:6px;">${escapeHtml(cat)}</div>
-        ${routines.map(r => {
-          const done = r.lastDone === today;
-          const streak = looksData.streaks.routines[r.id]?.count || 0;
+      <div style="padding:12px 14px; border-radius:12px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); color:#fcd34d; font-size:0.85rem; font-weight:700; margin-bottom:12px;">
+        ⚠️ ${text}
+      </div>
+    `;
+  }
+
+  function infoCard(text) {
+    return `
+      <div style="padding:12px 14px; border-radius:12px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); color:#a78bfa; font-size:0.85rem; line-height:1.5; margin-bottom:12px;">
+        💡 ${text}
+      </div>
+    `;
+  }
+
+  // ─── TAB 1: FACIAL & NECK ─────────────────────────────────────────────────
+
+  function renderFacialTab() {
+    const neckWeighted = [
+      { id: "lm_neck_curls",    name: "Weighted Neck Curls", detail: "4 directions · 4×15 reps", freq: "3x/week", weeklyTarget: 3 },
+      { id: "lm_neck_bridges",  name: "Neck Bridges",        detail: "3×30sec holds",            freq: "3x/week", weeklyTarget: 3 },
+      { id: "lm_trap_shrugs",   name: "Trap Shrugs",         detail: "Heavy · 4×12",             freq: "2x/week", weeklyTarget: 2 },
+    ];
+    const neckDaily = [
+      { id: "lm_neck_iso",      name: "Isometric Holds",     detail: "All 4 directions · 3×20sec each", freq: "Daily" },
+    ];
+    const facial = [
+      { id: "lm_mewing_am",     name: "Mewing — Morning",    detail: "3×5min conscious sessions. Tongue on roof of mouth.", freq: "Daily" },
+      { id: "lm_mewing_pm",     name: "Mewing — Night",      detail: "3×5min before sleep.", freq: "Daily" },
+      { id: "lm_jaw_gum",       name: "Jaw Gum Chewing",     detail: "Hard gum (Falim/mastic) · 30min · alternate sides", freq: "Daily" },
+      { id: "lm_jaw_clench",    name: "Jaw Clenching",       detail: "50 hard clenches morning + night (builds masseter)", freq: "Daily" },
+      { id: "lm_cheek_lifts",   name: "Cheek Lifts",         detail: "Smile wide, eyes neutral · 3×20 reps", freq: "Daily" },
+      { id: "lm_chin_tucks",    name: "Chin Tucks",          detail: "3×15 (fixes forward head, sharpens jawline)", freq: "Daily" },
+      { id: "lm_face_massage",  name: "Face Massage",        detail: "5min lymphatic drainage · nightly", freq: "Daily" },
+    ];
+    const debloat = [
+      { id: "lm_sodium",        name: "Low Sodium",          detail: "Under 2000mg today", freq: "Daily" },
+      { id: "lm_water",         name: "High Water Intake",   detail: "Gallon+ of water today", freq: "Daily" },
+      { id: "lm_sleep_elev",    name: "Sleep Elevated",      detail: "2 pillows minimum (prevents fluid retention in face)", freq: "Daily" },
+      { id: "lm_ice_face",      name: "Ice Rolling — AM",    detail: "Ice cube wrapped in cloth · 2-3min · morning only", freq: "Daily" },
+      { id: "lm_black_coffee",  name: "Black Coffee AM",     detail: "Natural diuretic · no sugar", freq: "Daily" },
+    ];
+
+    // Neck recovery warning
+    const neckYest = ["lm_neck_curls","lm_neck_bridges"].some(id => {
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+      return isChecked(id, todayKey(yesterday));
+    });
+
+    return `
+      ${sectionHeader("Neck Training", "Goal: 17+ inch neck. Build thickness from all angles.")}
+      ${neckYest ? warningCard("You trained neck yesterday — today skip weighted work, do isometrics only.") : ""}
+      ${renderChecklist(neckWeighted)}
+      ${renderChecklist(neckDaily)}
+
+      ${sectionHeader("Facial Exercises", "Morning & Night — non-negotiable for structure over time.")}
+      ${infoCard("These work best with low body fat (under 12%). Stay lean to reveal structure.")}
+      ${renderChecklist(facial)}
+
+      ${sectionHeader("De-Bloating Protocol", "Daily habits that reduce facial puffiness.")}
+      ${renderChecklist(debloat)}
+    `;
+  }
+
+  // ─── TAB 2: SKIN & GROOMING ───────────────────────────────────────────────
+
+  function renderSkinTab() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+    // Salicylic on Mon(1), Wed(3), Fri(5)
+    const isSalicylicDay = [1, 3, 5].includes(dayOfWeek);
+    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+    const morningRoutine = [
+      { id: "lm_am_cleanser",   name: "Cleanser",            detail: "The Ordinary — gentle wash, pat dry", freq: "AM" },
+      { id: "lm_am_vitc",       name: "Vitamin C Serum",     detail: "The Ordinary — wait 5min to absorb. Antioxidant protection all day.", freq: "AM" },
+      { id: "lm_am_moisturizer",name: "Moisturizer",         detail: "The Ordinary — lightweight, good under SPF", freq: "AM" },
+      { id: "lm_am_ice",        name: "Ice Cube",            detail: "Wrapped in cloth · 2-3min · de-puffs, tightens pores. Morning ONLY.", freq: "AM" },
+    ];
+
+    const nightBase = [
+      { id: "lm_pm_cleanser",   name: "Cleanser",            detail: "The Ordinary — double cleanse if wore sunscreen", freq: "PM" },
+    ];
+    const nightSalicylic = [
+      { id: "lm_pm_salicylic",  name: "Salicylic Acid",      detail: "The Ordinary — unclogs pores while you sleep. 3x/week ONLY or you'll strip barrier.", freq: "Mon/Wed/Fri", weeklyTarget: 3 },
+    ];
+    const nightAlways = [
+      { id: "lm_pm_tallow",     name: "Beef Tallow Moisturizer", detail: "Last step only. Heavy + occlusive = seals everything in overnight. Nighttime ONLY — too heavy for AM.", freq: "PM" },
+      { id: "lm_pm_guasha",     name: "Gua Sha",             detail: "5min after tallow (tallow = glide medium). Promotes lymphatic drainage, defines jawline.", freq: "PM" },
+    ];
+
+    const supplements = [
+      { id: "lm_supp_zinc",     name: "Zinc 50mg",           detail: "Reduces acne, supports immune", freq: "Daily" },
+      { id: "lm_supp_omega",    name: "Omega-3 2-3g",        detail: "Reduces skin inflammation", freq: "Daily" },
+      { id: "lm_supp_collagen", name: "Collagen 10g",        detail: "Skin elasticity and joint health", freq: "Daily" },
+      { id: "lm_supp_vitd",     name: "Vitamin D 5000IU",    detail: "Most people are deficient", freq: "Daily" },
+    ];
+
+    const grooming = [
+      { id: "lm_teeth_brush",   name: "Electric Toothbrush", detail: "2x daily, 2min each", freq: "Daily" },
+      { id: "lm_teeth_floss",   name: "Floss",               detail: "Every night before bed", freq: "Daily" },
+      { id: "lm_nails",         name: "Nails Check",         detail: "Trim weekly, clean under them", freq: "Weekly" },
+    ];
+
+    return `
+      ${sectionHeader("Morning Routine", "In this exact order — sequence matters.")}
+      <div style="padding:10px 14px; border-radius:10px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); color:#fcd34d; font-size:0.82rem; margin-bottom:12px;">
+        ☀️ <strong>Vitamin C is always AM only.</strong> Never use at night.
+      </div>
+      ${renderChecklist(morningRoutine)}
+
+      ${sectionHeader("Night Routine", "In this exact order — sequence matters.")}
+      ${isSalicylicDay
+        ? `<div style="padding:10px 14px; border-radius:10px; background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-size:0.82rem; margin-bottom:12px;">✅ <strong>Today (${dayNames[dayOfWeek]}) is a Salicylic Acid day.</strong></div>`
+        : `<div style="padding:10px 14px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); color:#6b7280; font-size:0.82rem; margin-bottom:12px;">⏭️ <strong>No Salicylic today (${dayNames[dayOfWeek]}).</strong> Next: ${dayOfWeek < 1 ? "Mon" : dayOfWeek < 3 ? "Wed" : dayOfWeek < 5 ? "Fri" : "Mon"}.</div>`
+      }
+      ${renderChecklist(nightBase)}
+      ${isSalicylicDay ? renderChecklist(nightSalicylic) : ""}
+      ${renderChecklist(nightAlways)}
+
+      ${sectionHeader("Daily Supplements")}
+      ${renderChecklist(supplements)}
+
+      ${sectionHeader("Grooming")}
+      ${infoCard("Haircut every 2-3 weeks ($40-60, show reference photos). Eyebrows shaped professionally once, maintain. Facial hair: shave daily or commit to full beard — no weak stubble.")}
+      ${renderChecklist(grooming)}
+    `;
+  }
+
+  // ─── TAB 3: POSTURE ───────────────────────────────────────────────────────
+
+  function renderPostureTab() {
+    const drills = [
+      { id: "lm_post_wall_am",   name: "Wall Angels — Morning",   detail: "3×15 · opens chest, strengthens upper back", freq: "Daily" },
+      { id: "lm_post_tucks_am",  name: "Chin Tucks — Morning",    detail: "3×15 · fixes forward head posture", freq: "Daily" },
+      { id: "lm_post_hangs_am",  name: "Dead Hangs — Morning",    detail: "3×30sec · decompresses spine", freq: "Daily" },
+      { id: "lm_post_bands_am",  name: "Band Pull-Aparts — AM",   detail: "3×20 · activates rear delts", freq: "Daily" },
+      { id: "lm_post_thoracic",  name: "Thoracic Extensions",     detail: "3×10 on foam roller · opens rounded upper back", freq: "Daily" },
+      { id: "lm_post_wall_pm",   name: "Wall Angels — Night",     detail: "3×15 · repeat before bed", freq: "Daily" },
+      { id: "lm_post_tucks_pm",  name: "Chin Tucks — Night",      detail: "3×15 · before bed", freq: "Daily" },
+      { id: "lm_post_hangs_pm",  name: "Dead Hangs — Night",      detail: "3×30sec · before bed", freq: "Daily" },
+    ];
+
+    const cues = [
+      "Shoulders back and down — imagine back pockets pulling shoulder blades together",
+      "Chin slightly tucked — not forward jutting",
+      "Core engaged at all times — like someone's about to punch you",
+      "Walk tall — you're 6'5\". Own it. No slouching to fit in.",
+    ];
+
+    return `
+      ${sectionHeader("Daily Posture Drills", "10min morning + 10min night. Non-negotiable.")}
+      ${warningCard("Poor posture kills aesthetics. At 6'5\" you probably slouch. Fix this IMMEDIATELY.")}
+      ${renderChecklist(drills)}
+
+      ${sectionHeader("All-Day Posture Cues", "Keep these in mind every moment.")}
+      <div style="display:grid; gap:8px;">
+        ${cues.map((c, i) => `
+          <div style="
+            display:flex; gap:12px; align-items:flex-start;
+            padding:12px 14px; border-radius:12px;
+            background:rgba(255,255,255,0.03);
+            border:1px solid rgba(255,255,255,0.07);
+          ">
+            <div style="
+              width:24px; height:24px; border-radius:50%; flex-shrink:0;
+              background:linear-gradient(135deg,rgba(99,102,241,0.6),rgba(236,72,153,0.5));
+              display:flex; align-items:center; justify-content:center;
+              font-size:0.72rem; font-weight:900; color:white;
+            ">${i+1}</div>
+            <div style="color:#d1d5db; font-size:0.9rem; line-height:1.45;">${c}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  // ─── TAB 4: CONDITIONING ─────────────────────────────────────────────────
+
+  function renderConditioningTab() {
+    const sprintLog = safeParse(STORE_SPRINT, []);
+
+    // Check last sprint date for 48hr rule
+    const lastSprint = sprintLog.length ? sprintLog[sprintLog.length - 1] : null;
+    const lastSprintDate = lastSprint ? new Date(lastSprint.date) : null;
+    const now = new Date();
+    const hoursSinceLast = lastSprintDate ? (now - lastSprintDate) / 3600000 : 999;
+    const tooSoon = hoursSinceLast < 48;
+
+    // Count this week's sessions
+    const weekSprints = sprintLog.filter(s => {
+      const d = new Date(s.date);
+      const diff = (now - d) / 86400000;
+      return diff <= 7;
+    }).length;
+
+    const protocols = [
+      { id: "tabata",    name: "Tabata",         detail: "20sec all-out / 10sec rest × 8 rounds = 4min. Rest 2min. Repeat 2-3x.", icon: "⚡" },
+      { id: "intervals", name: "Hill Intervals",  detail: "30sec hard resistance / 90sec easy × 8 rounds.", icon: "🏔️" },
+      { id: "maxsprint", name: "Max Sprints",     detail: "10sec absolute max / 50sec rest × 10 rounds.", icon: "🚀" },
+      { id: "steady",    name: "Steady Power",    detail: "20min at 75-80% max effort. Lower intensity, good for recovery days.", icon: "🔄" },
+    ];
+
+    return `
+      ${sectionHeader("Stationary Bike Conditioning", "2-3x per week MAX. 48hr minimum between sessions.")}
+
+      <!-- Status banner -->
+      <div style="
+        padding:14px 16px; border-radius:14px; margin-bottom:16px;
+        ${tooSoon
+          ? "background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3);"
+          : "background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25);"
+        }
+        display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;
+      ">
+        <div>
+          <div style="font-weight:900; color:${tooSoon ? "#fca5a5" : "#86efac"};">
+            ${tooSoon ? "⛔ Recovery Window Active" : "✅ Ready to Sprint"}
+          </div>
+          <div style="font-size:0.82rem; color:#9ca3af; margin-top:2px;">
+            ${tooSoon
+              ? `Last session ${Math.round(hoursSinceLast)}h ago. Wait ${Math.ceil(48 - hoursSinceLast)}h more.`
+              : lastSprint ? `Last session: ${lastSprint.date} — fully recovered.` : "No sessions logged yet."
+            }
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:1.4rem; font-weight:900; color:${weekSprints >= 3 ? "#22c55e" : weekSprints >= 2 ? "#eab308" : "#9ca3af"};">
+            ${weekSprints}/3
+          </div>
+          <div style="font-size:0.75rem; color:#6b7280;">sessions this week</div>
+        </div>
+      </div>
+
+      ${warningCard("Always warm up 5min easy pedaling before sprints. If legs feel heavy or fatigued — skip and go tomorrow.")}
+
+      ${sectionHeader("Protocols — Pick One Per Session")}
+      <div style="display:grid; gap:10px; margin-bottom:20px;">
+        ${protocols.map(p => `
+          <div style="
+            padding:14px 16px; border-radius:14px;
+            border:1px solid rgba(255,255,255,0.08);
+            background:rgba(255,255,255,0.03);
+          ">
+            <div style="font-weight:900; font-size:0.95rem; margin-bottom:4px;">${p.icon} ${p.name}</div>
+            <div style="font-size:0.85rem; color:#9ca3af; line-height:1.4;">${p.detail}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      ${sectionHeader("Log a Session")}
+      ${tooSoon ? `<div style="color:#fca5a5; font-size:0.85rem; margin-bottom:12px;">⛔ Logging disabled — still in recovery window.</div>` : ""}
+      <div style="display:grid; gap:10px; margin-bottom:12px;">
+        <select id="lmSprintProtocol" style="
+          padding:10px 12px; border-radius:10px;
+          border:1px solid rgba(255,255,255,0.12);
+          background:rgba(255,255,255,0.05); color:white; outline:none;
+          ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
+        ">
+          ${protocols.map(p => `<option value="${p.id}">${p.name}</option>`).join("")}
+        </select>
+        <div style="display:flex; gap:10px;">
+          <input id="lmSprintResistance" type="number" min="1" max="20" placeholder="Resistance level (1-20)"
+            style="
+              flex:1; padding:10px 12px; border-radius:10px;
+              border:1px solid rgba(255,255,255,0.12);
+              background:rgba(255,255,255,0.05); color:white; outline:none;
+              ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
+            "
+          />
+          <select id="lmSprintFeel" style="
+            flex:1; padding:10px 12px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.05); color:white; outline:none;
+            ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
+          ">
+            <option value="5">💪 Crushed it</option>
+            <option value="4">✅ Solid session</option>
+            <option value="3">😐 Got through it</option>
+            <option value="2">😓 Tough day</option>
+            <option value="1">💀 Barely survived</option>
+          </select>
+        </div>
+        <button onclick="lmLogSprint()" style="
+          padding:12px; border-radius:12px; font-weight:900;
+          border:none; cursor:pointer; font-size:0.95rem;
+          background:${tooSoon ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8))"};
+          color:${tooSoon ? "#6b7280" : "white"};
+          ${tooSoon ? "pointer-events:none;" : ""}
+        ">Log Session</button>
+      </div>
+
+      ${sectionHeader("Recent Sessions")}
+      ${sprintLog.length === 0
+        ? `<div style="color:#6b7280; font-size:0.9rem;">No sessions logged yet.</div>`
+        : `<div style="display:grid; gap:8px;">
+            ${[...sprintLog].reverse().slice(0, 8).map(s => {
+              const feelLabels = { 5:"💪 Crushed it", 4:"✅ Solid", 3:"😐 Got through it", 2:"😓 Tough", 1:"💀 Barely survived" };
+              const protocolNames = { tabata:"Tabata", intervals:"Hill Intervals", maxsprint:"Max Sprints", steady:"Steady Power" };
+              return `
+                <div style="
+                  display:flex; justify-content:space-between; align-items:center;
+                  padding:12px 14px; border-radius:12px;
+                  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+                  flex-wrap:wrap; gap:8px;
+                ">
+                  <div>
+                    <div style="font-weight:800; font-size:0.9rem;">${protocolNames[s.protocol] || s.protocol}</div>
+                    <div style="font-size:0.78rem; color:#6b7280; margin-top:2px;">${s.date} · Resistance ${s.resistance || "—"}</div>
+                  </div>
+                  <div style="font-size:0.85rem; color:#9ca3af;">${feelLabels[s.feel] || ""}</div>
+                </div>
+              `;
+            }).join("")}
+          </div>`
+      }
+    `;
+  }
+
+  window.lmLogSprint = function() {
+    const protocol   = document.getElementById("lmSprintProtocol")?.value;
+    const resistance = document.getElementById("lmSprintResistance")?.value;
+    const feel       = document.getElementById("lmSprintFeel")?.value;
+
+    const log = safeParse(STORE_SPRINT, []);
+
+    // Check 48hr rule
+    const last = log.length ? new Date(log[log.length-1].date) : null;
+    const hoursSince = last ? (new Date() - last) / 3600000 : 999;
+    if (hoursSince < 48) {
+      alert(`⛔ Recovery window active. ${Math.ceil(48 - hoursSince)} hours remaining.`);
+      return;
+    }
+
+    log.push({
+      date: todayKey(),
+      protocol,
+      resistance: resistance || null,
+      feel: Number(feel),
+    });
+
+    localStorage.setItem(STORE_SPRINT, JSON.stringify(log));
+    renderLooksmaxxing();
+  };
+
+  // ─── TAB 5: PROGRESS ──────────────────────────────────────────────────────
+
+  function renderProgressTab() {
+    const neckLog = safeParse(STORE_NECK, []);
+    const notes   = safeParse(STORE_NOTES, {});
+    const weekKey = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - d.getDay());
+      return todayKey(d);
+    })();
+    const currentNote = notes[weekKey] || "";
+
+    return `
+      ${sectionHeader("Neck Measurement", "Goal: 17+ inches. Track weekly.")}
+      <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+        <input id="lmNeckInches" type="number" step="0.25" min="10" max="25" placeholder='e.g. 15.5 (inches)'
+          style="
+            flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.05); color:white; outline:none;
+          "
+        />
+        <button onclick="lmLogNeck()" style="
+          padding:10px 20px; border-radius:10px; font-weight:800;
+          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
+          border:none; color:white; cursor:pointer;
+        ">Log</button>
+      </div>
+
+      ${neckLog.length === 0
+        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No measurements yet. Start logging to track progress.</div>`
+        : `<div style="display:grid; gap:8px; margin-bottom:20px;">
+            ${[...neckLog].reverse().slice(0, 10).map((entry, i, arr) => {
+              const prev = arr[i+1];
+              const diff = prev ? (entry.inches - prev.inches).toFixed(2) : null;
+              const diffColor = diff > 0 ? "#22c55e" : diff < 0 ? "#ef4444" : "#9ca3af";
+              return `
+                <div style="
+                  display:flex; justify-content:space-between; align-items:center;
+                  padding:12px 14px; border-radius:12px;
+                  background:${i === 0 ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)"};
+                  border:1px solid ${i === 0 ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.07)"};
+                ">
+                  <div>
+                    <span style="font-weight:900; font-size:1.05rem;">${entry.inches}"</span>
+                    <span style="color:#6b7280; font-size:0.82rem; margin-left:8px;">${entry.date}</span>
+                  </div>
+                  ${diff !== null ? `<span style="font-weight:800; font-size:0.85rem; color:${diffColor};">${diff > 0 ? "+" : ""}${diff}"</span>` : `<span style="color:#4b5563; font-size:0.8rem;">baseline</span>`}
+                </div>
+              `;
+            }).join("")}
+          </div>`
+      }
+
+      ${sectionHeader("Weekly Notes", "What worked? What didn't? What to focus on next week?")}
+      <textarea id="lmWeeklyNote" placeholder="Write your weekly reflection here..."
+        style="
+          width:100%; min-height:120px; padding:12px; border-radius:12px; resize:vertical;
+          border:1px solid rgba(255,255,255,0.12);
+          background:rgba(255,255,255,0.04); color:white; outline:none;
+          font-size:0.9rem; line-height:1.5;
+        "
+        oninput="lmSaveNote(this.value)"
+      >${currentNote}</textarea>
+
+      ${sectionHeader("This Week's Completion")}
+      ${renderWeekSummary()}
+    `;
+  }
+
+  function renderWeekSummary() {
+    const allItems = [
+      "lm_neck_iso","lm_mewing_am","lm_mewing_pm","lm_jaw_gum","lm_jaw_clench",
+      "lm_cheek_lifts","lm_chin_tucks","lm_face_massage","lm_sodium","lm_water",
+      "lm_am_cleanser","lm_am_vitc","lm_am_moisturizer","lm_pm_cleanser","lm_pm_tallow","lm_pm_guasha",
+      "lm_supp_zinc","lm_supp_omega","lm_supp_collagen","lm_supp_vitd",
+      "lm_post_wall_am","lm_post_tucks_am","lm_post_hangs_am","lm_teeth_brush","lm_teeth_floss",
+    ];
+    const data = getCompletions();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const k = todayKey(d);
+      const done = allItems.filter(id => data?.[k]?.[id]).length;
+      const pct = Math.round((done / allItems.length) * 100);
+      days.push({ label: ["Su","Mo","Tu","We","Th","Fr","Sa"][d.getDay()], date: d.getDate(), pct, k });
+    }
+
+    return `
+      <div style="display:flex; gap:8px; align-items:flex-end; height:80px; margin-bottom:8px;">
+        ${days.map(d => {
+          const isToday = d.k === todayKey();
+          const color = d.pct >= 75 ? "#22c55e" : d.pct >= 50 ? "#eab308" : d.pct > 0 ? "#f97316" : "rgba(255,255,255,0.1)";
           return `
-            <div onclick="markRoutineDone('${escapeHtml(r.id)}')" style="padding:10px; border-radius:10px; background:${done ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)'}; cursor:pointer; margin-bottom:6px;">
-              <strong>${escapeHtml(r.name)}</strong>
-              <span style="color:#9CA3AF;">(${escapeHtml(r.frequency)})</span>
-              ${done ? "✅" : ""}
-              ${streak ? `<div style="font-size:0.85rem;color:#F59E0B;">🔥 ${streak}-day streak</div>` : ""}
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <div style="font-size:0.72rem; font-weight:800; color:#9ca3af;">${d.pct > 0 ? d.pct + "%" : ""}</div>
+              <div style="
+                width:100%; border-radius:6px;
+                height:${Math.max(6, d.pct * 0.48)}px;
+                background:${color};
+                border:${isToday ? "1px solid rgba(167,139,250,0.6)" : "none"};
+              "></div>
+              <div style="font-size:0.72rem; color:${isToday ? "#a78bfa" : "#6b7280"}; font-weight:${isToday ? "900" : "400"};">${d.label}</div>
             </div>
           `;
         }).join("")}
       </div>
     `;
-  }).join("");
-}
+  }
 
-function markRoutineDone(id) {
-  const r = (looksData.routines || []).find(x => x && x.id === id);
-  if (!r) return;
+  window.lmLogNeck = function() {
+    const val = parseFloat(document.getElementById("lmNeckInches")?.value);
+    if (!val || val < 10 || val > 25) return alert("Enter a valid neck measurement in inches (10-25).");
+    const log = safeParse(STORE_NECK, []);
+    log.push({ date: todayKey(), inches: val });
+    localStorage.setItem(STORE_NECK, JSON.stringify(log));
+    renderLooksmaxxing();
+  };
 
-  const today = getTodayKey();
-  const completed = r.lastDone !== today;
-  r.lastDone = completed ? today : null;
+  window.lmSaveNote = function(val) {
+    const notes = safeParse(STORE_NOTES, {});
+    const d = new Date(); d.setDate(d.getDate() - d.getDay());
+    notes[todayKey(d)] = val;
+    localStorage.setItem(STORE_NOTES, JSON.stringify(notes));
+  };
 
-  updateRoutineStreak(id, completed);
+  // ─── TAB BAR ─────────────────────────────────────────────────────────────
 
-  markActive();
-  saveLooksData();
-  renderLooksMaxxing();
-}
-
-// ---------- RENDER: STAT BAR ----------
-function renderStatBar(label, value) {
-  const v = Math.max(0, Math.min(100, Number(value) || 0));
-  return `
-    <div style="margin-bottom:10px;">
-      <div style="display:flex; justify-content:space-between;">
-        <span>${escapeHtml(label)}</span>
-        <span style="font-weight:700;">${v}</span>
-      </div>
-      <div style="height:8px; background:rgba(255,255,255,0.1); border-radius:6px;">
-        <div style="height:100%; width:${v}%; background:linear-gradient(90deg,#6366F1,#EC4899); border-radius:6px;"></div>
-      </div>
-    </div>
-  `;
-}
-
-// ---------- RENDER: STAT EXPLANATIONS ----------
-function renderStatExplanations(stats) {
-  const today = getTodayKey();
-  const completion = getDayCompletion(today);
-
-  const trend = stats.trend;
-  const mode = trend.mode;
-
-  const modeTip =
-    mode === "bulk"
-      ? "Bulk: aim for slow upward trend."
-      : mode === "cut"
-      ? "Cut: aim for slow downward trend."
-      : "Maintain: aim for stable weight.";
-
-  const explanations = [
-    {
-      title: "Face",
-      text:
-        stats.jawScore < 100 || completion.doneRoutines < completion.totalRoutines
-          ? "Face dips when skincare routines or jaw/neck work are skipped."
-          : "Face is strong because skincare + jaw/neck are consistent.",
-      win: "Fastest win: do skincare + jaw/neck today."
-    },
-    {
-      title: "Body",
-      text:
-        trend.status === "On Track"
-          ? `Body improves because your trend matches your mode (${mode}).`
-          : trend.status === "Off Track"
-          ? `Body suffers because your trend is opposite your mode (${mode}).`
-          : "Body is stalled. Your trend is flat.",
-      win:
-        trend.status === "Stalled"
-          ? "Fastest win: adjust calories slightly and log weight consistently."
-          : "Fastest win: keep consistency. Don’t change what’s working."
-    },
-    {
-      title: "Discipline",
-      text:
-        stats.routineScore < 70
-          ? "Discipline falls when routines are skipped."
-          : "Discipline rises when you keep the chain alive.",
-      win: "Fastest win: complete Today’s Focus (3 wins)."
-    },
-    {
-      title: "Aura",
-      text: "Aura rises when Face, Body, and Discipline are consistent together.",
-      win: "Fastest win: stack simple wins daily."
-    }
+  const TABS = [
+    { id: "facial",       label: "💪 Facial & Neck" },
+    { id: "skin",         label: "✨ Skin & Grooming" },
+    { id: "posture",      label: "🧍 Posture" },
+    { id: "conditioning", label: "🚴 Conditioning" },
+    { id: "progress",     label: "📈 Progress" },
   ];
 
-  return `
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧠 Why Your Stats Changed</div>
-      <div style="color:#9CA3AF; margin-bottom:10px;">${escapeHtml(modeTip)}</div>
-      ${explanations
-        .map(
-          e => `
-          <div style="margin-bottom:10px; padding:10px; border-radius:10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);">
-            <div style="font-weight:900; margin-bottom:6px;">${escapeHtml(e.title)}</div>
-            <div style="color:#E5E7EB; margin-bottom:6px;">${escapeHtml(e.text)}</div>
-            <div style="color:#A78BFA; font-weight:800;">${escapeHtml(e.win)}</div>
-          </div>
-        `
-        )
-        .join("")}
-    </div>
-  `;
-}
+  window.lmSetTab = function(id) {
+    activeTab = id;
+    renderLooksmaxxing();
+  };
 
-// ---------- RENDER: WEEKLY SUMMARY ----------
-function renderWeeklySummary() {
-  const due = isWeeklySummaryDue();
-  const bullets = generateWeeklyIdentitySummary();
-  const archetype = getArchetype();
+  // ─── MAIN RENDER ──────────────────────────────────────────────────────────
 
-  return `
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧾 Weekly Identity Summary</div>
-      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:10px;">
-        <div style="color:${due ? "#F59E0B" : "#22C55E"}; font-weight:900;">
-          ${due ? "Weekly Check-in Due" : "Up to date"}
-        </div>
-        ${due ? `<button class="form-submit" onclick="logWeeklyCheckIn()">Log Weekly Check-in</button>` : ""}
-      </div>
-      <div style="margin-bottom:8px; color:#9CA3AF;">Archetype: <strong style="color:#E5E7EB;">${escapeHtml(archetype)}</strong></div>
-      <ul style="margin:0; padding-left:18px; color:#E5E7EB;">
-        ${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
-      </ul>
-    </div>
-  `;
-}
+  function renderLooksmaxxing() {
+    const container = document.getElementById("looksMaxxingContainer");
+    if (!container) return;
 
-// ---------- RENDER: HEAT + NARRATIVE ----------
-function renderHeatAndNarrative() {
-  const h = getHeatMeter();
-  const narrative = getThirtyDayNarrative();
+    const tabContent = {
+      facial:       renderFacialTab,
+      skin:         renderSkinTab,
+      posture:      renderPostureTab,
+      conditioning: renderConditioningTab,
+      progress:     renderProgressTab,
+    };
 
-  const narrativeHtml = !narrative
-    ? `<div style="color:#9CA3AF;">Not enough data yet for a 30-day narrative.</div>`
-    : `
-      <div style="color:#E5E7EB;">
-        30-day adherence average: <strong>${narrative.avg}%</strong><br/>
-        Last 10 days vs first 10 days: <strong>${narrative.avgLast}%</strong> vs <strong>${narrative.avgFirst}%</strong>
-        (${narrative.diff > 0 ? "+" : ""}${narrative.diff}%)
+    const tabBar = `
+      <div style="
+        display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
+        scrollbar-width:none; margin-bottom:20px;
+      ">
+        ${TABS.map(t => `
+          <button onclick="lmSetTab('${t.id}')" style="
+            padding:9px 14px; border-radius:20px; cursor:pointer; white-space:nowrap;
+            font-weight:800; font-size:0.85rem; transition:all 0.15s;
+            border:1px solid ${activeTab === t.id ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.1)"};
+            background:${activeTab === t.id
+              ? "linear-gradient(135deg,rgba(99,102,241,0.8),rgba(236,72,153,0.7))"
+              : "rgba(255,255,255,0.04)"};
+            color:${activeTab === t.id ? "white" : "#9ca3af"};
+          ">${t.label}</button>
+        `).join("")}
       </div>
     `;
 
-  return `
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🔥 Consistency Heat (Last 7 Days)</div>
-      <div style="display:flex; gap:12px; flex-wrap:wrap; color:#E5E7EB;">
-        <div>Face: <strong>${h.face}</strong></div>
-        <div>Body: <strong>${h.body}</strong></div>
-        <div>Style: <strong>${h.style}</strong></div>
-        <div>Discipline: <strong>${h.discipline}</strong></div>
-      </div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">📆 30-Day Before/After</div>
-      ${narrativeHtml}
-    </div>
-  `;
-}
-
-// ---------- REGRESSION GUARD ----------
-function getInactivityDays() {
-  const last = looksData.meta.lastActiveDate;
-  if (!last) return 0;
-  return daysBetweenKeys(last, getTodayKey());
-}
-
-function shouldUseCompactView() {
-  if (looksData.meta.ui.forceExpanded) return false;
-  return getInactivityDays() >= 3;
-}
-
-function renderCompactReturnView(stats, confidence) {
-  const inactiveDays = getInactivityDays();
-
-  return `
-    <div style="margin-bottom:20px;">
-      <h2>💎 LooksMaxxing RPG System</h2>
-      <div style="color:#9CA3AF;">Welcome back. You were away for ${inactiveDays} days.</div>
-    </div>
-
-    ${renderTodaysFocus()}
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧠 Confidence Index</div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-weight:900; font-size:1.4rem;">${confidence.score}</div>
-        <div style="color:${confidence.direction === "Rising" ? "#22C55E" : confidence.direction === "Dropping" ? "#EF4444" : "#F59E0B"}; font-weight:900;">
-          ${confidence.direction}
+    container.innerHTML = `
+      <div style="padding:4px 0;">
+        <h2 style="
+          font-size:1.5rem; font-weight:900; margin-bottom:6px;
+          background:linear-gradient(135deg,#e5e7eb,#a78bfa);
+          -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        ">Looksmaxxing</h2>
+        <div style="color:#6b7280; font-size:0.85rem; margin-bottom:20px;">
+          Daily protocol for facial structure, skin, posture & conditioning.
+        </div>
+        ${tabBar}
+        <div id="lmTabContent">
+          ${(tabContent[activeTab] || tabContent.facial)()}
         </div>
       </div>
-      <div style="color:#9CA3AF;">Today: ${confidence.todayPercent}% · Yesterday: ${confidence.yesterdayPercent}%</div>
-      <div style="margin-top:10px;">
-        <button class="form-submit" onclick="setForceExpanded(true)">Show Full Dashboard</button>
-      </div>
-    </div>
-  `;
-}
-
-// ---------- MAIN RENDER ----------
-function renderLooksMaxxing() {
-  const container = document.getElementById("looksMaxxingContainer");
-  if (!container) return;
-
-  const stats = calculateLooksStats();
-  const confidence = getConfidenceIndex();
-  const latestWeight = (looksData.weightLogs || []).slice(-1)[0]?.weight || "—";
-  const trend = stats.trend;
-
-  // Compact view if user went inactive (silent regression guard)
-  if (shouldUseCompactView()) {
-    container.innerHTML = renderCompactReturnView(stats, confidence);
-    return;
+    `;
   }
 
-  const archetype = getArchetype();
+  window.renderLooksmaxxing = renderLooksmaxxing;
 
-  container.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <h2>💎 LooksMaxxing RPG System</h2>
-      <div style="color:#9CA3AF;">Elite masculine optimization dashboard</div>
-    </div>
-
-    ${renderTodaysFocus()}
-
-    <div class="stats-grid" style="margin-bottom:20px;">
-      <div class="stat-card">
-        <div class="stat-value">${stats.looksScore}</div>
-        <div class="stat-label">Looks Score</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${latestWeight}</div>
-        <div class="stat-label">Body Weight (lbs)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${getThisWeekCheckIns()}</div>
-        <div class="stat-label">Weekly Check-ins</div>
-      </div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧠 Confidence Index</div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-weight:900; font-size:1.4rem;">${confidence.score}</div>
-        <div style="color:${confidence.direction === "Rising" ? "#22C55E" : confidence.direction === "Dropping" ? "#EF4444" : "#F59E0B"}; font-weight:900;">
-          ${confidence.direction}
-        </div>
-      </div>
-      <div style="color:#9CA3AF;">Today: ${confidence.todayPercent}% · Yesterday: ${confidence.yesterdayPercent}%</div>
-      <div style="margin-top:6px; color:#9CA3AF;">Archetype: <strong style="color:#E5E7EB;">${escapeHtml(archetype)}</strong></div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🧬 RPG Character Stats</div>
-      ${renderStatBar("Face", stats.face)}
-      ${renderStatBar("Body", stats.body)}
-      ${renderStatBar("Style", stats.style)}
-      ${renderStatBar("Discipline", stats.discipline)}
-      ${renderStatBar("Aura", stats.aura)}
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🏋️ Body Weight Tracker</div>
-      ${renderModeSelector()}
-      <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input id="weightInput" type="number" placeholder="Enter weight (lbs)" class="form-input"/>
-        <button onclick="logWeight()" class="form-submit">Log</button>
-      </div>
-      <div style="margin-bottom:6px;"><strong>Status:</strong>
-        <span style="color:${
-          trend.status === "On Track" ? "#22C55E" : trend.status === "Off Track" ? "#EF4444" : "#F59E0B"
-        }; font-weight:900;">
-          ${escapeHtml(trend.status)}
-        </span>
-      </div>
-      <div style="margin-bottom:8px;"><strong>7-log change:</strong> ${trend.delta > 0 ? "+" : ""}${escapeHtml(trend.delta)} lbs</div>
-      <div id="weightHistory">${renderWeightHistory()}</div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">🦷 Jawline & Neck Training</div>
-      <div id="jawNeckGrid">${renderJawNeck()}</div>
-    </div>
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">✨ Routines</div>
-      <div id="routinesGrid"></div>
-    </div>
-
-    ${renderStatExplanations(stats)}
-    ${renderWeeklySummary()}
-    ${renderHeatAndNarrative()}
-
-    <div class="habit-section" style="margin-bottom:20px;">
-      <div class="section-title">⚙️ Quick Controls</div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="form-submit" onclick="setForceExpanded(false)">Enable Return Guard</button>
-        <button class="form-submit" onclick="setForceExpanded(true)">Force Full View</button>
-      </div>
-      <div style="margin-top:8px; color:#9CA3AF;">
-        Return Guard shows a simplified view if you go inactive for 3+ days.
-      </div>
-    </div>
-  `;
-
-  // routines render after HTML injection
-  renderRoutinesGrid();
-}
-
-// ---------- BOOT ----------
-(function bootLooksMaxxing() {
-  try {
-    initLooksMaxxing();
-    const container = document.getElementById("looksMaxxingContainer");
-    if (container) renderLooksMaxxing();
-  } catch (e) {
-    console.error("LooksMaxxing init failed:", e);
+  if (App) {
+    App.features.looksmaxxing = { render: renderLooksmaxxing };
+    App.on("looksmaxxing", renderLooksmaxxing);
   }
+
 })();
-
-console.log("LooksMaxxing RPG module loaded");
