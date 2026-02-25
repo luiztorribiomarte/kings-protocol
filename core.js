@@ -23,9 +23,8 @@
       dashboard: 1,
       workout: 2,
       looksmaxxing: 3,
-      visionBoard: 4,
-      content: 5,
-      books: 6
+      content: 4,
+      books: 5
     };
 
     const pageId = page + "Page";
