@@ -11,6 +11,8 @@
   const STORE_NECK        = "looksmaxxNeckLog";
   const STORE_SPRINT      = "looksmaxxSprintLog";
   const STORE_NOTES       = "looksmaxxWeeklyNotes";
+  const STORE_WEIGHT      = "looksmaxxWeightLog";
+  const STORE_HEIGHT      = "looksmaxxHeight";
 
   let activeTab = "facial";
 
@@ -467,19 +469,134 @@
   // ─── TAB 5: PROGRESS ──────────────────────────────────────────────────────
 
   function renderProgressTab() {
-    const neckLog = safeParse(STORE_NECK, []);
-    const notes   = safeParse(STORE_NOTES, {});
-    const weekKey = (() => {
+    const neckLog     = safeParse(STORE_NECK, []);
+    const weightLog   = safeParse(STORE_WEIGHT, []);
+    const savedHeight = safeParse(STORE_HEIGHT, null);  // stored in inches
+    const notes       = safeParse(STORE_NOTES, {});
+    const weekKey     = (() => {
       const d = new Date();
       d.setDate(d.getDate() - d.getDay());
       return todayKey(d);
     })();
-    const currentNote = notes[weekKey] || "";
+    const currentNote  = notes[weekKey] || "";
+    const latestWeight = weightLog.length ? weightLog[weightLog.length - 1].lbs : null;
+
+    // BMI = (lbs / inches²) × 703
+    function calcBMI(lbs, heightIn) {
+      if (!lbs || !heightIn) return null;
+      return ((lbs / (heightIn * heightIn)) * 703).toFixed(1);
+    }
+    function bmiLabel(b) {
+      if (!b) return "";
+      const n = parseFloat(b);
+      if (n < 18.5) return { text: "Underweight", color: "#60a5fa" };
+      if (n < 25)   return { text: "Normal",      color: "#22c55e" };
+      if (n < 30)   return { text: "Overweight",  color: "#f59e0b" };
+      return               { text: "Obese",        color: "#ef4444" };
+    }
+
+    const currentBMI   = calcBMI(latestWeight, savedHeight);
+    const bmiMeta      = bmiLabel(currentBMI);
+
+    // Reusable log row renderer
+    function logRow(entry, i, arr, valKey, unit, higherIsBetter) {
+      const prev = arr[i + 1];
+      const raw  = prev ? (entry[valKey] - prev[valKey]) : null;
+      const diff = raw !== null ? raw.toFixed(1) : null;
+      const improved = raw !== null ? (higherIsBetter ? raw > 0 : raw < 0) : false;
+      const neutral  = raw !== null && parseFloat(diff) === 0;
+      const diffColor = diff === null ? "#9ca3af" : neutral ? "#9ca3af" : improved ? "#22c55e" : "#ef4444";
+
+      return `
+        <div style="
+          display:flex; justify-content:space-between; align-items:center;
+          padding:12px 14px; border-radius:12px;
+          background:${i === 0 ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)"};
+          border:1px solid ${i === 0 ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.07)"};
+        ">
+          <div>
+            <span style="font-weight:900; font-size:1.05rem;">${entry[valKey]} ${unit}</span>
+            <span style="color:#6b7280; font-size:0.82rem; margin-left:8px;">${entry.date}</span>
+          </div>
+          ${diff !== null
+            ? `<span style="font-weight:800; font-size:0.85rem; color:${diffColor};">${parseFloat(diff) > 0 ? "+" : ""}${diff} ${unit}</span>`
+            : `<span style="color:#4b5563; font-size:0.8rem;">baseline</span>`}
+        </div>
+      `;
+    }
+
+    // Height display helper
+    function inchesToFtIn(inches) {
+      const ft = Math.floor(inches / 12);
+      const ins = Math.round(inches % 12);
+      return `${ft}ft ${ins}in`;
+    }
 
     return `
+      ${sectionHeader("Height", "Set once — used for BMI. You're 6'5\" = 77 inches.")}
+      <div style="display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+        <input id="lmHeightIn" type="number" step="0.5" min="48" max="96"
+          value="${savedHeight || ""}"
+          placeholder="Height in total inches (e.g. 77)"
+          style="
+            flex:1; min-width:200px; padding:10px 12px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.05); color:white; outline:none;
+          "
+        />
+        <button onclick="lmSaveHeight()" style="
+          padding:10px 20px; border-radius:10px; font-weight:800;
+          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
+          border:none; color:white; cursor:pointer;
+        ">Save</button>
+      </div>
+      ${savedHeight ? `<div style="color:#6b7280; font-size:0.82rem; margin-bottom:16px;">Saved: ${savedHeight}" = ${inchesToFtIn(savedHeight)}</div>` : `<div style="margin-bottom:16px;"></div>`}
+
+      ${sectionHeader("Weight & BMI", "Log in lbs. BMI auto-calculates once height is set.")}
+
+      ${(latestWeight && currentBMI) ? `
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;">
+          <div style="padding:14px; border-radius:14px; background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.25); text-align:center;">
+            <div style="font-size:1.4rem; font-weight:900;">${latestWeight}</div>
+            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">lbs</div>
+          </div>
+          <div style="padding:14px; border-radius:14px; background:rgba(236,72,153,0.08); border:1px solid rgba(236,72,153,0.2); text-align:center;">
+            <div style="font-size:1.4rem; font-weight:900; color:${bmiMeta.color};">${currentBMI}</div>
+            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">BMI</div>
+          </div>
+          <div style="padding:14px; border-radius:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); text-align:center;">
+            <div style="font-size:1rem; font-weight:900; color:${bmiMeta.color}; padding-top:4px;">${bmiMeta.text}</div>
+            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">Category</div>
+          </div>
+        </div>
+      ` : ""}
+
+      <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+        <input id="lmWeightLbs" type="number" step="0.5" min="80" max="400"
+          placeholder="Weight in lbs (e.g. 185)"
+          style="
+            flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.05); color:white; outline:none;
+          "
+        />
+        <button onclick="lmLogWeight()" style="
+          padding:10px 20px; border-radius:10px; font-weight:800;
+          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
+          border:none; color:white; cursor:pointer;
+        ">Log</button>
+      </div>
+      ${weightLog.length === 0
+        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No entries yet.</div>`
+        : `<div style="display:grid; gap:8px; margin-bottom:20px;">
+            ${[...weightLog].reverse().slice(0, 10).map((e, i, arr) => logRow(e, i, arr, "lbs", "lbs", false)).join("")}
+          </div>`
+      }
+
       ${sectionHeader("Neck Measurement", "Goal: 17+ inches. Track weekly.")}
-      <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
-        <input id="lmNeckInches" type="number" step="0.25" min="10" max="25" placeholder='e.g. 15.5 (inches)'
+      <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+        <input id="lmNeckInches" type="number" step="0.25" min="10" max="25"
+          placeholder="Neck in inches (e.g. 15.5)"
           style="
             flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
             border:1px solid rgba(255,255,255,0.12);
@@ -492,39 +609,20 @@
           border:none; color:white; cursor:pointer;
         ">Log</button>
       </div>
-
       ${neckLog.length === 0
-        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No measurements yet. Start logging to track progress.</div>`
+        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No measurements yet.</div>`
         : `<div style="display:grid; gap:8px; margin-bottom:20px;">
-            ${[...neckLog].reverse().slice(0, 10).map((entry, i, arr) => {
-              const prev = arr[i+1];
-              const diff = prev ? (entry.inches - prev.inches).toFixed(2) : null;
-              const diffColor = diff > 0 ? "#22c55e" : diff < 0 ? "#ef4444" : "#9ca3af";
-              return `
-                <div style="
-                  display:flex; justify-content:space-between; align-items:center;
-                  padding:12px 14px; border-radius:12px;
-                  background:${i === 0 ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)"};
-                  border:1px solid ${i === 0 ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.07)"};
-                ">
-                  <div>
-                    <span style="font-weight:900; font-size:1.05rem;">${entry.inches}"</span>
-                    <span style="color:#6b7280; font-size:0.82rem; margin-left:8px;">${entry.date}</span>
-                  </div>
-                  ${diff !== null ? `<span style="font-weight:800; font-size:0.85rem; color:${diffColor};">${diff > 0 ? "+" : ""}${diff}"</span>` : `<span style="color:#4b5563; font-size:0.8rem;">baseline</span>`}
-                </div>
-              `;
-            }).join("")}
+            ${[...neckLog].reverse().slice(0, 10).map((e, i, arr) => logRow(e, i, arr, "inches", '"', true)).join("")}
           </div>`
       }
 
-      ${sectionHeader("Weekly Notes", "What worked? What didn't? What to focus on next week?")}
+      ${sectionHeader("Weekly Notes", "What worked? What didn't? What to adjust next week?")}
       <textarea id="lmWeeklyNote" placeholder="Write your weekly reflection here..."
         style="
           width:100%; min-height:120px; padding:12px; border-radius:12px; resize:vertical;
           border:1px solid rgba(255,255,255,0.12);
           background:rgba(255,255,255,0.04); color:white; outline:none;
-          font-size:0.9rem; line-height:1.5;
+          font-size:0.9rem; line-height:1.5; margin-bottom:20px;
         "
         oninput="lmSaveNote(this.value)"
       >${currentNote}</textarea>
@@ -580,6 +678,22 @@
     const log = safeParse(STORE_NECK, []);
     log.push({ date: todayKey(), inches: val });
     localStorage.setItem(STORE_NECK, JSON.stringify(log));
+    renderLooksmaxxing();
+  };
+
+  window.lmLogWeight = function() {
+    const val = parseFloat(document.getElementById("lmWeightLbs")?.value);
+    if (!val || val < 80 || val > 400) return alert("Enter a valid weight in lbs (80-400).");
+    const log = safeParse(STORE_WEIGHT, []);
+    log.push({ date: todayKey(), lbs: val });
+    localStorage.setItem(STORE_WEIGHT, JSON.stringify(log));
+    renderLooksmaxxing();
+  };
+
+  window.lmSaveHeight = function() {
+    const val = parseFloat(document.getElementById("lmHeightIn")?.value);
+    if (!val || val < 48 || val > 96) return alert("Enter height in inches (48-96). e.g. 77 for 6ft 5in.");
+    localStorage.setItem(STORE_HEIGHT, JSON.stringify(val));
     renderLooksmaxxing();
   };
 
