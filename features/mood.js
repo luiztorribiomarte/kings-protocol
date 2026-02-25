@@ -558,8 +558,7 @@
       <div id="moodInsight"></div>
       <div id="moodEmojiRow" style="margin-top:12px; display:grid; gap:8px; grid-template-columns:repeat(auto-fit, minmax(44px, 1fr));"></div>
     `;
-    if (typeof window.openModal === "function") window.openModal(html);
-    else return alert("Modal system not found.");
+    window.openModal(html);
     const select = document.getElementById("moodRangeSelect");
     if (select) select.onchange = () => openMoodGraph(select.value);
     setTimeout(() => renderMoodChart(range), 0);
