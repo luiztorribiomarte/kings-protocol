@@ -24,7 +24,8 @@
       workout: 2,
       looksmaxxing: 3,
       content: 4,
-      books: 5
+      books: 5,
+      deadlines: 6   // ← ADDED
     };
 
     const pageId = page + "Page";
