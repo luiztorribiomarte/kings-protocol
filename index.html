@@ -128,14 +128,12 @@ window.openModal = function(html) {
 };
 
 window.closeModal = function(e) {
-    // If called from backdrop click, only close if clicking the backdrop itself
     if (e && e.target !== document.getElementById("modal")) return;
     const modal = document.getElementById("modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
 };
 
-// Allow ESC key to close modal
 document.addEventListener("keydown", function(e) {
     if (e.key === "Escape") {
         const modal = document.getElementById("modal");
@@ -279,6 +277,7 @@ window.openWeeklyReview = function() {
 <script src="./features/contentHub.js"></script>
 <script src="./features/contentUpgrades.js"></script>
 <script src="./features/youtubeStats.js"></script>
+<script src="./features/notifications.js"></script>
 
 </body>
 </html>
