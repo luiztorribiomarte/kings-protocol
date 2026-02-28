@@ -1,6 +1,6 @@
 /* features/looksmaxxing.js — KINGS PROTOCOL
-   5 tabs: Facial & Neck | Skin & Grooming | Posture | Conditioning | Progress
-   All data saved to localStorage under looksmaxxCompletions[dateKey][itemId]
+   4 tabs: Facial & Neck | Skin & Grooming | Conditioning | Progress
+   Smart day-awareness: neck days Mon/Wed/Fri, sprints Tue/Thu/Sat, salicylic Mon/Wed/Fri
 */
 
 (function () {
@@ -16,7 +16,7 @@
 
   let activeTab = "facial";
 
-  // ─── STORAGE HELPERS ──────────────────────────────────────────────────────
+  // ─── HELPERS ──────────────────────────────────────────────────────────────
 
   function pad(n) { return String(n).padStart(2, "0"); }
 
@@ -29,17 +29,60 @@
     catch { return fallback; }
   }
 
+  // Day-of-week helpers: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  const DOW = new Date().getDay();
+  const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  // Neck weighted: Mon/Wed/Fri
+  const NECK_DAYS   = [1, 3, 5];
+  // Sprint: Tue/Thu/Sat
+  const SPRINT_DAYS = [2, 4, 6];
+  // Salicylic: Mon/Wed/Fri
+  const SAL_DAYS    = [1, 3, 5];
+
+  function scheduleStatus(days) {
+    const isToday = days.includes(DOW);
+    if (isToday) return { isToday: true, nextDay: null };
+    for (let i = 1; i <= 7; i++) {
+      if (days.includes((DOW + i) % 7)) {
+        return { isToday: false, nextDay: DAY_NAMES[(DOW + i) % 7] };
+      }
+    }
+    return { isToday: false, nextDay: null };
+  }
+
+  function dayScheduleBadge(scheduledDays) {
+    const { isToday, nextDay } = scheduleStatus(scheduledDays);
+    const labels = scheduledDays.map(d => DAY_NAMES[d]).join(" · ");
+    if (isToday) {
+      return `<span style="font-size:0.72rem; padding:2px 8px; border-radius:20px; background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.35); color:#86efac; font-weight:800;">✅ Today · ${labels}</span>`;
+    }
+    return `<span style="font-size:0.72rem; padding:2px 8px; border-radius:20px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#6b7280; font-weight:700;">Next: ${nextDay} · ${labels}</span>`;
+  }
+
+  function scheduleBanner(days, label) {
+    const { isToday, nextDay } = scheduleStatus(days);
+    const labels = days.map(d => DAY_NAMES[d]).join(" / ");
+    if (isToday) {
+      return `<div style="padding:10px 14px; border-radius:10px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); color:#86efac; font-size:0.82rem; margin-bottom:12px; font-weight:800;">✅ Today is a ${label} day &nbsp;·&nbsp; ${labels}</div>`;
+    }
+    return `<div style="padding:10px 14px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#6b7280; font-size:0.82rem; margin-bottom:12px;">⏭️ No ${label} today — next: <strong style="color:#9ca3af;">${nextDay}</strong> &nbsp;·&nbsp; ${labels}</div>`;
+  }
+
+  // ─── COMPLETIONS ──────────────────────────────────────────────────────────
+
   function getCompletions() { return safeParse(STORE_COMPLETIONS, {}); }
-  function saveCompletions(data) { localStorage.setItem(STORE_COMPLETIONS, JSON.stringify(data)); }
+  function saveCompletions(d) { localStorage.setItem(STORE_COMPLETIONS, JSON.stringify(d)); }
 
   function isChecked(itemId, dateKey = todayKey()) {
     return !!(getCompletions()?.[dateKey]?.[itemId]);
   }
 
-  function toggleItem(itemId, dateKey = todayKey()) {
+  function toggleItem(itemId) {
     const data = getCompletions();
-    if (!data[dateKey]) data[dateKey] = {};
-    data[dateKey][itemId] = !data[dateKey][itemId];
+    const k = todayKey();
+    if (!data[k]) data[k] = {};
+    data[k][itemId] = !data[k][itemId];
     saveCompletions(data);
     renderLooksmaxxing();
   }
@@ -52,8 +95,7 @@
     for (let i = 0; i < 365; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const k = todayKey(d);
-      if (data?.[k]?.[itemId]) streak++;
+      if (data?.[todayKey(d)]?.[itemId]) streak++;
       else break;
     }
     return streak;
@@ -63,8 +105,7 @@
     const data = getCompletions();
     let count = 0;
     for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+      const d = new Date(); d.setDate(d.getDate() - i);
       if (data?.[todayKey(d)]?.[itemId]) count++;
     }
     return count;
@@ -72,19 +113,21 @@
 
   // ─── CHECKLIST RENDERER ───────────────────────────────────────────────────
 
-  function renderChecklist(items, dateKey = todayKey()) {
+  function renderChecklist(items) {
     return items.map(item => {
-      const checked = isChecked(item.id, dateKey);
-      const streak = getStreak(item.id);
-      const freq = item.freq || "";
+      const checked  = isChecked(item.id);
+      const streak   = getStreak(item.id);
       const weekCount = item.weeklyTarget ? getWeekCount(item.id) : null;
+      const notToday = item.scheduledDays && !item.scheduledDays.includes(DOW);
 
       return `
-        <div onclick="lmToggle('${item.id}')" style="
+        <div onclick="${notToday ? "" : `lmToggle('${item.id}')`}" style="
           display:flex; align-items:flex-start; gap:14px;
-          padding:14px 16px; border-radius:14px; cursor:pointer;
-          border:1px solid ${checked ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"};
-          background:${checked ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)"};
+          padding:14px 16px; border-radius:14px;
+          cursor:${notToday ? "default" : "pointer"};
+          border:1px solid ${checked ? "rgba(34,197,94,0.3)" : notToday ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)"};
+          background:${checked ? "rgba(34,197,94,0.06)" : notToday ? "rgba(255,255,255,0.01)" : "rgba(255,255,255,0.03)"};
+          opacity:${notToday ? "0.4" : "1"};
           margin-bottom:8px; transition:all 0.15s;
         ">
           <div style="
@@ -94,11 +137,12 @@
             display:flex; align-items:center; justify-content:center;
             font-size:0.75rem; color:white; font-weight:900;
           ">${checked ? "✓" : ""}</div>
-
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-weight:800; color:${checked ? "#86efac" : "#e5e7eb"};">${item.name}</span>
-              ${freq ? `<span style="font-size:0.72rem; padding:2px 8px; border-radius:20px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-weight:700;">${freq}</span>` : ""}
+              ${item.scheduledDays
+                ? dayScheduleBadge(item.scheduledDays)
+                : item.freq ? `<span style="font-size:0.72rem; padding:2px 8px; border-radius:20px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-weight:700;">${item.freq}</span>` : ""}
               ${streak >= 3 ? `<span style="font-size:0.72rem; color:#f59e0b; font-weight:800;">🔥 ${streak}d</span>` : ""}
               ${weekCount !== null ? `<span style="font-size:0.72rem; color:#9ca3af;">${weekCount}/${item.weeklyTarget}x this week</span>` : ""}
             </div>
@@ -109,7 +153,7 @@
     }).join("");
   }
 
-  // ─── SECTION HEADER ───────────────────────────────────────────────────────
+  // ─── UI HELPERS ───────────────────────────────────────────────────────────
 
   function sectionHeader(title, subtitle = "") {
     return `
@@ -121,282 +165,270 @@
   }
 
   function warningCard(text) {
-    return `
-      <div style="padding:12px 14px; border-radius:12px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); color:#fcd34d; font-size:0.85rem; font-weight:700; margin-bottom:12px;">
-        ⚠️ ${text}
-      </div>
-    `;
+    return `<div style="padding:12px 14px; border-radius:12px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); color:#fcd34d; font-size:0.85rem; font-weight:700; margin-bottom:12px;">⚠️ ${text}</div>`;
   }
 
   function infoCard(text) {
-    return `
-      <div style="padding:12px 14px; border-radius:12px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); color:#a78bfa; font-size:0.85rem; line-height:1.5; margin-bottom:12px;">
-        💡 ${text}
-      </div>
-    `;
+    return `<div style="padding:12px 14px; border-radius:12px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); color:#a78bfa; font-size:0.85rem; line-height:1.5; margin-bottom:12px;">💡 ${text}</div>`;
   }
 
   // ─── TAB 1: FACIAL & NECK ─────────────────────────────────────────────────
 
   function renderFacialTab() {
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const neckYest  = ["lm_neck_curls","lm_neck_bridges"].some(id => isChecked(id, todayKey(yesterday)));
+
     const neckWeighted = [
-      { id: "lm_neck_curls",    name: "Weighted Neck Curls", detail: "4 directions · 4×15 reps", freq: "3x/week", weeklyTarget: 3 },
-      { id: "lm_neck_bridges",  name: "Neck Bridges",        detail: "3×30sec holds",            freq: "3x/week", weeklyTarget: 3 },
-      { id: "lm_trap_shrugs",   name: "Trap Shrugs",         detail: "Heavy · 4×12",             freq: "2x/week", weeklyTarget: 2 },
+      { id: "lm_neck_curls",   name: "Weighted Neck Curls", detail: "4 directions · 4×15 reps",  scheduledDays: NECK_DAYS, weeklyTarget: 3 },
+      { id: "lm_neck_bridges", name: "Neck Bridges",        detail: "3×30sec holds",              scheduledDays: NECK_DAYS, weeklyTarget: 3 },
+      { id: "lm_trap_shrugs",  name: "Trap Shrugs",         detail: "Heavy · 4×12",               scheduledDays: [1, 5],   weeklyTarget: 2 },
     ];
     const neckDaily = [
-      { id: "lm_neck_iso",      name: "Isometric Holds",     detail: "All 4 directions · 3×20sec each", freq: "Daily" },
+      { id: "lm_neck_iso", name: "Isometric Holds", detail: "All 4 directions · 3×20sec each · builds thickness + fixes posture", freq: "Daily" },
     ];
     const facial = [
-      { id: "lm_mewing_am",     name: "Mewing — Morning",    detail: "3×5min conscious sessions. Tongue on roof of mouth.", freq: "Daily" },
-      { id: "lm_mewing_pm",     name: "Mewing — Night",      detail: "3×5min before sleep.", freq: "Daily" },
-      { id: "lm_jaw_gum",       name: "Jaw Gum Chewing",     detail: "Hard gum (Falim/mastic) · 30min · alternate sides", freq: "Daily" },
-      { id: "lm_jaw_clench",    name: "Jaw Clenching",       detail: "50 hard clenches morning + night (builds masseter)", freq: "Daily" },
-      { id: "lm_cheek_lifts",   name: "Cheek Lifts",         detail: "Smile wide, eyes neutral · 3×20 reps", freq: "Daily" },
-      { id: "lm_chin_tucks",    name: "Chin Tucks",          detail: "3×15 (fixes forward head, sharpens jawline)", freq: "Daily" },
-      { id: "lm_face_massage",  name: "Face Massage",        detail: "5min lymphatic drainage · nightly", freq: "Daily" },
+      { id: "lm_mewing",       name: "Mewing",          detail: "Tongue on roof of mouth ALL DAY — set reminders to check. Resting position, not just a few minutes.", freq: "All Day" },
+      { id: "lm_jaw_gum",      name: "Jaw Gum Chewing", detail: "Falim or mastic gum · 30min · alternate sides · builds masseter",                                      freq: "Daily" },
+      { id: "lm_cheek_lifts",  name: "Cheek Lifts",     detail: "Smile wide, eyes neutral · 3×20 reps",                                                                  freq: "Daily" },
+      { id: "lm_chin_tucks",   name: "Chin Tucks",      detail: "3×15 · sharpens jawline, fixes forward head",                                                           freq: "Daily" },
+      { id: "lm_face_massage", name: "Face Massage",    detail: "5min lymphatic drainage · nightly before bed",                                                          freq: "Daily" },
     ];
-    const debloat = [
-      { id: "lm_sodium",        name: "Low Sodium",          detail: "Under 2000mg today", freq: "Daily" },
-      { id: "lm_water",         name: "High Water Intake",   detail: "Gallon+ of water today", freq: "Daily" },
-      { id: "lm_sleep_elev",    name: "Sleep Elevated",      detail: "2 pillows minimum (prevents fluid retention in face)", freq: "Daily" },
-      { id: "lm_ice_face",      name: "Ice Rolling — AM",    detail: "Ice cube wrapped in cloth · 2-3min · morning only", freq: "Daily" },
-      { id: "lm_black_coffee",  name: "Black Coffee AM",     detail: "Natural diuretic · no sugar", freq: "Daily" },
-    ];
-
-    // Neck recovery warning
-    const neckYest = ["lm_neck_curls","lm_neck_bridges"].some(id => {
-      const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-      return isChecked(id, todayKey(yesterday));
-    });
 
     return `
-      ${sectionHeader("Neck Training", "Goal: 17+ inch neck. Build thickness from all angles.")}
-      ${neckYest ? warningCard("You trained neck yesterday — today skip weighted work, do isometrics only.") : ""}
+      ${sectionHeader("Neck Training", "Weighted Mon/Wed/Fri — isometrics every day.")}
+      ${scheduleBanner(NECK_DAYS, "neck training")}
+      ${neckYest ? warningCard("Neck trained yesterday — do isometrics only today. Skip weighted work.") : ""}
       ${renderChecklist(neckWeighted)}
       ${renderChecklist(neckDaily)}
 
-      ${sectionHeader("Facial Exercises", "Morning & Night — non-negotiable for structure over time.")}
-      ${infoCard("These work best with low body fat (under 12%). Stay lean to reveal structure.")}
+      ${sectionHeader("Facial Exercises", "Daily — consistency over months is what creates change.")}
+      ${infoCard("Best under 12% body fat. Stay lean to reveal bone structure.")}
       ${renderChecklist(facial)}
-
-      ${sectionHeader("De-Bloating Protocol", "Daily habits that reduce facial puffiness.")}
-      ${renderChecklist(debloat)}
     `;
   }
 
   // ─── TAB 2: SKIN & GROOMING ───────────────────────────────────────────────
 
   function renderSkinTab() {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon ... 6=Sat
-    // Salicylic on Mon(1), Wed(3), Fri(5)
-    const isSalicylicDay = [1, 3, 5].includes(dayOfWeek);
-    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const isSalDay = SAL_DAYS.includes(DOW);
 
-    const morningRoutine = [
-      { id: "lm_am_cleanser",   name: "Cleanser",            detail: "The Ordinary — gentle wash, pat dry", freq: "AM" },
-      { id: "lm_am_vitc",       name: "Vitamin C Serum",     detail: "The Ordinary — wait 5min to absorb. Antioxidant protection all day.", freq: "AM" },
-      { id: "lm_am_moisturizer",name: "Moisturizer",         detail: "The Ordinary — lightweight, good under SPF", freq: "AM" },
-      { id: "lm_am_ice",        name: "Ice Cube",            detail: "Wrapped in cloth · 2-3min · de-puffs, tightens pores. Morning ONLY.", freq: "AM" },
+    // AM: Cleanser → Ice Cube → Vitamin C → Beef Tallow
+    const amRoutine = [
+      { id: "lm_am_cleanser", name: "① Cleanser",        detail: "The Ordinary — gentle wash, pat dry",                                            freq: "AM" },
+      { id: "lm_am_ice",      name: "② Ice Cube Roll",   detail: "Cloth-wrapped · 2-3min · de-puffs, tightens pores · AM ONLY, never at night",     freq: "AM" },
+      { id: "lm_am_vitc",     name: "③ Vitamin C Serum", detail: "The Ordinary — wait 5min to absorb. Antioxidant shield all day. AM ONLY.",         freq: "AM" },
+      { id: "lm_am_tallow",   name: "④ Beef Tallow",     detail: "Seals in vitamin C. Lightweight morning layer.",                                  freq: "AM" },
     ];
 
-    const nightBase = [
-      { id: "lm_pm_cleanser",   name: "Cleanser",            detail: "The Ordinary — double cleanse if wore sunscreen", freq: "PM" },
+    // PM: Cleanser → (Salicylic if day) → Moisturizer → Gua Sha
+    const pmBase = [
+      { id: "lm_pm_cleanser", name: "① Cleanser", detail: "The Ordinary — double cleanse if wore sunscreen", freq: "PM" },
     ];
-    const nightSalicylic = [
-      { id: "lm_pm_salicylic",  name: "Salicylic Acid",      detail: "The Ordinary — unclogs pores while you sleep. 3x/week ONLY or you'll strip barrier.", freq: "Mon/Wed/Fri", weeklyTarget: 3 },
+    const pmSal = [
+      { id: "lm_pm_salicylic", name: "② Salicylic Acid", detail: "The Ordinary — exfoliates, unclogs pores while you sleep. 3x/week MAX — more will strip barrier.", scheduledDays: SAL_DAYS, weeklyTarget: 3 },
     ];
-    const nightAlways = [
-      { id: "lm_pm_tallow",     name: "Beef Tallow Moisturizer", detail: "Last step only. Heavy + occlusive = seals everything in overnight. Nighttime ONLY — too heavy for AM.", freq: "PM" },
-      { id: "lm_pm_guasha",     name: "Gua Sha",             detail: "5min after tallow (tallow = glide medium). Promotes lymphatic drainage, defines jawline.", freq: "PM" },
-    ];
-
-    const supplements = [
-      { id: "lm_supp_zinc",     name: "Zinc 50mg",           detail: "Reduces acne, supports immune", freq: "Daily" },
-      { id: "lm_supp_omega",    name: "Omega-3 2-3g",        detail: "Reduces skin inflammation", freq: "Daily" },
-      { id: "lm_supp_collagen", name: "Collagen 10g",        detail: "Skin elasticity and joint health", freq: "Daily" },
-      { id: "lm_supp_vitd",     name: "Vitamin D 5000IU",    detail: "Most people are deficient", freq: "Daily" },
+    const pmAlways = [
+      { id: "lm_pm_moisturizer", name: isSalDay ? "③ Moisturizer" : "② Moisturizer", detail: "The Ordinary — seals night routine",    freq: "PM" },
+      { id: "lm_pm_guasha",      name: isSalDay ? "④ Gua Sha"     : "③ Gua Sha",     detail: "5min · lymphatic drainage · defines jawline", freq: "PM" },
     ];
 
-    const grooming = [
-      { id: "lm_teeth_brush",   name: "Electric Toothbrush", detail: "2x daily, 2min each", freq: "Daily" },
-      { id: "lm_teeth_floss",   name: "Floss",               detail: "Every night before bed", freq: "Daily" },
-      { id: "lm_nails",         name: "Nails Check",         detail: "Trim weekly, clean under them", freq: "Weekly" },
+    // Supplements
+    const suppAM = [
+      { id: "lm_supp_vitd",        name: "Vitamin D — 5000IU", detail: "Take with a fatty meal for absorption",                       freq: "AM" },
+      { id: "lm_supp_zinc",        name: "Zinc — 50mg",        detail: "Reduces acne, supports testosterone — take with food",        freq: "AM" },
+      { id: "lm_supp_creatine",    name: "Creatine — 5g",      detail: "Mix in water or shake — daily consistency matters most",      freq: "AM" },
+      { id: "lm_supp_ashwagandha", name: "Ashwagandha",        detail: "Reduces cortisol, supports testosterone — take with food",    freq: "AM" },
     ];
+    const suppPM = [
+      { id: "lm_supp_magnesium", name: "Magnesium — 400mg", detail: "Before bed — improves sleep quality, muscle recovery, reduces cortisol", freq: "Before Bed" },
+    ];
+
+    function haircutStatus() {
+      const last = safeParse("lm_haircut_last", null);
+      if (!last) return { days: null, due: false, last: null };
+      const days = Math.floor((new Date() - new Date(last)) / 86400000);
+      return { days, due: days >= 18, last };
+    }
+
+    function groomCheck(id, icon, name, detail, tag) {
+      const checked = isChecked(id);
+      const streak  = getStreak(id);
+      return `
+        <div onclick="lmToggle('${id}')" style="
+          display:flex; align-items:center; gap:14px;
+          padding:14px 16px; border-radius:14px; cursor:pointer;
+          border:1px solid ${checked ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"};
+          background:${checked ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)"};
+          transition:all 0.15s;
+        ">
+          <div style="
+            width:42px; height:42px; border-radius:12px; flex-shrink:0;
+            background:${checked ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)"};
+            border:1px solid ${checked ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.1)"};
+            display:flex; align-items:center; justify-content:center; font-size:1.3rem;
+          ">${icon}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-weight:800; font-size:0.95rem; color:${checked ? "#86efac" : "#e5e7eb"};">${name}</span>
+              ${tag ? `<span style="font-size:0.7rem; padding:2px 7px; border-radius:20px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-weight:700;">${tag}</span>` : ""}
+              ${streak >= 3 ? `<span style="font-size:0.72rem; color:#f59e0b; font-weight:800;">🔥 ${streak}d</span>` : ""}
+            </div>
+            <div style="font-size:0.8rem; color:#6b7280; margin-top:3px;">${detail}</div>
+          </div>
+          <div style="
+            width:24px; height:24px; border-radius:7px; flex-shrink:0;
+            border:2px solid ${checked ? "#22c55e" : "rgba(255,255,255,0.2)"};
+            background:${checked ? "#22c55e" : "transparent"};
+            display:flex; align-items:center; justify-content:center;
+            font-size:0.75rem; color:white; font-weight:900;
+          ">${checked ? "✓" : ""}</div>
+        </div>
+      `;
+    }
 
     return `
-      ${sectionHeader("Morning Routine", "In this exact order — sequence matters.")}
+      ${sectionHeader("Morning Routine", "Follow exact order — sequence matters.")}
       <div style="padding:10px 14px; border-radius:10px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); color:#fcd34d; font-size:0.82rem; margin-bottom:12px;">
-        ☀️ <strong>Vitamin C is always AM only.</strong> Never use at night.
+        ☀️ Vitamin C and ice cube are <strong>morning only</strong> — never at night.
       </div>
-      ${renderChecklist(morningRoutine)}
+      ${renderChecklist(amRoutine)}
 
-      ${sectionHeader("Night Routine", "In this exact order — sequence matters.")}
-      ${isSalicylicDay
-        ? `<div style="padding:10px 14px; border-radius:10px; background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-size:0.82rem; margin-bottom:12px;">✅ <strong>Today (${dayNames[dayOfWeek]}) is a Salicylic Acid day.</strong></div>`
-        : `<div style="padding:10px 14px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); color:#6b7280; font-size:0.82rem; margin-bottom:12px;">⏭️ <strong>No Salicylic today (${dayNames[dayOfWeek]}).</strong> Next: ${dayOfWeek < 1 ? "Mon" : dayOfWeek < 3 ? "Wed" : dayOfWeek < 5 ? "Fri" : "Mon"}.</div>`
-      }
-      ${renderChecklist(nightBase)}
-      ${isSalicylicDay ? renderChecklist(nightSalicylic) : ""}
-      ${renderChecklist(nightAlways)}
+      ${sectionHeader("Night Routine", "Follow exact order — sequence matters.")}
+      ${scheduleBanner(SAL_DAYS, "Salicylic Acid")}
+      ${renderChecklist(pmBase)}
+      ${isSalDay ? renderChecklist(pmSal) : ""}
+      ${renderChecklist(pmAlways)}
 
-      ${sectionHeader("Daily Supplements")}
-      ${renderChecklist(supplements)}
+      ${sectionHeader("Morning Supplements")}
+      ${renderChecklist(suppAM)}
+
+      ${sectionHeader("Before Bed")}
+      ${renderChecklist(suppPM)}
 
       ${sectionHeader("Grooming")}
-      ${infoCard("Haircut every 2-3 weeks ($40-60, show reference photos). Eyebrows shaped professionally once, maintain. Facial hair: shave daily or commit to full beard — no weak stubble.")}
-      ${renderChecklist(grooming)}
-    `;
-  }
+      ${(() => {
+        const hc = haircutStatus();
+        return `
+          <div style="display:grid; gap:8px;">
 
-  // ─── TAB 3: POSTURE ───────────────────────────────────────────────────────
-
-  function renderPostureTab() {
-    const drills = [
-      { id: "lm_post_wall_am",   name: "Wall Angels — Morning",   detail: "3×15 · opens chest, strengthens upper back", freq: "Daily" },
-      { id: "lm_post_tucks_am",  name: "Chin Tucks — Morning",    detail: "3×15 · fixes forward head posture", freq: "Daily" },
-      { id: "lm_post_hangs_am",  name: "Dead Hangs — Morning",    detail: "3×30sec · decompresses spine", freq: "Daily" },
-      { id: "lm_post_bands_am",  name: "Band Pull-Aparts — AM",   detail: "3×20 · activates rear delts", freq: "Daily" },
-      { id: "lm_post_thoracic",  name: "Thoracic Extensions",     detail: "3×10 on foam roller · opens rounded upper back", freq: "Daily" },
-      { id: "lm_post_wall_pm",   name: "Wall Angels — Night",     detail: "3×15 · repeat before bed", freq: "Daily" },
-      { id: "lm_post_tucks_pm",  name: "Chin Tucks — Night",      detail: "3×15 · before bed", freq: "Daily" },
-      { id: "lm_post_hangs_pm",  name: "Dead Hangs — Night",      detail: "3×30sec · before bed", freq: "Daily" },
-    ];
-
-    const cues = [
-      "Shoulders back and down — imagine back pockets pulling shoulder blades together",
-      "Chin slightly tucked — not forward jutting",
-      "Core engaged at all times — like someone's about to punch you",
-      "Walk tall — you're 6'5\". Own it. No slouching to fit in.",
-    ];
-
-    return `
-      ${sectionHeader("Daily Posture Drills", "10min morning + 10min night. Non-negotiable.")}
-      ${warningCard("Poor posture kills aesthetics. At 6'5\" you probably slouch. Fix this IMMEDIATELY.")}
-      ${renderChecklist(drills)}
-
-      ${sectionHeader("All-Day Posture Cues", "Keep these in mind every moment.")}
-      <div style="display:grid; gap:8px;">
-        ${cues.map((c, i) => `
-          <div style="
-            display:flex; gap:12px; align-items:flex-start;
-            padding:12px 14px; border-radius:12px;
-            background:rgba(255,255,255,0.03);
-            border:1px solid rgba(255,255,255,0.07);
-          ">
+            <!-- Haircut tracker -->
             <div style="
-              width:24px; height:24px; border-radius:50%; flex-shrink:0;
-              background:linear-gradient(135deg,rgba(99,102,241,0.6),rgba(236,72,153,0.5));
-              display:flex; align-items:center; justify-content:center;
-              font-size:0.72rem; font-weight:900; color:white;
-            ">${i+1}</div>
-            <div style="color:#d1d5db; font-size:0.9rem; line-height:1.45;">${c}</div>
+              padding:16px; border-radius:14px;
+              border:1px solid ${hc.due ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.08)"};
+              background:${hc.due ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.03)"};
+            ">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <div style="
+                  width:42px; height:42px; border-radius:12px; flex-shrink:0;
+                  background:${hc.due ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.06)"};
+                  border:1px solid ${hc.due ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.1)"};
+                  display:flex; align-items:center; justify-content:center; font-size:1.3rem;
+                ">✂️</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-weight:800; font-size:0.95rem;">Haircut</span>
+                    <span style="font-size:0.7rem; padding:2px 7px; border-radius:20px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); color:#a78bfa; font-weight:700;">Every 2-3 wks</span>
+                    ${hc.due ? `<span style="font-size:0.72rem; color:#fcd34d; font-weight:800;">⚠️ Overdue</span>` : ""}
+                  </div>
+                  <div style="font-size:0.8rem; color:#6b7280; margin-top:3px;">
+                    ${hc.days !== null
+                      ? `${hc.due ? "⏰" : "✅"} Last cut ${hc.days} days ago (${hc.last})`
+                      : "Not logged yet — tap to mark after your next cut"}
+                  </div>
+                </div>
+                <button onclick="lmSetLastHaircut()" style="
+                  padding:8px 14px; border-radius:20px; flex-shrink:0;
+                  border:1px solid ${hc.due ? "rgba(245,158,11,0.5)" : "rgba(99,102,241,0.4)"};
+                  background:${hc.due ? "rgba(245,158,11,0.12)" : "rgba(99,102,241,0.12)"};
+                  color:${hc.due ? "#fcd34d" : "#a78bfa"};
+                  font-size:0.8rem; font-weight:800; cursor:pointer; white-space:nowrap;
+                ">Mark Today</button>
+              </div>
+            </div>
+
+            <!-- Daily dental -->
+            ${groomCheck("lm_teeth_brush", "🪥", "Electric Toothbrush", "2 minutes · twice daily · morning + night", "Daily")}
+            ${groomCheck("lm_teeth_floss", "🦷", "Floss", "Every night before bed — non-negotiable for gum health", "Nightly")}
+
+            <!-- Weekly upkeep -->
+            ${groomCheck("lm_nails", "💅", "Nails", "Trim + clean underneath · weekly · people notice", "Weekly")}
+            ${groomCheck("lm_facial_hair", "🪒", "Facial Hair", "Shave clean or maintain beard shape — no weak stubble", "Weekly")}
+
           </div>
-        `).join("")}
-      </div>
+        `;
+      })()}
     `;
   }
 
-  // ─── TAB 4: CONDITIONING ─────────────────────────────────────────────────
+  window.lmSetLastHaircut = function() {
+    localStorage.setItem("lm_haircut_last", JSON.stringify(todayKey()));
+    renderLooksmaxxing();
+  };
+
+  // ─── TAB 3: CONDITIONING ─────────────────────────────────────────────────
 
   function renderConditioningTab() {
     const sprintLog = safeParse(STORE_SPRINT, []);
-
-    // Check last sprint date for 48hr rule
     const lastSprint = sprintLog.length ? sprintLog[sprintLog.length - 1] : null;
-    const lastSprintDate = lastSprint ? new Date(lastSprint.date) : null;
-    const now = new Date();
-    const hoursSinceLast = lastSprintDate ? (now - lastSprintDate) / 3600000 : 999;
-    const tooSoon = hoursSinceLast < 48;
+    const lastDate   = lastSprint ? new Date(lastSprint.date + "T12:00:00") : null;
+    const now        = new Date();
+    const hoursSince = lastDate ? (now - lastDate) / 3600000 : 999;
+    const tooSoon    = hoursSince < 48;
 
-    // Count this week's sessions
-    const weekSprints = sprintLog.filter(s => {
-      const d = new Date(s.date);
-      const diff = (now - d) / 86400000;
-      return diff <= 7;
-    }).length;
+    const { isToday: isSprintDay, nextDay: nextSprintDay } = scheduleStatus(SPRINT_DAYS);
+    const sprintLabels = SPRINT_DAYS.map(d => DAY_NAMES[d]).join(" / ");
 
-    const protocols = [
-      { id: "tabata",    name: "Tabata",         detail: "20sec all-out / 10sec rest × 8 rounds = 4min. Rest 2min. Repeat 2-3x.", icon: "⚡" },
-      { id: "intervals", name: "Hill Intervals",  detail: "30sec hard resistance / 90sec easy × 8 rounds.", icon: "🏔️" },
-      { id: "maxsprint", name: "Max Sprints",     detail: "10sec absolute max / 50sec rest × 10 rounds.", icon: "🚀" },
-      { id: "steady",    name: "Steady Power",    detail: "20min at 75-80% max effort. Lower intensity, good for recovery days.", icon: "🔄" },
-    ];
+    const weekSprints = sprintLog.filter(s => (now - new Date(s.date + "T12:00:00")) / 86400000 <= 7).length;
+
+    const feelMap = { 5:"💪 Crushed it", 4:"✅ Solid session", 3:"😐 Got through it", 2:"😓 Tough day", 1:"💀 Barely survived" };
 
     return `
-      ${sectionHeader("Stationary Bike Conditioning", "2-3x per week MAX. 48hr minimum between sessions.")}
+      ${sectionHeader("Stationary Bike Sprints", "Tue / Thu / Sat — 48hr minimum recovery between sessions.")}
 
-      <!-- Status banner -->
-      <div style="
-        padding:14px 16px; border-radius:14px; margin-bottom:16px;
-        ${tooSoon
-          ? "background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3);"
-          : "background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25);"
-        }
-        display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;
-      ">
-        <div>
-          <div style="font-weight:900; color:${tooSoon ? "#fca5a5" : "#86efac"};">
-            ${tooSoon ? "⛔ Recovery Window Active" : "✅ Ready to Sprint"}
-          </div>
-          <div style="font-size:0.82rem; color:#9ca3af; margin-top:2px;">
-            ${tooSoon
-              ? `Last session ${Math.round(hoursSinceLast)}h ago. Wait ${Math.ceil(48 - hoursSinceLast)}h more.`
-              : lastSprint ? `Last session: ${lastSprint.date} — fully recovered.` : "No sessions logged yet."
-            }
-          </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+        <div style="padding:14px; border-radius:14px; ${isSprintDay && !tooSoon ? "background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25);" : "background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);"}">
+          <div style="font-size:0.72rem; color:#6b7280; margin-bottom:4px; letter-spacing:0.04em;">SCHEDULE</div>
+          <div style="font-weight:900; color:${isSprintDay ? "#86efac" : "#9ca3af"};">${isSprintDay ? "✅ Sprint Day" : `⏭️ Next: ${nextSprintDay}`}</div>
+          <div style="font-size:0.75rem; color:#6b7280; margin-top:3px;">${sprintLabels}</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:1.4rem; font-weight:900; color:${weekSprints >= 3 ? "#22c55e" : weekSprints >= 2 ? "#eab308" : "#9ca3af"};">
-            ${weekSprints}/3
-          </div>
-          <div style="font-size:0.75rem; color:#6b7280;">sessions this week</div>
+        <div style="padding:14px; border-radius:14px; ${tooSoon ? "background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25);" : "background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);"}">
+          <div style="font-size:0.72rem; color:#6b7280; margin-bottom:4px; letter-spacing:0.04em;">RECOVERY</div>
+          <div style="font-weight:900; color:${tooSoon ? "#fca5a5" : "#86efac"};">${tooSoon ? `⛔ ${Math.ceil(48 - hoursSince)}h left` : "✅ Ready"}</div>
+          <div style="font-size:0.75rem; color:#6b7280; margin-top:3px;">${lastSprint ? `Last: ${lastSprint.date}` : "No sessions yet"}</div>
         </div>
       </div>
 
-      ${warningCard("Always warm up 5min easy pedaling before sprints. If legs feel heavy or fatigued — skip and go tomorrow.")}
-
-      ${sectionHeader("Protocols — Pick One Per Session")}
-      <div style="display:grid; gap:10px; margin-bottom:20px;">
-        ${protocols.map(p => `
-          <div style="
-            padding:14px 16px; border-radius:14px;
-            border:1px solid rgba(255,255,255,0.08);
-            background:rgba(255,255,255,0.03);
-          ">
-            <div style="font-weight:900; font-size:0.95rem; margin-bottom:4px;">${p.icon} ${p.name}</div>
-            <div style="font-size:0.85rem; color:#9ca3af; line-height:1.4;">${p.detail}</div>
-          </div>
-        `).join("")}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); margin-bottom:16px;">
+        <span style="font-size:0.85rem; color:#9ca3af;">This week's sessions</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${[0,1,2].map(i => `
+            <div style="width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:900; background:${i < weekSprints ? "linear-gradient(135deg,rgba(99,102,241,0.85),rgba(236,72,153,0.7))" : "rgba(255,255,255,0.06)"}; border:1px solid ${i < weekSprints ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.1)"}; color:${i < weekSprints ? "white" : "#4b5563"};">${i < weekSprints ? "✓" : i+1}</div>
+          `).join("")}
+          <span style="font-weight:900; font-size:0.9rem; color:${weekSprints >= 3 ? "#22c55e" : "#9ca3af"}; margin-left:4px;">${weekSprints}/3</span>
+        </div>
       </div>
+
+      ${warningCard("Warm up 5min easy pedaling first. Legs heavy or fatigued? Skip — go tomorrow.")}
 
       ${sectionHeader("Log a Session")}
-      ${tooSoon ? `<div style="color:#fca5a5; font-size:0.85rem; margin-bottom:12px;">⛔ Logging disabled — still in recovery window.</div>` : ""}
-      <div style="display:grid; gap:10px; margin-bottom:12px;">
-        <select id="lmSprintProtocol" style="
-          padding:10px 12px; border-radius:10px;
-          border:1px solid rgba(255,255,255,0.12);
-          background:rgba(255,255,255,0.05); color:white; outline:none;
-          ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
-        ">
-          ${protocols.map(p => `<option value="${p.id}">${p.name}</option>`).join("")}
-        </select>
-        <div style="display:flex; gap:10px;">
-          <input id="lmSprintResistance" type="number" min="1" max="20" placeholder="Resistance level (1-20)"
-            style="
-              flex:1; padding:10px 12px; border-radius:10px;
-              border:1px solid rgba(255,255,255,0.12);
-              background:rgba(255,255,255,0.05); color:white; outline:none;
-              ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
-            "
-          />
-          <select id="lmSprintFeel" style="
-            flex:1; padding:10px 12px; border-radius:10px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.05); color:white; outline:none;
-            ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}
-          ">
+      ${tooSoon ? `<div style="color:#fca5a5; font-size:0.85rem; margin-bottom:12px; font-weight:700;">⛔ Recovery window active — ${Math.ceil(48 - hoursSince)}h remaining.</div>` : ""}
+
+      <div style="display:grid; gap:10px; margin-bottom:16px; ${tooSoon ? "opacity:0.4; pointer-events:none;" : ""}">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <div style="font-size:0.78rem; color:#6b7280; margin-bottom:6px;">Duration (minutes)</div>
+            <input id="lmSprintDuration" type="number" min="5" max="60" placeholder="e.g. 20"
+              style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none; box-sizing:border-box;" />
+          </div>
+          <div>
+            <div style="font-size:0.78rem; color:#6b7280; margin-bottom:6px;">Avg Resistance (1-20)</div>
+            <input id="lmSprintResistance" type="number" min="1" max="20" placeholder="e.g. 12"
+              style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none; box-sizing:border-box;" />
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.78rem; color:#6b7280; margin-bottom:6px;">How did it feel?</div>
+          <select id="lmSprintFeel" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none;">
             <option value="5">💪 Crushed it</option>
             <option value="4">✅ Solid session</option>
             <option value="3">😐 Got through it</option>
@@ -404,267 +436,163 @@
             <option value="1">💀 Barely survived</option>
           </select>
         </div>
-        <button onclick="lmLogSprint()" style="
-          padding:12px; border-radius:12px; font-weight:900;
-          border:none; cursor:pointer; font-size:0.95rem;
-          background:${tooSoon ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8))"};
-          color:${tooSoon ? "#6b7280" : "white"};
-          ${tooSoon ? "pointer-events:none;" : ""}
-        ">Log Session</button>
+        <button onclick="lmLogSprint()" style="padding:13px; border-radius:12px; font-weight:900; font-size:0.95rem; border:none; cursor:pointer; width:100%; background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8)); color:white;">Log Session</button>
       </div>
 
-      ${sectionHeader("Recent Sessions")}
+      ${sectionHeader("Session History")}
       ${sprintLog.length === 0
         ? `<div style="color:#6b7280; font-size:0.9rem;">No sessions logged yet.</div>`
         : `<div style="display:grid; gap:8px;">
-            ${[...sprintLog].reverse().slice(0, 8).map(s => {
-              const feelLabels = { 5:"💪 Crushed it", 4:"✅ Solid", 3:"😐 Got through it", 2:"😓 Tough", 1:"💀 Barely survived" };
-              const protocolNames = { tabata:"Tabata", intervals:"Hill Intervals", maxsprint:"Max Sprints", steady:"Steady Power" };
-              return `
-                <div style="
-                  display:flex; justify-content:space-between; align-items:center;
-                  padding:12px 14px; border-radius:12px;
-                  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-                  flex-wrap:wrap; gap:8px;
-                ">
-                  <div>
-                    <div style="font-weight:800; font-size:0.9rem;">${protocolNames[s.protocol] || s.protocol}</div>
-                    <div style="font-size:0.78rem; color:#6b7280; margin-top:2px;">${s.date} · Resistance ${s.resistance || "—"}</div>
-                  </div>
-                  <div style="font-size:0.85rem; color:#9ca3af;">${feelLabels[s.feel] || ""}</div>
+            ${[...sprintLog].reverse().slice(0,10).map((s, i) => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px; flex-wrap:wrap; gap:8px; background:${i===0?"rgba(99,102,241,0.07)":"rgba(255,255,255,0.03)"}; border:1px solid ${i===0?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.07)"};">
+                <div>
+                  <div style="font-weight:800;">${s.date}</div>
+                  <div style="font-size:0.78rem; color:#6b7280; margin-top:2px;">${[s.duration?`${s.duration}min`:"", s.resistance?`Resistance ${s.resistance}`:""].filter(Boolean).join(" · ")}</div>
                 </div>
-              `;
-            }).join("")}
+                <div style="font-size:0.85rem; color:#9ca3af;">${feelMap[s.feel]||""}</div>
+              </div>
+            `).join("")}
           </div>`
       }
     `;
   }
 
   window.lmLogSprint = function() {
-    const protocol   = document.getElementById("lmSprintProtocol")?.value;
-    const resistance = document.getElementById("lmSprintResistance")?.value;
-    const feel       = document.getElementById("lmSprintFeel")?.value;
-
-    const log = safeParse(STORE_SPRINT, []);
-
-    // Check 48hr rule
-    const last = log.length ? new Date(log[log.length-1].date) : null;
-    const hoursSince = last ? (new Date() - last) / 3600000 : 999;
-    if (hoursSince < 48) {
-      alert(`⛔ Recovery window active. ${Math.ceil(48 - hoursSince)} hours remaining.`);
+    const log  = safeParse(STORE_SPRINT, []);
+    const last = log.length ? new Date(log[log.length-1].date + "T12:00:00") : null;
+    if (last && (new Date() - last) / 3600000 < 48) {
+      alert(`⛔ Recovery window active. ${Math.ceil(48 - (new Date()-last)/3600000)}h remaining.`);
       return;
     }
-
     log.push({
-      date: todayKey(),
-      protocol,
-      resistance: resistance || null,
-      feel: Number(feel),
+      date:       todayKey(),
+      duration:   document.getElementById("lmSprintDuration")?.value  || null,
+      resistance: document.getElementById("lmSprintResistance")?.value || null,
+      feel:       Number(document.getElementById("lmSprintFeel")?.value),
     });
-
     localStorage.setItem(STORE_SPRINT, JSON.stringify(log));
     renderLooksmaxxing();
   };
 
-  // ─── TAB 5: PROGRESS ──────────────────────────────────────────────────────
+  // ─── TAB 4: PROGRESS ──────────────────────────────────────────────────────
 
   function renderProgressTab() {
     const neckLog     = safeParse(STORE_NECK, []);
     const weightLog   = safeParse(STORE_WEIGHT, []);
-    const savedHeight = safeParse(STORE_HEIGHT, null);  // stored in inches
+    const savedHeight = safeParse(STORE_HEIGHT, null);
     const notes       = safeParse(STORE_NOTES, {});
-    const weekKey     = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() - d.getDay());
-      return todayKey(d);
-    })();
-    const currentNote  = notes[weekKey] || "";
-    const latestWeight = weightLog.length ? weightLog[weightLog.length - 1].lbs : null;
+    const weekKey     = (() => { const d = new Date(); d.setDate(d.getDate()-d.getDay()); return todayKey(d); })();
+    const currentNote = notes[weekKey] || "";
+    const latestWeight = weightLog.length ? weightLog[weightLog.length-1].lbs : null;
 
-    // BMI = (lbs / inches²) × 703
-    function calcBMI(lbs, heightIn) {
-      if (!lbs || !heightIn) return null;
-      return ((lbs / (heightIn * heightIn)) * 703).toFixed(1);
-    }
-    function bmiLabel(b) {
-      if (!b) return "";
+    function calcBMI(lbs, h) { return (!lbs||!h) ? null : ((lbs/(h*h))*703).toFixed(1); }
+    function bmiMeta(b) {
       const n = parseFloat(b);
-      if (n < 18.5) return { text: "Underweight", color: "#60a5fa" };
-      if (n < 25)   return { text: "Normal",      color: "#22c55e" };
-      if (n < 30)   return { text: "Overweight",  color: "#f59e0b" };
-      return               { text: "Obese",        color: "#ef4444" };
+      if (n < 18.5) return { text:"Underweight", color:"#60a5fa" };
+      if (n < 25)   return { text:"Normal",       color:"#22c55e" };
+      if (n < 30)   return { text:"Overweight",   color:"#f59e0b" };
+      return               { text:"Obese",         color:"#ef4444" };
     }
+    const bmi  = calcBMI(latestWeight, savedHeight);
+    const meta = bmi ? bmiMeta(bmi) : null;
 
-    const currentBMI   = calcBMI(latestWeight, savedHeight);
-    const bmiMeta      = bmiLabel(currentBMI);
-
-    // Reusable log row renderer
-    function logRow(entry, i, arr, valKey, unit, higherIsBetter) {
-      const prev = arr[i + 1];
-      const raw  = prev ? (entry[valKey] - prev[valKey]) : null;
+    function logRow(entry, i, arr, vk, unit, higherBetter) {
+      const prev = arr[i+1];
+      const raw  = prev ? entry[vk] - prev[vk] : null;
       const diff = raw !== null ? raw.toFixed(1) : null;
-      const improved = raw !== null ? (higherIsBetter ? raw > 0 : raw < 0) : false;
-      const neutral  = raw !== null && parseFloat(diff) === 0;
-      const diffColor = diff === null ? "#9ca3af" : neutral ? "#9ca3af" : improved ? "#22c55e" : "#ef4444";
-
+      const good = diff !== null ? (higherBetter ? raw > 0 : raw < 0) : false;
+      const neutral = diff !== null && parseFloat(diff) === 0;
+      const color = diff === null ? "#9ca3af" : neutral ? "#9ca3af" : good ? "#22c55e" : "#ef4444";
       return `
-        <div style="
-          display:flex; justify-content:space-between; align-items:center;
-          padding:12px 14px; border-radius:12px;
-          background:${i === 0 ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)"};
-          border:1px solid ${i === 0 ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.07)"};
-        ">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px; background:${i===0?"rgba(99,102,241,0.08)":"rgba(255,255,255,0.03)"}; border:1px solid ${i===0?"rgba(99,102,241,0.25)":"rgba(255,255,255,0.07)"};">
           <div>
-            <span style="font-weight:900; font-size:1.05rem;">${entry[valKey]} ${unit}</span>
+            <span style="font-weight:900; font-size:1.05rem;">${entry[vk]} ${unit}</span>
             <span style="color:#6b7280; font-size:0.82rem; margin-left:8px;">${entry.date}</span>
           </div>
-          ${diff !== null
-            ? `<span style="font-weight:800; font-size:0.85rem; color:${diffColor};">${parseFloat(diff) > 0 ? "+" : ""}${diff} ${unit}</span>`
-            : `<span style="color:#4b5563; font-size:0.8rem;">baseline</span>`}
+          ${diff!==null ? `<span style="font-weight:800; font-size:0.85rem; color:${color};">${parseFloat(diff)>0?"+":""}${diff} ${unit}</span>` : `<span style="color:#4b5563; font-size:0.8rem;">baseline</span>`}
         </div>
       `;
     }
 
-    // Height display helper
-    function inchesToFtIn(inches) {
-      const ft = Math.floor(inches / 12);
-      const ins = Math.round(inches % 12);
-      return `${ft}ft ${ins}in`;
-    }
+    function ftIn(n) { return `${Math.floor(n/12)}ft ${Math.round(n%12)}in`; }
 
     return `
-      ${sectionHeader("Height", "Set once — used for BMI. You're 6'5\" = 77 inches.")}
-      <div style="display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
-        <input id="lmHeightIn" type="number" step="0.5" min="48" max="96"
-          value="${savedHeight || ""}"
-          placeholder="Height in total inches (e.g. 77)"
-          style="
-            flex:1; min-width:200px; padding:10px 12px; border-radius:10px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.05); color:white; outline:none;
-          "
-        />
-        <button onclick="lmSaveHeight()" style="
-          padding:10px 20px; border-radius:10px; font-weight:800;
-          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
-          border:none; color:white; cursor:pointer;
-        ">Save</button>
+      ${sectionHeader("Height", "Set once — used for BMI.")}
+      <div style="display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+        <input id="lmHeightIn" type="number" step="0.5" min="48" max="96" value="${savedHeight||""}" placeholder="Total inches (77 = 6ft 5in)"
+          style="flex:1; min-width:180px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none;" />
+        <button onclick="lmSaveHeight()" style="padding:10px 20px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8)); border:none; color:white; cursor:pointer;">Save</button>
       </div>
-      ${savedHeight ? `<div style="color:#6b7280; font-size:0.82rem; margin-bottom:16px;">Saved: ${savedHeight}" = ${inchesToFtIn(savedHeight)}</div>` : `<div style="margin-bottom:16px;"></div>`}
+      ${savedHeight ? `<div style="color:#6b7280; font-size:0.82rem; margin-bottom:16px;">${savedHeight}" = ${ftIn(savedHeight)}</div>` : `<div style="margin-bottom:16px;"></div>`}
 
-      ${sectionHeader("Weight & BMI", "Log in lbs. BMI auto-calculates once height is set.")}
-
-      ${(latestWeight && currentBMI) ? `
+      ${sectionHeader("Weight & BMI")}
+      ${bmi ? `
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;">
           <div style="padding:14px; border-radius:14px; background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.25); text-align:center;">
             <div style="font-size:1.4rem; font-weight:900;">${latestWeight}</div>
-            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">lbs</div>
+            <div style="color:#9ca3af; font-size:0.78rem;">lbs</div>
           </div>
           <div style="padding:14px; border-radius:14px; background:rgba(236,72,153,0.08); border:1px solid rgba(236,72,153,0.2); text-align:center;">
-            <div style="font-size:1.4rem; font-weight:900; color:${bmiMeta.color};">${currentBMI}</div>
-            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">BMI</div>
+            <div style="font-size:1.4rem; font-weight:900; color:${meta.color};">${bmi}</div>
+            <div style="color:#9ca3af; font-size:0.78rem;">BMI</div>
           </div>
           <div style="padding:14px; border-radius:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); text-align:center;">
-            <div style="font-size:1rem; font-weight:900; color:${bmiMeta.color}; padding-top:4px;">${bmiMeta.text}</div>
-            <div style="color:#9ca3af; font-size:0.78rem; margin-top:2px;">Category</div>
+            <div style="font-size:0.95rem; font-weight:900; color:${meta.color}; padding-top:6px;">${meta.text}</div>
+            <div style="color:#9ca3af; font-size:0.78rem;">Category</div>
           </div>
-        </div>
-      ` : ""}
-
+        </div>` : ""}
       <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-        <input id="lmWeightLbs" type="number" step="0.5" min="80" max="400"
-          placeholder="Weight in lbs (e.g. 185)"
-          style="
-            flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.05); color:white; outline:none;
-          "
-        />
-        <button onclick="lmLogWeight()" style="
-          padding:10px 20px; border-radius:10px; font-weight:800;
-          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
-          border:none; color:white; cursor:pointer;
-        ">Log</button>
+        <input id="lmWeightLbs" type="number" step="0.5" min="80" max="400" placeholder="Weight in lbs"
+          style="flex:1; min-width:160px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none;" />
+        <button onclick="lmLogWeight()" style="padding:10px 20px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8)); border:none; color:white; cursor:pointer;">Log</button>
       </div>
-      ${weightLog.length === 0
-        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No entries yet.</div>`
-        : `<div style="display:grid; gap:8px; margin-bottom:20px;">
-            ${[...weightLog].reverse().slice(0, 10).map((e, i, arr) => logRow(e, i, arr, "lbs", "lbs", false)).join("")}
-          </div>`
-      }
+      ${weightLog.length===0 ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No entries yet.</div>` : `<div style="display:grid; gap:8px; margin-bottom:20px;">${[...weightLog].reverse().slice(0,10).map((e,i,a)=>logRow(e,i,a,"lbs","lbs",false)).join("")}</div>`}
 
-      ${sectionHeader("Neck Measurement", "Goal: 17+ inches. Track weekly.")}
+      ${sectionHeader("Neck Measurement", "Goal: 17+ inches.")}
       <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-        <input id="lmNeckInches" type="number" step="0.25" min="10" max="25"
-          placeholder="Neck in inches (e.g. 15.5)"
-          style="
-            flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.05); color:white; outline:none;
-          "
-        />
-        <button onclick="lmLogNeck()" style="
-          padding:10px 20px; border-radius:10px; font-weight:800;
-          background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8));
-          border:none; color:white; cursor:pointer;
-        ">Log</button>
+        <input id="lmNeckInches" type="number" step="0.25" min="10" max="25" placeholder="Neck in inches (e.g. 15.5)"
+          style="flex:1; min-width:160px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:white; outline:none;" />
+        <button onclick="lmLogNeck()" style="padding:10px 20px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(236,72,153,0.8)); border:none; color:white; cursor:pointer;">Log</button>
       </div>
-      ${neckLog.length === 0
-        ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No measurements yet.</div>`
-        : `<div style="display:grid; gap:8px; margin-bottom:20px;">
-            ${[...neckLog].reverse().slice(0, 10).map((e, i, arr) => logRow(e, i, arr, "inches", '"', true)).join("")}
-          </div>`
-      }
+      ${neckLog.length===0 ? `<div style="color:#6b7280; font-size:0.9rem; margin-bottom:20px;">No measurements yet.</div>` : `<div style="display:grid; gap:8px; margin-bottom:20px;">${[...neckLog].reverse().slice(0,10).map((e,i,a)=>logRow(e,i,a,"inches",'"',true)).join("")}</div>`}
 
-      ${sectionHeader("Weekly Notes", "What worked? What didn't? What to adjust next week?")}
-      <textarea id="lmWeeklyNote" placeholder="Write your weekly reflection here..."
-        style="
-          width:100%; min-height:120px; padding:12px; border-radius:12px; resize:vertical;
-          border:1px solid rgba(255,255,255,0.12);
-          background:rgba(255,255,255,0.04); color:white; outline:none;
-          font-size:0.9rem; line-height:1.5; margin-bottom:20px;
-        "
+      ${sectionHeader("Weekly Notes")}
+      <textarea id="lmWeeklyNote" placeholder="What worked? What didn't? What to adjust next week?"
+        style="width:100%; min-height:120px; padding:12px; border-radius:12px; resize:vertical; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:white; outline:none; font-size:0.9rem; line-height:1.5; margin-bottom:20px; box-sizing:border-box;"
         oninput="lmSaveNote(this.value)"
       >${currentNote}</textarea>
 
-      ${sectionHeader("This Week's Completion")}
+      ${sectionHeader("This Week's Protocol Completion")}
       ${renderWeekSummary()}
     `;
   }
 
   function renderWeekSummary() {
     const allItems = [
-      "lm_neck_iso","lm_mewing_am","lm_mewing_pm","lm_jaw_gum","lm_jaw_clench",
-      "lm_cheek_lifts","lm_chin_tucks","lm_face_massage","lm_sodium","lm_water",
-      "lm_am_cleanser","lm_am_vitc","lm_am_moisturizer","lm_pm_cleanser","lm_pm_tallow","lm_pm_guasha",
-      "lm_supp_zinc","lm_supp_omega","lm_supp_collagen","lm_supp_vitd",
-      "lm_post_wall_am","lm_post_tucks_am","lm_post_hangs_am","lm_teeth_brush","lm_teeth_floss",
+      "lm_neck_iso","lm_mewing","lm_jaw_gum","lm_cheek_lifts","lm_chin_tucks","lm_face_massage",
+      "lm_am_cleanser","lm_am_ice","lm_am_vitc","lm_am_tallow",
+      "lm_pm_cleanser","lm_pm_moisturizer","lm_pm_guasha",
+      "lm_supp_vitd","lm_supp_zinc","lm_supp_creatine","lm_supp_ashwagandha","lm_supp_magnesium",
+      "lm_teeth_brush","lm_teeth_floss",
     ];
     const data = getCompletions();
     const days = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
+      const d = new Date(); d.setDate(d.getDate()-i);
       const k = todayKey(d);
       const done = allItems.filter(id => data?.[k]?.[id]).length;
-      const pct = Math.round((done / allItems.length) * 100);
-      days.push({ label: ["Su","Mo","Tu","We","Th","Fr","Sa"][d.getDay()], date: d.getDate(), pct, k });
+      days.push({ label:["Su","Mo","Tu","We","Th","Fr","Sa"][d.getDay()], pct:Math.round((done/allItems.length)*100), k });
     }
-
     return `
       <div style="display:flex; gap:8px; align-items:flex-end; height:80px; margin-bottom:8px;">
         ${days.map(d => {
           const isToday = d.k === todayKey();
-          const color = d.pct >= 75 ? "#22c55e" : d.pct >= 50 ? "#eab308" : d.pct > 0 ? "#f97316" : "rgba(255,255,255,0.1)";
+          const color = d.pct>=75?"#22c55e":d.pct>=50?"#eab308":d.pct>0?"#f97316":"rgba(255,255,255,0.1)";
           return `
             <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
-              <div style="font-size:0.72rem; font-weight:800; color:#9ca3af;">${d.pct > 0 ? d.pct + "%" : ""}</div>
-              <div style="
-                width:100%; border-radius:6px;
-                height:${Math.max(6, d.pct * 0.48)}px;
-                background:${color};
-                border:${isToday ? "1px solid rgba(167,139,250,0.6)" : "none"};
-              "></div>
-              <div style="font-size:0.72rem; color:${isToday ? "#a78bfa" : "#6b7280"}; font-weight:${isToday ? "900" : "400"};">${d.label}</div>
+              <div style="font-size:0.72rem; font-weight:800; color:#9ca3af;">${d.pct>0?d.pct+"%":""}</div>
+              <div style="width:100%; border-radius:6px; height:${Math.max(6,d.pct*0.48)}px; background:${color}; border:${isToday?"1px solid rgba(167,139,250,0.6)":"none"};"></div>
+              <div style="font-size:0.72rem; color:${isToday?"#a78bfa":"#6b7280"}; font-weight:${isToday?"900":"400"};">${d.label}</div>
             </div>
           `;
         }).join("")}
@@ -672,109 +600,72 @@
     `;
   }
 
+  // ─── DATA HANDLERS ────────────────────────────────────────────────────────
+
   window.lmLogNeck = function() {
     const val = parseFloat(document.getElementById("lmNeckInches")?.value);
-    if (!val || val < 10 || val > 25) return alert("Enter a valid neck measurement in inches (10-25).");
+    if (!val||val<10||val>25) return alert("Enter neck measurement in inches (10-25).");
     const log = safeParse(STORE_NECK, []);
-    log.push({ date: todayKey(), inches: val });
+    log.push({ date:todayKey(), inches:val });
     localStorage.setItem(STORE_NECK, JSON.stringify(log));
     renderLooksmaxxing();
   };
 
   window.lmLogWeight = function() {
     const val = parseFloat(document.getElementById("lmWeightLbs")?.value);
-    if (!val || val < 80 || val > 400) return alert("Enter a valid weight in lbs (80-400).");
+    if (!val||val<80||val>400) return alert("Enter weight in lbs (80-400).");
     const log = safeParse(STORE_WEIGHT, []);
-    log.push({ date: todayKey(), lbs: val });
+    log.push({ date:todayKey(), lbs:val });
     localStorage.setItem(STORE_WEIGHT, JSON.stringify(log));
     renderLooksmaxxing();
   };
 
   window.lmSaveHeight = function() {
     const val = parseFloat(document.getElementById("lmHeightIn")?.value);
-    if (!val || val < 48 || val > 96) return alert("Enter height in inches (48-96). e.g. 77 for 6ft 5in.");
+    if (!val||val<48||val>96) return alert("Enter height in total inches (48-96). e.g. 77 = 6ft 5in.");
     localStorage.setItem(STORE_HEIGHT, JSON.stringify(val));
     renderLooksmaxxing();
   };
 
   window.lmSaveNote = function(val) {
     const notes = safeParse(STORE_NOTES, {});
-    const d = new Date(); d.setDate(d.getDate() - d.getDay());
+    const d = new Date(); d.setDate(d.getDate()-d.getDay());
     notes[todayKey(d)] = val;
     localStorage.setItem(STORE_NOTES, JSON.stringify(notes));
   };
 
-  // ─── TAB BAR ─────────────────────────────────────────────────────────────
+  // ─── TAB BAR + MAIN RENDER ────────────────────────────────────────────────
 
   const TABS = [
-    { id: "facial",       label: "💪 Facial & Neck" },
-    { id: "skin",         label: "✨ Skin & Grooming" },
-    { id: "posture",      label: "🧍 Posture" },
-    { id: "conditioning", label: "🚴 Conditioning" },
-    { id: "progress",     label: "📈 Progress" },
+    { id:"facial",       label:"💪 Facial & Neck" },
+    { id:"skin",         label:"✨ Skin & Grooming" },
+    { id:"conditioning", label:"🚴 Conditioning" },
+    { id:"progress",     label:"📈 Progress" },
   ];
 
-  window.lmSetTab = function(id) {
-    activeTab = id;
-    renderLooksmaxxing();
-  };
-
-  // ─── MAIN RENDER ──────────────────────────────────────────────────────────
+  window.lmSetTab = function(id) { activeTab = id; renderLooksmaxxing(); };
 
   function renderLooksmaxxing() {
     const container = document.getElementById("looksMaxxingContainer");
     if (!container) return;
 
-    const tabContent = {
-      facial:       renderFacialTab,
-      skin:         renderSkinTab,
-      posture:      renderPostureTab,
-      conditioning: renderConditioningTab,
-      progress:     renderProgressTab,
-    };
-
-    const tabBar = `
-      <div style="
-        display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
-        scrollbar-width:none; margin-bottom:20px;
-      ">
-        ${TABS.map(t => `
-          <button onclick="lmSetTab('${t.id}')" style="
-            padding:9px 14px; border-radius:20px; cursor:pointer; white-space:nowrap;
-            font-weight:800; font-size:0.85rem; transition:all 0.15s;
-            border:1px solid ${activeTab === t.id ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.1)"};
-            background:${activeTab === t.id
-              ? "linear-gradient(135deg,rgba(99,102,241,0.8),rgba(236,72,153,0.7))"
-              : "rgba(255,255,255,0.04)"};
-            color:${activeTab === t.id ? "white" : "#9ca3af"};
-          ">${t.label}</button>
-        `).join("")}
-      </div>
-    `;
+    const tabContent = { facial:renderFacialTab, skin:renderSkinTab, conditioning:renderConditioningTab, progress:renderProgressTab };
 
     container.innerHTML = `
       <div style="padding:4px 0;">
-        <h2 style="
-          font-size:1.5rem; font-weight:900; margin-bottom:6px;
-          background:linear-gradient(135deg,#e5e7eb,#a78bfa);
-          -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-        ">Looksmaxxing</h2>
-        <div style="color:#6b7280; font-size:0.85rem; margin-bottom:20px;">
-          Daily protocol for facial structure, skin, posture & conditioning.
+        <h2 style="font-size:1.5rem; font-weight:900; margin-bottom:6px; background:linear-gradient(135deg,#e5e7eb,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Looksmaxxing</h2>
+        <div style="color:#6b7280; font-size:0.85rem; margin-bottom:20px;">Daily protocol for facial structure, skin & conditioning.</div>
+        <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; margin-bottom:20px;">
+          ${TABS.map(t => `
+            <button onclick="lmSetTab('${t.id}')" style="padding:9px 14px; border-radius:20px; cursor:pointer; white-space:nowrap; font-weight:800; font-size:0.85rem; transition:all 0.15s; border:1px solid ${activeTab===t.id?"rgba(99,102,241,0.5)":"rgba(255,255,255,0.1)"}; background:${activeTab===t.id?"linear-gradient(135deg,rgba(99,102,241,0.8),rgba(236,72,153,0.7))":"rgba(255,255,255,0.04)"}; color:${activeTab===t.id?"white":"#9ca3af"};">${t.label}</button>
+          `).join("")}
         </div>
-        ${tabBar}
-        <div id="lmTabContent">
-          ${(tabContent[activeTab] || tabContent.facial)()}
-        </div>
+        <div id="lmTabContent">${(tabContent[activeTab]||tabContent.facial)()}</div>
       </div>
     `;
   }
 
   window.renderLooksmaxxing = renderLooksmaxxing;
-
-  if (App) {
-    App.features.looksmaxxing = { render: renderLooksmaxxing };
-    App.on("looksmaxxing", renderLooksmaxxing);
-  }
+  if (App) { App.features.looksmaxxing = { render:renderLooksmaxxing }; App.on("looksmaxxing", renderLooksmaxxing); }
 
 })();
