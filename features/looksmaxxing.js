@@ -35,8 +35,8 @@
 
   // Neck weighted: Mon/Wed/Fri
   const NECK_DAYS   = [1, 3, 5];
-  // Sprint: Tue/Thu/Sat
-  const SPRINT_DAYS = [2, 4, 6];
+  // Sprint: Tue/Fri/Sun (per protocol)
+  const SPRINT_DAYS = [2, 5, 0];
   // Salicylic: Mon/Wed/Fri
   const SAL_DAYS    = [1, 3, 5];
 
@@ -187,11 +187,12 @@
       { id: "lm_neck_iso", name: "Isometric Holds", detail: "All 4 directions · 3×20sec each · builds thickness + fixes posture", freq: "Daily" },
     ];
     const facial = [
-      { id: "lm_mewing",       name: "Mewing",          detail: "Tongue on roof of mouth ALL DAY — set reminders to check. Resting position, not just a few minutes.", freq: "All Day" },
-      { id: "lm_jaw_gum",      name: "Jaw Gum Chewing", detail: "Falim or mastic gum · 30min · alternate sides · builds masseter",                                      freq: "Daily" },
-      { id: "lm_cheek_lifts",  name: "Cheek Lifts",     detail: "Smile wide, eyes neutral · 3×20 reps",                                                                  freq: "Daily" },
-      { id: "lm_chin_tucks",   name: "Chin Tucks",      detail: "3×15 · sharpens jawline, fixes forward head",                                                           freq: "Daily" },
-      { id: "lm_face_massage", name: "Face Massage",    detail: "5min lymphatic drainage · nightly before bed",                                                          freq: "Daily" },
+      { id: "lm_mewing",       name: "Mewing",           detail: "Tongue fully on roof of mouth ALL DAY including back third — constant background habit, not just a few minutes.", freq: "All Day" },
+      { id: "lm_jaw_gum",      name: "Mastic Gum",       detail: "30-45 min · both sides evenly · stop if TMJ pain develops",                                                      freq: "Daily" },
+      { id: "lm_jaw_device",   name: "Jawliner Device",  detail: "10-15 min daily when available · stop immediately if TMJ pain",                                                   freq: "Daily" },
+      { id: "lm_cheek_lifts",  name: "Cheek Lifts",      detail: "Smile wide, eyes neutral · 3×20 reps",                                                                           freq: "Daily" },
+      { id: "lm_chin_tucks",   name: "Chin Tucks",       detail: "3×10 reps · hold 5-10 sec each · do against wall for feedback · AM + PM",                                        freq: "2x Daily" },
+      { id: "lm_face_massage", name: "Face Massage",     detail: "5min lymphatic drainage · nightly before bed",                                                                    freq: "Daily" },
     ];
 
     return `
@@ -212,35 +213,42 @@
   function renderSkinTab() {
     const isSalDay = SAL_DAYS.includes(DOW);
 
-    // AM: Cleanser → Ice Cube → Vitamin C → Beef Tallow
+    // AM: Cleanser → Ice Face → Caffeine Eye Cream → Vitamin C → Hyaluronic Acid → Moisturizer → SPF
     const amRoutine = [
-      { id: "lm_am_cleanser", name: "① Cleanser",        detail: "The Ordinary — gentle wash, pat dry",                                            freq: "AM" },
-      { id: "lm_am_ice",      name: "② Ice Cube Roll",   detail: "Cloth-wrapped · 2-3min · de-puffs, tightens pores · AM ONLY, never at night",     freq: "AM" },
-      { id: "lm_am_vitc",     name: "③ Vitamin C Serum", detail: "The Ordinary — wait 5min to absorb. Antioxidant shield all day. AM ONLY.",         freq: "AM" },
-      { id: "lm_am_tallow",   name: "④ Beef Tallow",     detail: "Seals in vitamin C. Lightweight morning layer.",                                  freq: "AM" },
+      { id: "lm_am_cleanser",   name: "① Cleanser",              detail: "Gentle wash — pat dry",                                                                        freq: "AM" },
+      { id: "lm_am_ice",        name: "② Ice Face",              detail: "2 min · focus under eyes · de-puffs, tightens pores · AM ONLY",                               freq: "AM" },
+      { id: "lm_am_caffeine",   name: "③ Caffeine Eye Cream",    detail: "Targets puffiness and dark circles under eyes",                                                freq: "AM" },
+      { id: "lm_am_vitc",       name: "④ Vitamin C Serum",       detail: "Brightens, evens tone, collagen — wait 5min. AM ONLY. Do NOT use with GHK-Cu.",               freq: "AM" },
+      { id: "lm_am_hyaluronic", name: "⑤ Hyaluronic Acid",       detail: "Apply to damp skin for max absorption — locks in hydration",                                  freq: "AM" },
+      { id: "lm_am_moisturizer",name: "⑥ Moisturizer",           detail: "Seals the AM routine",                                                                        freq: "AM" },
+      { id: "lm_am_spf",        name: "⑦ SPF",                   detail: "Non-negotiable. Every single day, even indoors. Reapply if outside.",                         freq: "AM" },
     ];
 
-    // PM: Cleanser → (Salicylic if day) → Moisturizer → Gua Sha
+    // PM: Cleanser → (Salicylic if day) → Niacinamide Under Eye → GHK-Cu → Moisturizer
     const pmBase = [
-      { id: "lm_pm_cleanser", name: "① Cleanser", detail: "The Ordinary — double cleanse if wore sunscreen", freq: "PM" },
+      { id: "lm_pm_cleanser", name: "① Cleanser", detail: "Double cleanse if wore SPF — remove all product first", freq: "PM" },
     ];
     const pmSal = [
-      { id: "lm_pm_salicylic", name: "② Salicylic Acid", detail: "The Ordinary — exfoliates, unclogs pores while you sleep. 3x/week MAX — more will strip barrier.", scheduledDays: SAL_DAYS, weeklyTarget: 3 },
+      { id: "lm_pm_salicylic", name: "② Salicylic Acid", detail: "The Ordinary — exfoliates, unclogs pores. 3x/week MAX — more will strip barrier.", scheduledDays: SAL_DAYS, weeklyTarget: 3 },
     ];
     const pmAlways = [
-      { id: "lm_pm_moisturizer", name: isSalDay ? "③ Moisturizer" : "② Moisturizer", detail: "The Ordinary — seals night routine",    freq: "PM" },
-      { id: "lm_pm_guasha",      name: isSalDay ? "④ Gua Sha"     : "③ Gua Sha",     detail: "5min · lymphatic drainage · defines jawline", freq: "PM" },
+      { id: "lm_pm_niacinamide", name: isSalDay ? "③ Niacinamide Eye" : "② Niacinamide Eye",  detail: "Under eye only — targets hyperpigmentation and dark circles",                     freq: "PM" },
+      { id: "lm_pm_ghkcu",       name: isSalDay ? "④ GHK-Cu"          : "③ GHK-Cu",           detail: "Full face — collagen, skin thickness, repair. PM ONLY. Do NOT mix with Vitamin C.", freq: "PM" },
+      { id: "lm_pm_moisturizer", name: isSalDay ? "⑤ Moisturizer"     : "④ Moisturizer",       detail: "Seals the PM routine",                                                             freq: "PM" },
     ];
 
     // Supplements
     const suppAM = [
-      { id: "lm_supp_vitd",        name: "Vitamin D — 5000IU", detail: "Take with a fatty meal for absorption",                       freq: "AM" },
-      { id: "lm_supp_zinc",        name: "Zinc — 50mg",        detail: "Reduces acne, supports testosterone — take with food",        freq: "AM" },
-      { id: "lm_supp_creatine",    name: "Creatine — 5g",      detail: "Mix in water or shake — daily consistency matters most",      freq: "AM" },
-      { id: "lm_supp_ashwagandha", name: "Ashwagandha",        detail: "Reduces cortisol, supports testosterone — take with food",    freq: "AM" },
+      { id: "lm_supp_vitd",        name: "Vitamin D",         detail: "5000IU · take with a fatty meal for absorption · hormonal health, immunity",          freq: "AM" },
+      { id: "lm_supp_enclomiphene",name: "Enclomiphene",      detail: "Testosterone optimization · take same time every morning",                            freq: "AM" },
+      { id: "lm_supp_creatine",    name: "Creatine — 5g",     detail: "Mix in water or shake — daily consistency matters most · strength + muscle",          freq: "AM" },
+      { id: "lm_supp_beetroot",    name: "Beetroot Pill",     detail: "Vascularity + blood flow — take with AM meal",                                        freq: "AM" },
+      { id: "lm_supp_algaeoil",    name: "Algae Oil (Omega 3)",detail: "EPA/DHA — inflammation, skin, recovery. Algae not fish oil (shellfish allergy).",   freq: "AM" },
     ];
     const suppPM = [
-      { id: "lm_supp_magnesium", name: "Magnesium — 400mg", detail: "Before bed — improves sleep quality, muscle recovery, reduces cortisol", freq: "Before Bed" },
+      { id: "lm_supp_magnesium", name: "Magnesium Glycinate", detail: "Before bed — sleep quality, cramping, muscle recovery",                               freq: "Before Bed" },
+      { id: "lm_supp_zinc",      name: "Zinc",                detail: "Every other day — free testosterone, immunity. Take with food.",                      freq: "EOD" },
+      { id: "lm_supp_boron",     name: "Boron",               detail: "Every other day — free testosterone boost.",                                          freq: "EOD" },
     ];
 
     function haircutStatus() {
@@ -289,7 +297,7 @@
     return `
       ${sectionHeader("Morning Routine", "Follow exact order — sequence matters.")}
       <div style="padding:10px 14px; border-radius:10px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); color:#fcd34d; font-size:0.82rem; margin-bottom:12px;">
-        ☀️ Vitamin C and ice cube are <strong>morning only</strong> — never at night.
+        ☀️ Vitamin C is <strong>AM only</strong> — GHK-Cu is <strong>PM only</strong>. Never layer them together.
       </div>
       ${renderChecklist(amRoutine)}
 
@@ -383,7 +391,7 @@
     const feelMap = { 5:"💪 Crushed it", 4:"✅ Solid session", 3:"😐 Got through it", 2:"😓 Tough day", 1:"💀 Barely survived" };
 
     return `
-      ${sectionHeader("Stationary Bike Sprints", "Tue / Thu / Sat — 48hr minimum recovery between sessions.")}
+      ${sectionHeader("Stationary Bike Sprints", "Tue / Fri / Sun — 48hr minimum recovery between sessions.")}
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
         <div style="padding:14px; border-radius:14px; ${isSprintDay && !tooSoon ? "background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25);" : "background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);"}">
@@ -569,10 +577,16 @@
 
   function renderWeekSummary() {
     const allItems = [
-      "lm_neck_iso","lm_mewing","lm_jaw_gum","lm_cheek_lifts","lm_chin_tucks","lm_face_massage",
-      "lm_am_cleanser","lm_am_ice","lm_am_vitc","lm_am_tallow",
-      "lm_pm_cleanser","lm_pm_moisturizer","lm_pm_guasha",
-      "lm_supp_vitd","lm_supp_zinc","lm_supp_creatine","lm_supp_ashwagandha","lm_supp_magnesium",
+      // Facial & neck
+      "lm_neck_iso","lm_mewing","lm_jaw_gum","lm_jaw_device","lm_cheek_lifts","lm_chin_tucks","lm_face_massage",
+      // AM skincare
+      "lm_am_cleanser","lm_am_ice","lm_am_caffeine","lm_am_vitc","lm_am_hyaluronic","lm_am_moisturizer","lm_am_spf",
+      // PM skincare
+      "lm_pm_cleanser","lm_pm_niacinamide","lm_pm_ghkcu","lm_pm_moisturizer",
+      // Supplements
+      "lm_supp_vitd","lm_supp_enclomiphene","lm_supp_creatine","lm_supp_beetroot","lm_supp_algaeoil",
+      "lm_supp_magnesium","lm_supp_zinc","lm_supp_boron",
+      // Grooming
       "lm_teeth_brush","lm_teeth_floss",
     ];
     const data = getCompletions();
