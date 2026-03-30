@@ -206,14 +206,9 @@
               LOG TODAY'S SESSION
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <input id="bkPgs_${book.id}" type="number" min="1" max="999" placeholder="Pages read"
+              <input id="bkPgs_${book.id}" type="number" min="1" max="999" placeholder="Pages read today"
                 onkeydown="if(event.key==='Enter') bkQuickLog('${book.id}')"
-                style="flex:1; min-width:120px; padding:10px 12px; border-radius:10px;
-                  border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
-                  color:white; outline:none; font-size:0.95rem;" />
-              <input id="bkPg_${book.id}" type="number" min="0" placeholder="Now on page"
-                value="${book.currentPage || ""}"
-                style="width:110px; padding:10px 12px; border-radius:10px;
+                style="flex:1; min-width:160px; padding:10px 12px; border-radius:10px;
                   border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
                   color:white; outline:none; font-size:0.95rem;" />
               <button onclick="bkQuickLog('${book.id}')" style="padding:10px 18px; border-radius:10px;
@@ -414,30 +409,18 @@
   window.bkSetTab = function(tab) { activeTab = tab; renderBooks(); };
 
   window.bkQuickLog = function(bookId) {
-    const pInput  = document.getElementById(`bkPgs_${bookId}`);
-    const pgInput = document.getElementById(`bkPg_${bookId}`);
-    const pages   = parseInt(pInput?.value);
-    const newPage = parseInt(pgInput?.value);
+    const pInput = document.getElementById(`bkPgs_${bookId}`);
+    const pages  = parseInt(pInput?.value);
 
     if (!pages || pages < 1) { pInput?.focus(); return; }
 
-    // Update book
     const books = getBooks();
     const book  = books.find(b => b.id === bookId);
     if (!book) return;
 
-    // If "now on page" is filled, use it directly.
-    // If not, auto-advance: currentPage + pages read today.
-    if (!isNaN(newPage) && newPage >= 0) {
-      book.currentPage = newPage;
-    } else {
-      book.currentPage = (book.currentPage || 0) + pages;
-    }
-
-    // Cap at totalPages
-    if (book.totalPages && book.currentPage > book.totalPages) {
-      book.currentPage = book.totalPages;
-    }
+    // Always auto-advance — no manual page input needed
+    book.currentPage = (book.currentPage || 0) + pages;
+    if (book.totalPages && book.currentPage > book.totalPages) book.currentPage = book.totalPages;
     if (book.totalPages && book.currentPage >= book.totalPages) book.status = "finished";
 
     saveBooks(books);
