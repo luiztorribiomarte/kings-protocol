@@ -1,974 +1,588 @@
-// =====================================================
-// BOOKS INTELLIGENCE SYSTEM (KP ELITE)
-// - Want to Read → Currently Reading → Read
-// - Progress tracking (pages + daily logs)
-// - Daily reading streaks
-// - Monthly analytics
-// - Insight engine (pattern detection)
-// - Gamification (XP, levels, achievements)
-// - Knowledge extraction (notes + highlights)
-// - Mount-safe (never wipes other modules)
-// =====================================================
+/* features/books.js — KINGS PROTOCOL
+   Redesigned. Four sections:
+   1. Now Reading  — hero card, inline quick-log, streak
+   2. Up Next      — compact queue, one-tap to start
+   3. Library      — finished books with rating + takeaway
+   4. Notes Vault  — all notes in one feed
+*/
 
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "booksData";
-  const HISTORY_KEY = "booksProgressHistory";
-  const GAME_KEY = "booksGamification";
-  const MOUNT_ID = "booksMount";
+  const App         = window.App;
+  const STORE_BOOKS = "kpBooks_v2";
+  const STORE_LOGS  = "kpBookLogs_v2";
 
-  let chart = null;
-  let monthlyChart = null;
+  // ── STORAGE ───────────────────────────────────────────────────────────────
 
-  // --------------------------------------------------
-  // MODAL HELPERS — use global modal if available,
-  // otherwise fall back to a simple inline modal so
-  // "Modal system missing" never fires.
-  // --------------------------------------------------
-  function openModal(html) {
-    // Prefer the global modal wired up in index.html
-    if (typeof window.openModal === "function" && window.openModal !== openModal) {
-      window.openModal(html);
-      return;
-    }
+  function safeParse(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; }
+    catch { return fallback; }
+  }
+  function saveItem(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-    // Fallback: use the #modal element directly
-    const modalEl = document.getElementById("modal");
-    const bodyEl  = document.getElementById("modalBody");
-    if (modalEl && bodyEl) {
-      bodyEl.innerHTML = html;
-      modalEl.style.display = "flex";
-      return;
-    }
+  function getBooks()   { return safeParse(STORE_BOOKS, []); }
+  function getLogs()    { return safeParse(STORE_LOGS,  []); }
+  function saveBooks(b) { saveItem(STORE_BOOKS, b); }
+  function saveLogs(l)  { saveItem(STORE_LOGS,  l); }
 
-    // Last resort: simple overlay
-    let overlay = document.getElementById("_booksModalOverlay");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "_booksModalOverlay";
-      overlay.style.cssText = `
-        position:fixed; inset:0; z-index:9999;
-        background:rgba(0,0,0,0.75);
-        display:flex; align-items:center; justify-content:center;
-      `;
-      overlay.onclick = e => { if (e.target === overlay) closeModal(); };
-      document.body.appendChild(overlay);
-    }
+  // ── HELPERS ───────────────────────────────────────────────────────────────
 
-    overlay.innerHTML = `
-      <div style="
-        background:#1a1a2e; border-radius:16px; padding:28px;
-        max-width:600px; width:90%; max-height:80vh; overflow-y:auto;
-        border:1px solid rgba(255,255,255,0.15); color:white; position:relative;
-      ">
-        <span onclick="(function(){document.getElementById('_booksModalOverlay').style.display='none'})()"
-          style="position:absolute; top:14px; right:18px; cursor:pointer; font-size:1.4rem; color:#9CA3AF;">✕</span>
-        ${html}
-      </div>
-    `;
-    overlay.style.display = "flex";
+  function pad(n) { return String(n).padStart(2,"0"); }
+  function todayKey(d = new Date()) {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  function esc(s) {
+    return String(s||"")
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  function closeModal() {
-    // Try global first
-    if (typeof window.closeModal === "function" && window.closeModal !== closeModal) {
-      window.closeModal();
-      return;
-    }
-    // Fallback elements
-    const modalEl = document.getElementById("modal");
-    if (modalEl) { modalEl.style.display = "none"; return; }
-    const overlay = document.getElementById("_booksModalOverlay");
-    if (overlay) overlay.style.display = "none";
-  }
+  // ── STREAK + STATS ────────────────────────────────────────────────────────
 
-  // --------------------------------------------------
-
-  function getContainer() {
-    return document.getElementById("booksContainer");
-  }
-
-  function ensureMount() {
-    const container = getContainer();
-    if (!container) return null;
-
-    let mount = document.getElementById(MOUNT_ID);
-    if (mount) return mount;
-
-    mount = document.createElement("div");
-    mount.id = MOUNT_ID;
-    container.prepend(mount);
-    return mount;
-  }
-
-  function loadBooks() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  }
-
-  function saveBooks(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
-
-  function loadHistory() {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  }
-
-  function saveHistory(data) {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(data));
-  }
-
-  function loadGame() {
-    try {
-      return JSON.parse(localStorage.getItem(GAME_KEY) || "{}");
-    } catch {
-      return {};
-    }
-  }
-
-  function saveGame(data) {
-    localStorage.setItem(GAME_KEY, JSON.stringify(data));
-  }
-
-  function uuid() {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-
-  function dayKeyFromDate(d) {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x.getTime();
-  }
-
-  function todayKey() {
-    return dayKeyFromDate(new Date());
-  }
-
-  function monthKeyFromDay(dayMs) {
-    const d = new Date(dayMs);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }
-
-  function escapeHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function clamp(n, min, max) {
-    n = Number(n);
-    if (Number.isNaN(n)) return min;
-    return Math.max(min, Math.min(max, n));
-  }
-
-  // =====================================================
-  // GAMIFICATION
-  // =====================================================
-
-  function ensureGameDefaults() {
-    const game = loadGame();
-    if (!game.xp) game.xp = 0;
-    if (!Array.isArray(game.achievements)) game.achievements = [];
-    if (!Array.isArray(game.milestones)) game.milestones = [];
-    saveGame(game);
-    return game;
-  }
-
-  function levelFromXP(xp) {
-    return Math.floor((xp || 0) / 500) + 1;
-  }
-
-  function unlockAchievement(game, key) {
-    if (!game.achievements.includes(key)) {
-      game.achievements.push(key);
-      saveGame(game);
-    }
-  }
-
-  function computeAchievements(game, stats) {
-    const pages = stats.totalPagesReadAllTime || 0;
-    const books = stats.totalBooksRead || 0;
-    const streak = stats.currentStreak || 0;
-    const best = stats.bestStreak || 0;
-
-    if (pages >= 50) unlockAchievement(game, "first-50");
-    if (pages >= 250) unlockAchievement(game, "pages-250");
-    if (pages >= 1000) unlockAchievement(game, "pages-1000");
-    if (books >= 1) unlockAchievement(game, "first-book");
-    if (books >= 5) unlockAchievement(game, "books-5");
-    if (books >= 10) unlockAchievement(game, "books-10");
-    if (streak >= 3) unlockAchievement(game, "streak-3");
-    if (streak >= 7) unlockAchievement(game, "streak-7");
-    if (best >= 14) unlockAchievement(game, "streak-14");
-  }
-
-  function achievementLabel(key) {
-    const map = {
-      "first-50": "Read 50 pages",
-      "pages-250": "Read 250 pages",
-      "pages-1000": "Read 1,000 pages",
-      "first-book": "Finish 1 book",
-      "books-5": "Finish 5 books",
-      "books-10": "Finish 10 books",
-      "streak-3": "3-day streak",
-      "streak-7": "7-day streak",
-      "streak-14": "14-day best streak"
-    };
-    return map[key] || key;
-  }
-
-  // =====================================================
-  // INSIGHTS ENGINE
-  // =====================================================
-
-  function weekdayName(dayMs) {
-    return new Date(dayMs).toLocaleDateString(undefined, { weekday: "short" });
-  }
-
-  function computeInsights(historyDailyTotals) {
-    if (!historyDailyTotals.length) {
-      return ["No reading data yet. Log pages for a few days and insights will appear."];
-    }
-
-    const byWeekday = {};
-    historyDailyTotals.forEach(x => {
-      const wd = weekdayName(x.day);
-      byWeekday[wd] = byWeekday[wd] || { total: 0, days: 0 };
-      byWeekday[wd].total += x.pages;
-      byWeekday[wd].days += 1;
-    });
-
-    let bestDay = null;
-    let bestAvg = 0;
-    Object.keys(byWeekday).forEach(k => {
-      const avg = byWeekday[k].total / byWeekday[k].days;
-      if (avg > bestAvg) { bestAvg = avg; bestDay = k; }
-    });
-
-    const daysRead = historyDailyTotals.filter(x => x.pages > 0).length;
-    const spanDays = Math.max(1, Math.round(
-      (historyDailyTotals[historyDailyTotals.length - 1].day - historyDailyTotals[0].day) / 86400000
-    ) + 1);
-    const consistency = Math.round((daysRead / spanDays) * 100);
-
-    const last14 = historyDailyTotals.slice(-14);
-    const last7 = last14.slice(-7).reduce((a, b) => a + b.pages, 0);
-    const prev7 = last14.slice(0, Math.max(0, last14.length - 7)).reduce((a, b) => a + b.pages, 0);
-    const momentum = last7 > prev7 ? "up" : last7 < prev7 ? "down" : "flat";
-
-    const insights = [];
-
-    if (bestDay) insights.push(`Your strongest reading day is ${bestDay} (avg ${bestAvg.toFixed(1)} pages).`);
-    insights.push(`Consistency: you read on about ${consistency}% of days in your tracked range.`);
-
-    if (historyDailyTotals.length >= 14) {
-      if (momentum === "up") insights.push("Momentum is rising: last 7 days beat the previous 7.");
-      if (momentum === "down") insights.push("Momentum dipped: last 7 days are below the previous 7.");
-      if (momentum === "flat") insights.push("Momentum is steady: last 7 days match the previous 7.");
-    } else {
-      insights.push("Track at least 14 days for momentum insights.");
-    }
-
-    const avgPerReadDay = Math.round(
-      historyDailyTotals.reduce((a, b) => a + b.pages, 0) / Math.max(1, daysRead)
-    );
-    if (avgPerReadDay < 10) insights.push("Try a 10-page minimum daily rule for a week.");
-    else if (avgPerReadDay < 25) insights.push("You're in a good zone. Push 5 extra pages on your best weekday.");
-    else insights.push("High output. Consider tracking notes/highlights to compound learning.");
-
-    return insights.slice(0, 5);
-  }
-
-  // =====================================================
-  // STATS / ANALYTICS
-  // =====================================================
-
-  function buildDailyTotals(history) {
-    const map = {};
-    history.forEach(h => {
-      const d = Number(h.day);
-      const delta = Number(h.delta || 0);
-      map[d] = (map[d] || 0) + Math.max(0, delta);
-    });
-
-    const days = Object.keys(map).map(Number).sort((a, b) => a - b);
-    return days.map(day => ({ day, pages: map[day] }));
-  }
-
-  function computeStreak(dailyTotals) {
-    const today = todayKey();
-    const map = {};
-    dailyTotals.forEach(x => { map[x.day] = x.pages; });
-
+  function getReadingStreak() {
+    const days = new Set(getLogs().map(l => l.date));
     let streak = 0;
-    let cursor = today;
-    while (map[cursor] > 0) {
-      streak += 1;
-      cursor -= 86400000;
+    const d = new Date();
+    while (days.has(todayKey(d))) {
+      streak++;
+      d.setDate(d.getDate() - 1);
     }
-
-    let best = 0;
-    let run = 0;
-    const sorted = dailyTotals.slice().sort((a, b) => a.day - b.day);
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].pages > 0) run += 1;
-      else run = 0;
-      if (run > best) best = run;
-    }
-
-    return { current: streak, best };
+    return streak;
   }
 
-  function computeMonthlyAnalytics(history) {
-    const monthMap = {};
-    const dayMapThisMonth = {};
-
-    history.forEach(h => {
-      const day = Number(h.day);
-      const month = monthKeyFromDay(day);
-      const delta = Math.max(0, Number(h.delta || 0));
-      monthMap[month] = (monthMap[month] || 0) + delta;
-    });
-
-    const nowMonth = monthKeyFromDay(todayKey());
-    history.forEach(h => {
-      const day = Number(h.day);
-      const month = monthKeyFromDay(day);
-      if (month !== nowMonth) return;
-      const delta = Math.max(0, Number(h.delta || 0));
-      dayMapThisMonth[day] = (dayMapThisMonth[day] || 0) + delta;
-    });
-
-    const daysRead = Object.keys(dayMapThisMonth).filter(d => dayMapThisMonth[d] > 0).length;
-    const pagesThisMonth = monthMap[nowMonth] || 0;
-    const avg = daysRead ? (pagesThisMonth / daysRead) : 0;
-
-    const monthTotals = Object.keys(monthMap).sort().map(m => ({ month: m, pages: monthMap[m] }));
-
-    return {
-      monthTotals,
-      thisMonth: { month: nowMonth, pages: pagesThisMonth, daysRead, avg }
-    };
-  }
-
-  function totalPagesReadAllTime(history) {
-    return history.reduce((sum, h) => sum + Math.max(0, Number(h.delta || 0)), 0);
-  }
-
-  function totalBooksRead(books) {
-    return books.filter(b => b.status === "read").length;
-  }
-
-  // =====================================================
-  // GLOBAL API
-  // =====================================================
-
-  window.Books = window.Books || {};
-
-  Books.addBook = function (title, author, pages, status) {
-    if (!String(title || "").trim()) return;
-
-    const books = loadBooks();
-    books.push({
-      id: uuid(),
-      title: String(title).trim(),
-      author: String(author || "").trim(),
-      totalPages: Number(pages) || 0,
-      currentPage: 0,
-      status: status || "want",
-      notes: [],
-      highlights: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    });
-
-    saveBooks(books);
-    renderBooks();
-  };
-
-  Books.moveBook = function (id, status) {
-    const books = loadBooks();
-    const book = books.find(b => b.id === id);
-    if (!book) return;
-
-    book.status = status;
-    book.updatedAt = Date.now();
-
-    saveBooks(books);
-    renderBooks();
-  };
-
-  Books.deleteBook = function (id) {
-    const books = loadBooks().filter(b => b.id !== id);
-    saveBooks(books);
-    renderBooks();
-  };
-
-  Books.updateProgress = function (id, newPage, dailyPagesOptional) {
-    const books = loadBooks();
-    const book = books.find(b => b.id === id);
-    if (!book) return;
-
-    const history = loadHistory();
+  function getTotalPages()  { return getLogs().reduce((s,l) => s + (l.pages||0), 0); }
+  function getPagesToday()  {
     const t = todayKey();
+    return getLogs().filter(l => l.date === t).reduce((s,l) => s + (l.pages||0), 0);
+  }
 
-    const current = clamp(newPage, 0, book.totalPages || 999999);
+  // ── TAB STATE ─────────────────────────────────────────────────────────────
 
-    const prevEntry = history
-      .filter(h => h.bookId === id)
-      .sort((a, b) => a.day - b.day)
-      .slice(-1)[0];
+  let activeTab = "reading";
 
-    const prevPage = prevEntry ? Number(prevEntry.page || 0) : Number(book.currentPage || 0);
-
-    let delta = 0;
-    if (dailyPagesOptional !== undefined && dailyPagesOptional !== null && String(dailyPagesOptional).trim() !== "") {
-      delta = Math.max(0, Number(dailyPagesOptional) || 0);
-    } else {
-      delta = Math.max(0, current - prevPage);
-    }
-
-    const todayEntry = history.find(h => h.bookId === id && Number(h.day) === t);
-
-    if (todayEntry) {
-      todayEntry.page = current;
-      todayEntry.delta = delta;
-    } else {
-      history.push({ bookId: id, day: t, page: current, delta });
-    }
-
-    saveHistory(history);
-
-    book.currentPage = current;
-    book.updatedAt = Date.now();
-
-    if (book.totalPages && book.currentPage >= book.totalPages) {
-      book.status = "read";
-    }
-
-    saveBooks(books);
-
-    const game = ensureGameDefaults();
-    game.xp += delta;
-    saveGame(game);
-
-    renderBooks();
-  };
-
-  Books.addKnowledge = function (id, type, text) {
-    const books = loadBooks();
-    const book = books.find(b => b.id === id);
-    if (!book) return;
-
-    const entry = { id: uuid(), text: String(text || "").trim(), createdAt: Date.now() };
-    if (!entry.text) return;
-
-    if (type === "note") book.notes = Array.isArray(book.notes) ? book.notes : [];
-    if (type === "highlight") book.highlights = Array.isArray(book.highlights) ? book.highlights : [];
-
-    if (type === "note") book.notes.push(entry);
-    if (type === "highlight") book.highlights.push(entry);
-
-    book.updatedAt = Date.now();
-    saveBooks(books);
-    renderBooks();
-  };
-
-  Books.viewKnowledge = function (id) {
-    const book = loadBooks().find(b => b.id === id);
-    if (!book) return;
-
-    const notes = (book.notes || []).slice().reverse();
-    const highlights = (book.highlights || []).slice().reverse();
-
-    openModal(`
-      <div class="section-title">Knowledge: ${escapeHtml(book.title)}</div>
-
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800; margin-bottom:6px;">Notes (${notes.length})</div>
-        ${notes.length ? notes.map(n => `
-          <div class="idea-item" style="margin-bottom:8px;">
-            <div style="color:#9CA3AF; font-size:0.8rem;">${new Date(n.createdAt).toLocaleString()}</div>
-            <div>${escapeHtml(n.text)}</div>
-          </div>
-        `).join("") : `<div style="color:#9CA3AF;">No notes yet.</div>`}
-      </div>
-
-      <div>
-        <div style="font-weight:800; margin-bottom:6px;">Highlights (${highlights.length})</div>
-        ${highlights.length ? highlights.map(h => `
-          <div class="idea-item" style="margin-bottom:8px;">
-            <div style="color:#9CA3AF; font-size:0.8rem;">${new Date(h.createdAt).toLocaleString()}</div>
-            <div>${escapeHtml(h.text)}</div>
-          </div>
-        `).join("") : `<div style="color:#9CA3AF;">No highlights yet.</div>`}
-      </div>
-    `);
-  };
-
-  // =====================================================
-  // UI RENDER
-  // =====================================================
+  // ── MAIN RENDER ───────────────────────────────────────────────────────────
 
   function renderBooks() {
-    const mount = ensureMount();
-    if (!mount) return;
+    const container = document.getElementById("booksContainer");
+    if (!container) return;
 
-    const books = loadBooks();
-    const history = loadHistory();
+    const books    = getBooks();
+    const reading  = books.filter(b => b.status === "reading");
+    const queue    = books.filter(b => b.status === "queue");
+    const finished = books.filter(b => b.status === "finished");
+    const streak   = getReadingStreak();
+    const total    = getTotalPages();
+    const today    = getPagesToday();
 
-    const current = books.filter(b => b.status === "current");
-    const want = books.filter(b => b.status === "want");
-    const read = books.filter(b => b.status === "read");
+    const TABS = [
+      { id:"reading", label:"📖 Reading"  },
+      { id:"queue",   label:"📚 Up Next"  },
+      { id:"library", label:"✅ Library"  },
+      { id:"notes",   label:"🗒 Notes"    },
+    ];
 
-    const dailyTotals = buildDailyTotals(history);
-    const streak = computeStreak(dailyTotals);
-    const monthly = computeMonthlyAnalytics(history);
+    container.innerHTML = `<div style="padding:4px 0;">
 
-    const pagesAll = totalPagesReadAllTime(history);
-    const booksReadCount = totalBooksRead(books);
-
-    const game = ensureGameDefaults();
-    const lvl = levelFromXP(game.xp);
-
-    computeAchievements(game, {
-      totalPagesReadAllTime: pagesAll,
-      totalBooksRead: booksReadCount,
-      currentStreak: streak.current,
-      bestStreak: streak.best,
-      monthPages: monthly.thisMonth.pages,
-      daysReadThisMonth: monthly.thisMonth.daysRead
-    });
-
-    const insights = computeInsights(dailyTotals);
-
-    mount.innerHTML = `
-      <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-          <div>
-            <div class="section-title">📚 Reading Dashboard</div>
-            <div style="color:#9CA3AF;">
-              Streak: <span style="color:#22c55e; font-weight:900;">${streak.current} day(s)</span>
-              (Best: ${streak.best})
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <div class="content-stat-card" style="padding:12px 14px; min-width:160px;">
-              <div style="color:#9CA3AF;">XP</div>
-              <div style="font-size:1.2rem; font-weight:900;">${Number(game.xp).toLocaleString()}</div>
-            </div>
-            <div class="content-stat-card" style="padding:12px 14px; min-width:160px;">
-              <div style="color:#9CA3AF;">Level</div>
-              <div style="font-size:1.2rem; font-weight:900;">${lvl}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-stats" style="margin-top:14px;">
-          <div class="content-stat-card">
-            <div>Pages Read (All Time)</div>
-            <div style="font-size:1.6rem; font-weight:900;">${Number(pagesAll).toLocaleString()}</div>
-          </div>
-          <div class="content-stat-card">
-            <div>Books Finished</div>
-            <div style="font-size:1.6rem; font-weight:900;">${booksReadCount}</div>
-          </div>
-          <div class="content-stat-card">
-            <div>This Month</div>
-            <div style="font-size:1.6rem; font-weight:900;">${monthly.thisMonth.pages} pages</div>
-            <div style="color:#9CA3AF; font-size:0.85rem;">
-              ${monthly.thisMonth.daysRead} day(s) • avg ${monthly.thisMonth.avg.toFixed(1)}/day
-            </div>
-          </div>
-          <div class="content-stat-card">
-            <div>Achievements</div>
-            <div style="font-size:1.1rem; font-weight:900;">${game.achievements.length}</div>
-            <button class="form-cancel" id="viewAchievementsBtn" style="margin-top:10px;">View</button>
-          </div>
+      <!-- HEADER -->
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:1.5rem; font-weight:900; margin-bottom:6px;
+          background:linear-gradient(135deg,#e5e7eb,#a78bfa);
+          -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+          Reading
+        </h2>
+        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:0.82rem; color:${streak > 0 ? "#f59e0b" : "#6b7280"};">
+            ${streak > 0 ? `🔥 ${streak}-day streak` : "Start a streak — read today"}
+          </span>
+          <span style="font-size:0.82rem; color:#6b7280;">${total.toLocaleString()} pages total</span>
+          ${today > 0 ? `<span style="font-size:0.82rem; font-weight:800; color:#86efac;">+${today} today</span>` : ""}
         </div>
       </div>
 
-      <div class="habit-section">
-        <div class="section-title">🧠 Insights</div>
-        ${insights.map(x => `<div style="margin-bottom:8px;">• ${escapeHtml(x)}</div>`).join("")}
+      <!-- TABS + ADD -->
+      <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
+        scrollbar-width:none; margin-bottom:20px; align-items:center;">
+        ${TABS.map(t => `
+          <button onclick="bkSetTab('${t.id}')" style="
+            padding:9px 15px; border-radius:20px; cursor:pointer;
+            white-space:nowrap; font-weight:800; font-size:0.82rem; transition:all 0.15s;
+            border:1px solid ${activeTab===t.id ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)"};
+            background:${activeTab===t.id
+              ? "linear-gradient(135deg,rgba(99,102,241,0.85),rgba(167,139,250,0.75))"
+              : "rgba(255,255,255,0.04)"};
+            color:${activeTab===t.id ? "white" : "#9ca3af"};">
+            ${t.label}
+          </button>
+        `).join("")}
+        <button onclick="bkOpenAddModal()" style="
+          padding:9px 15px; border-radius:20px; cursor:pointer; margin-left:auto;
+          white-space:nowrap; font-weight:800; font-size:0.82rem;
+          border:1px solid rgba(167,139,250,0.4); background:rgba(167,139,250,0.1);
+          color:#a78bfa;">
+          + Add Book
+        </button>
       </div>
 
-      <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="section-title">📖 Currently Reading</div>
-          <button class="form-submit" id="addBookBtn">Add Book</button>
-        </div>
-        ${current.length ? current.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No books currently being read.</div>`}
+      <!-- CONTENT -->
+      <div id="bkContent">
+        ${activeTab === "reading"  ? renderReadingTab(reading)  : ""}
+        ${activeTab === "queue"    ? renderQueueTab(queue)       : ""}
+        ${activeTab === "library"  ? renderLibraryTab(finished)  : ""}
+        ${activeTab === "notes"    ? renderNotesTab(books)       : ""}
       </div>
 
-      <div class="habit-section">
-        <div class="section-title">📚 Want to Read</div>
-        ${want.length ? want.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No books in wishlist.</div>`}
-      </div>
-
-      <div class="habit-section">
-        <div class="section-title">✅ Books Read</div>
-        ${read.length ? read.map(renderBookCard).join("") : `<div style="color:#9CA3AF;">No completed books yet.</div>`}
-      </div>
-
-      <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <div class="section-title">📈 Book Progress</div>
-          <select id="bookSelect" class="form-input" style="width:auto; min-width:220px;">
-            ${current.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("")}
-            ${(!current.length && want.length) ? want.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("") : ""}
-            ${(!current.length && !want.length && read.length) ? read.map(b => `<option value="${b.id}">${escapeHtml(b.title)}</option>`).join("") : ""}
-          </select>
-        </div>
-        <canvas id="booksChart" height="140"></canvas>
-      </div>
-
-      <div class="habit-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="section-title">📅 Monthly Pages Read</div>
-        </div>
-        <canvas id="booksMonthlyChart" height="140"></canvas>
-      </div>
-    `;
-
-    bindEvents();
-    renderProgressChart();
-    renderMonthlyChart();
+    </div>`;
   }
 
-  function renderBookCard(book) {
-    const progress = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
-    const notesCount = (book.notes || []).length;
-    const highlightsCount = (book.highlights || []).length;
+  // ── TAB 1: NOW READING ────────────────────────────────────────────────────
 
-    let buttons = "";
-
-    if (book.status === "want") {
-      buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="current">Start Reading</button>`;
+  function renderReadingTab(reading) {
+    if (!reading.length) {
+      return `
+        <div style="padding:40px 20px; text-align:center; border-radius:20px;
+          border:1px dashed rgba(167,139,250,0.2); background:rgba(167,139,250,0.03);">
+          <div style="font-size:2rem; margin-bottom:12px;">📖</div>
+          <div style="font-weight:800; color:#e5e7eb; margin-bottom:6px;">Nothing in progress</div>
+          <div style="font-size:0.85rem; color:#6b7280; margin-bottom:16px;">
+            Add a book and start. Even 10 pages a day stacks up fast.
+          </div>
+          <button onclick="bkOpenAddModal('reading')" style="padding:10px 22px; border-radius:20px;
+            background:linear-gradient(135deg,rgba(99,102,241,0.85),rgba(167,139,250,0.75));
+            border:none; color:white; font-weight:800; cursor:pointer; font-size:0.9rem;">
+            Start a Book
+          </button>
+        </div>
+      `;
     }
 
-    if (book.status === "current") {
-      buttons += `<button class="form-submit" data-action="move" data-id="${book.id}" data-status="read">Mark Read</button>`;
-      buttons += `<button class="form-cancel" data-action="progress" data-id="${book.id}">Update Progress</button>`;
-    }
+    return reading.map(book => {
+      const pct       = book.totalPages ? Math.min(100, Math.round((book.currentPage / book.totalPages) * 100)) : 0;
+      const pLeft     = book.totalPages ? book.totalPages - book.currentPage : null;
+      const todayLogs = getLogs().filter(l => l.bookId === book.id && l.date === todayKey());
+      const todayPgs  = todayLogs.reduce((s,l) => s + (l.pages||0), 0);
 
-    buttons += `<button class="form-cancel" data-action="knowledge" data-id="${book.id}">Knowledge</button>`;
-    buttons += `<button class="form-cancel" data-action="addNote" data-id="${book.id}">Add Note</button>`;
-    buttons += `<button class="form-cancel" data-action="addHighlight" data-id="${book.id}">Add Highlight</button>`;
-    buttons += `<button class="form-cancel" data-action="delete" data-id="${book.id}" style="color:#ef4444;">Delete</button>`;
+      return `
+        <div style="border-radius:20px; overflow:hidden; margin-bottom:16px;
+          border:1px solid rgba(167,139,250,0.2);
+          background:linear-gradient(160deg,rgba(99,102,241,0.07),rgba(167,139,250,0.04));">
 
-    return `
-      <div class="idea-item" style="margin-top:10px;">
-        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-          <div style="min-width:260px;">
-            <div style="font-weight:800;">${escapeHtml(book.title)}</div>
-            <div style="color:#9CA3AF;">${escapeHtml(book.author || "")}</div>
+          <!-- Book header -->
+          <div style="padding:20px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+              <div style="flex:1;">
+                <div style="font-weight:900; font-size:1.1rem; color:#e5e7eb; line-height:1.3;">${esc(book.title)}</div>
+                ${book.author ? `<div style="font-size:0.82rem; color:#6b7280; margin-top:3px;">${esc(book.author)}</div>` : ""}
+              </div>
+              ${todayPgs > 0 ? `
+                <span style="font-size:0.72rem; padding:3px 10px; border-radius:20px; flex-shrink:0;
+                  background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); color:#86efac; font-weight:800;">
+                  +${todayPgs} today ✓
+                </span>` : ""}
+            </div>
 
             ${book.totalPages ? `
-              <div style="color:#a78bfa; margin-top:6px;">
-                ${book.currentPage}/${book.totalPages} pages (${progress}%)
+              <div style="margin-top:16px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:7px;">
+                  <span style="font-size:0.78rem; color:#9ca3af;">
+                    Page ${book.currentPage} of ${book.totalPages}
+                    ${pLeft !== null ? ` · ${pLeft} left` : ""}
+                  </span>
+                  <span style="font-size:0.78rem; font-weight:900; color:#a78bfa;">${pct}%</span>
+                </div>
+                <div style="height:7px; border-radius:7px; background:rgba(255,255,255,0.07); overflow:hidden;">
+                  <div style="height:100%; width:${pct}%;
+                    background:linear-gradient(90deg,#6366f1,#a78bfa);
+                    border-radius:7px; transition:width 0.5s;"></div>
+                </div>
               </div>
-              <div style="margin-top:8px; height:6px; border-radius:6px; background:rgba(255,255,255,0.18); overflow:hidden;">
-                <div style="height:100%; width:${progress}%; background:linear-gradient(135deg,#6366f1,#ec4899);"></div>
-              </div>
-            ` : `<div style="color:#9CA3AF; margin-top:6px;">Set total pages to track progress.</div>`}
+            ` : ""}
+          </div>
 
-            <div style="color:#9CA3AF; font-size:0.85rem; margin-top:8px;">
-              Notes: ${notesCount} • Highlights: ${highlightsCount}
+          <!-- Quick log -->
+          <div style="padding:12px 20px 16px; border-top:1px solid rgba(255,255,255,0.06);
+            background:rgba(0,0,0,0.12);">
+            <div style="font-size:0.7rem; font-weight:900; letter-spacing:0.08em; color:#6b7280; margin-bottom:8px;">
+              LOG TODAY'S SESSION
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input id="bkPgs_${book.id}" type="number" min="1" max="999" placeholder="Pages read"
+                onkeydown="if(event.key==='Enter') bkQuickLog('${book.id}')"
+                style="flex:1; min-width:120px; padding:10px 12px; border-radius:10px;
+                  border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+                  color:white; outline:none; font-size:0.95rem;" />
+              <input id="bkPg_${book.id}" type="number" min="0" placeholder="Now on page"
+                value="${book.currentPage || ""}"
+                style="width:110px; padding:10px 12px; border-radius:10px;
+                  border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+                  color:white; outline:none; font-size:0.95rem;" />
+              <button onclick="bkQuickLog('${book.id}')" style="padding:10px 18px; border-radius:10px;
+                border:none; cursor:pointer; font-weight:900; color:white; font-size:0.9rem;
+                background:linear-gradient(135deg,rgba(99,102,241,0.9),rgba(167,139,250,0.8));">
+                Log
+              </button>
             </div>
           </div>
 
-          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start;">
-            ${buttons}
+          <!-- Actions -->
+          <div style="padding:10px 20px 14px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button onclick="bkOpenNoteModal('${book.id}')" style="padding:7px 14px; border-radius:20px;
+              font-size:0.78rem; font-weight:700; cursor:pointer;
+              border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#9ca3af;">
+              ✏️ Add Note
+            </button>
+            <button onclick="bkOpenFinishModal('${book.id}')" style="padding:7px 14px; border-radius:20px;
+              font-size:0.78rem; font-weight:700; cursor:pointer;
+              border:1px solid rgba(34,197,94,0.3); background:rgba(34,197,94,0.07); color:#86efac;">
+              ✅ Mark Finished
+            </button>
+            <button onclick="bkDelete('${book.id}')" style="padding:7px 14px; border-radius:20px;
+              font-size:0.78rem; font-weight:700; cursor:pointer;
+              border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.04); color:#ef4444;">
+              Remove
+            </button>
+          </div>
+
+        </div>
+      `;
+    }).join("");
+  }
+
+  // ── TAB 2: UP NEXT ────────────────────────────────────────────────────────
+
+  function renderQueueTab(queue) {
+    if (!queue.length) {
+      return `
+        <div style="padding:32px 20px; text-align:center; border-radius:16px;
+          border:1px dashed rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+          <div style="font-size:1.8rem; margin-bottom:10px;">📚</div>
+          <div style="font-weight:800; color:#e5e7eb; margin-bottom:6px;">Queue is empty</div>
+          <div style="font-size:0.85rem; color:#6b7280;">Add books you plan to read next.</div>
+        </div>
+      `;
+    }
+    return `<div style="display:grid; gap:8px;">` +
+      queue.map((book, i) => `
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 16px;
+          border-radius:14px; border:1px solid rgba(255,255,255,0.07);
+          background:rgba(255,255,255,0.03);">
+          <div style="width:30px; height:30px; border-radius:9px; flex-shrink:0;
+            background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.2);
+            display:flex; align-items:center; justify-content:center;
+            font-size:0.8rem; font-weight:900; color:#a78bfa;">${i+1}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:800; font-size:0.9rem; color:#e5e7eb;">${esc(book.title)}</div>
+            ${book.author ? `<div style="font-size:0.77rem; color:#6b7280; margin-top:2px;">${esc(book.author)}</div>` : ""}
+            ${book.totalPages ? `<div style="font-size:0.72rem; color:#4b5563; margin-top:2px;">${book.totalPages.toLocaleString()} pages</div>` : ""}
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <button onclick="bkStartReading('${book.id}')" style="padding:7px 12px; border-radius:20px;
+              font-size:0.78rem; font-weight:800; cursor:pointer;
+              border:1px solid rgba(167,139,250,0.35); background:rgba(167,139,250,0.1); color:#a78bfa;">
+              Start
+            </button>
+            <button onclick="bkDelete('${book.id}')" style="width:28px; height:28px; border-radius:50%;
+              border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05);
+              color:#ef4444; cursor:pointer; font-size:0.78rem;
+              display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
           </div>
         </div>
+      `).join("") + `</div>`;
+  }
+
+  // ── TAB 3: LIBRARY ────────────────────────────────────────────────────────
+
+  function renderLibraryTab(finished) {
+    if (!finished.length) {
+      return `
+        <div style="padding:32px 20px; text-align:center; border-radius:16px;
+          border:1px dashed rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+          <div style="font-size:1.8rem; margin-bottom:10px;">🏆</div>
+          <div style="font-weight:800; color:#e5e7eb; margin-bottom:6px;">No finished books yet</div>
+          <div style="font-size:0.85rem; color:#6b7280;">Finish your first book — it lives here forever.</div>
+        </div>
+      `;
+    }
+    return `
+      <div style="margin-bottom:12px; font-size:0.82rem; color:#6b7280;">
+        ${finished.length} book${finished.length!==1?"s":""} completed
+      </div>
+      <div style="display:grid; gap:8px;">
+        ${[...finished].reverse().map(book => {
+          const stars = book.rating ? "★".repeat(book.rating) + "☆".repeat(5-book.rating) : null;
+          const nc = (book.notes||[]).length;
+          return `
+            <div style="padding:14px 16px; border-radius:14px;
+              border:1px solid rgba(34,197,94,0.15); background:rgba(34,197,94,0.04);">
+              <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                <div style="flex:1;">
+                  <div style="font-weight:800; font-size:0.92rem; color:#e5e7eb;">${esc(book.title)}</div>
+                  ${book.author ? `<div style="font-size:0.77rem; color:#6b7280; margin-top:2px;">${esc(book.author)}</div>` : ""}
+                  ${stars ? `<div style="font-size:0.88rem; color:#f59e0b; margin-top:6px; letter-spacing:1px;">${stars}</div>` : ""}
+                  ${book.takeaway ? `
+                    <div style="font-size:0.82rem; color:#9ca3af; margin-top:8px;
+                      padding:8px 12px; border-radius:8px; background:rgba(255,255,255,0.04);
+                      border-left:2px solid rgba(167,139,250,0.4); font-style:italic; line-height:1.5;">
+                      "${esc(book.takeaway)}"
+                    </div>` : ""}
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0;">
+                  ${nc > 0 ? `<span style="font-size:0.7rem; color:#6b7280;">${nc} note${nc!==1?"s":""}</span>` : ""}
+                  <button onclick="bkOpenFinishModal('${book.id}')" style="padding:5px 12px; border-radius:20px;
+                    font-size:0.75rem; font-weight:700; cursor:pointer;
+                    border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#9ca3af;">
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("")}
       </div>
     `;
   }
 
-  // =====================================================
-  // EVENTS + MODALS
-  // =====================================================
+  // ── TAB 4: NOTES VAULT ────────────────────────────────────────────────────
 
-  function bindEvents() {
-    const mount = document.getElementById(MOUNT_ID);
-    if (!mount) return;
-
-    const addBtn = mount.querySelector("#addBookBtn");
-    if (addBtn) addBtn.onclick = openAddBookModal;
-
-    const viewAch = mount.querySelector("#viewAchievementsBtn");
-    if (viewAch) viewAch.onclick = openAchievementsModal;
-
-    mount.querySelectorAll("[data-action]").forEach(btn => {
-      btn.onclick = () => {
-        const id = btn.dataset.id;
-        const action = btn.dataset.action;
-
-        if (action === "move") Books.moveBook(id, btn.dataset.status);
-        if (action === "delete") Books.deleteBook(id);
-        if (action === "progress") openProgressModal(id);
-        if (action === "knowledge") Books.viewKnowledge(id);
-        if (action === "addNote") openKnowledgeModal(id, "note");
-        if (action === "addHighlight") openKnowledgeModal(id, "highlight");
-      };
+  function renderNotesTab(books) {
+    const allNotes = [];
+    books.forEach(book => {
+      (book.notes || []).forEach(n => {
+        allNotes.push({ ...n, bookTitle: book.title, bookId: book.id });
+      });
     });
-  }
+    allNotes.sort((a, b) => b.createdAt - a.createdAt);
 
-  function openAddBookModal() {
-    openModal(`
-      <div class="section-title">Add Book</div>
-
-      <div class="form-group">
-        <label>Title</label>
-        <input id="bookTitle" class="form-input">
-      </div>
-
-      <div class="form-group">
-        <label>Author (optional)</label>
-        <input id="bookAuthor" class="form-input">
-      </div>
-
-      <div class="form-group">
-        <label>Total Pages</label>
-        <input id="bookPages" type="number" class="form-input">
-      </div>
-
-      <div class="form-group">
-        <label>Status</label>
-        <select id="bookStatus" class="form-input">
-          <option value="want">Want to Read</option>
-          <option value="current">Currently Reading</option>
-        </select>
-      </div>
-
-      <div class="form-actions">
-        <button class="form-submit" id="saveBook">Save</button>
-        <button class="form-cancel" id="cancelBook">Cancel</button>
-      </div>
-    `);
-
-    setTimeout(() => {
-      const saveBtn = document.getElementById("saveBook");
-      const cancelBtn = document.getElementById("cancelBook");
-
-      if (saveBtn) saveBtn.onclick = () => {
-        Books.addBook(
-          document.getElementById("bookTitle")?.value,
-          document.getElementById("bookAuthor")?.value,
-          document.getElementById("bookPages")?.value,
-          document.getElementById("bookStatus")?.value
-        );
-        closeModal();
-      };
-
-      if (cancelBtn) cancelBtn.onclick = closeModal;
-    }, 50);
-  }
-
-  function openProgressModal(id) {
-    const books = loadBooks();
-    const book = books.find(b => b.id === id);
-    if (!book) return;
-
-    openModal(`
-      <div class="section-title">Update Progress</div>
-
-      <div class="form-group">
-        <label>Current Page</label>
-        <input id="progressPage" type="number" class="form-input" value="${book.currentPage}">
-      </div>
-
-      <div class="form-group">
-        <label>Pages read today (optional)</label>
-        <input id="pagesToday" type="number" class="form-input" placeholder="Example: 20">
-        <div style="color:#9CA3AF; font-size:0.85rem; margin-top:6px;">
-          If you fill this, it will log today's pages read even if your current page doesn't jump much.
+    if (!allNotes.length) {
+      return `
+        <div style="padding:32px 20px; text-align:center; border-radius:16px;
+          border:1px dashed rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+          <div style="font-size:1.8rem; margin-bottom:10px;">🗒</div>
+          <div style="font-weight:800; color:#e5e7eb; margin-bottom:6px;">Notes vault is empty</div>
+          <div style="font-size:0.85rem; color:#6b7280;">
+            Add notes while reading. Ideas compound here.
+          </div>
         </div>
+      `;
+    }
+
+    // Group by book
+    const byBook = {};
+    allNotes.forEach(n => {
+      if (!byBook[n.bookId]) byBook[n.bookId] = { title: n.bookTitle, notes: [] };
+      byBook[n.bookId].notes.push(n);
+    });
+
+    return `
+      <div style="margin-bottom:12px; font-size:0.82rem; color:#6b7280;">
+        ${allNotes.length} note${allNotes.length!==1?"s":""} · ${Object.keys(byBook).length} book${Object.keys(byBook).length!==1?"s":""}
       </div>
-
-      <div class="form-actions">
-        <button class="form-submit" id="updateProgress">Update</button>
-        <button class="form-cancel" id="cancelProgress">Cancel</button>
-      </div>
-    `);
-
-    setTimeout(() => {
-      const updateBtn = document.getElementById("updateProgress");
-      const cancelBtn = document.getElementById("cancelProgress");
-
-      if (updateBtn) updateBtn.onclick = () => {
-        Books.updateProgress(
-          id,
-          document.getElementById("progressPage")?.value,
-          document.getElementById("pagesToday")?.value
-        );
-        closeModal();
-      };
-
-      if (cancelBtn) cancelBtn.onclick = closeModal;
-    }, 50);
-  }
-
-  function openKnowledgeModal(id, type) {
-    const book = loadBooks().find(b => b.id === id);
-    if (!book) return;
-
-    const title = type === "note" ? "Add Note" : "Add Highlight";
-
-    openModal(`
-      <div class="section-title">${title}</div>
-      <div style="color:#9CA3AF; margin-bottom:10px;">${escapeHtml(book.title)}</div>
-
-      <div class="form-group">
-        <label>${type === "note" ? "Note" : "Highlight"}</label>
-        <textarea id="knowledgeText" class="form-input" rows="6" placeholder="Paste your notes/highlights here..."></textarea>
-      </div>
-
-      <div class="form-actions">
-        <button class="form-submit" id="saveKnowledge">Save</button>
-        <button class="form-cancel" id="cancelKnowledge">Cancel</button>
-      </div>
-    `);
-
-    setTimeout(() => {
-      const saveBtn = document.getElementById("saveKnowledge");
-      const cancelBtn = document.getElementById("cancelKnowledge");
-
-      if (saveBtn) saveBtn.onclick = () => {
-        Books.addKnowledge(id, type, document.getElementById("knowledgeText")?.value);
-        closeModal();
-      };
-
-      if (cancelBtn) cancelBtn.onclick = closeModal;
-    }, 50);
-  }
-
-  function openAchievementsModal() {
-    const game = ensureGameDefaults();
-    const list = (game.achievements || []).slice().reverse();
-
-    openModal(`
-      <div class="section-title">Achievements</div>
-      ${list.length ? list.map(a => `
-        <div class="idea-item" style="margin-bottom:10px;">
-          <div style="font-weight:900;">${escapeHtml(achievementLabel(a))}</div>
-          <div style="color:#9CA3AF; font-size:0.85rem;">${escapeHtml(a)}</div>
+      ${Object.values(byBook).map(group => `
+        <div style="margin-bottom:18px;">
+          <div style="font-size:0.7rem; font-weight:900; letter-spacing:0.09em; color:#a78bfa;
+            text-transform:uppercase; margin-bottom:8px; padding-left:2px;">
+            ${esc(group.title)}
+          </div>
+          <div style="display:grid; gap:6px;">
+            ${group.notes.map(n => `
+              <div style="padding:12px 14px; border-radius:12px;
+                border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.03);
+                border-left:3px solid rgba(167,139,250,0.4);">
+                <div style="font-size:0.87rem; color:#e5e7eb; line-height:1.55;">${esc(n.text)}</div>
+                <div style="font-size:0.72rem; color:#4b5563; margin-top:6px;">
+                  ${new Date(n.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+                </div>
+              </div>
+            `).join("")}
+          </div>
         </div>
-      `).join("") : `<div style="color:#9CA3AF;">No achievements unlocked yet.</div>`}
+      `).join("")}
+    `;
+  }
+
+  // ── ACTIONS ───────────────────────────────────────────────────────────────
+
+  window.bkSetTab = function(tab) { activeTab = tab; renderBooks(); };
+
+  window.bkQuickLog = function(bookId) {
+    const pInput  = document.getElementById(`bkPgs_${bookId}`);
+    const pgInput = document.getElementById(`bkPg_${bookId}`);
+    const pages   = parseInt(pInput?.value);
+    const newPage = parseInt(pgInput?.value);
+
+    if (!pages || pages < 1) { pInput?.focus(); return; }
+
+    // Update book
+    const books = getBooks();
+    const book  = books.find(b => b.id === bookId);
+    if (!book) return;
+    if (!isNaN(newPage) && newPage >= 0) {
+      book.currentPage = newPage;
+      if (book.totalPages && book.currentPage >= book.totalPages) book.status = "finished";
+    }
+    saveBooks(books);
+
+    // Save log
+    const logs = getLogs();
+    logs.push({ id: uid(), bookId, date: todayKey(), pages, page: newPage || book.currentPage });
+    saveLogs(logs);
+
+    renderBooks();
+  };
+
+  window.bkStartReading = function(bookId) {
+    const books = getBooks();
+    const book  = books.find(b => b.id === bookId);
+    if (!book) return;
+    book.status = "reading";
+    saveBooks(books);
+    activeTab = "reading";
+    renderBooks();
+  };
+
+  window.bkDelete = function(bookId) {
+    if (!confirm("Remove this book?")) return;
+    saveBooks(getBooks().filter(b => b.id !== bookId));
+    renderBooks();
+  };
+
+  // ── MODALS ────────────────────────────────────────────────────────────────
+
+  window.bkOpenAddModal = function(defaultStatus = "queue") {
+    window.openModal(`
+      <h2 style="margin-bottom:16px;">Add Book</h2>
+      <div style="display:grid; gap:12px;">
+        <div>
+          <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">Title *</div>
+          <input id="bkAddTitle" class="form-input" style="width:100%;" placeholder="Book title"
+            onkeydown="if(event.key==='Enter') bkSaveAdd()" />
+        </div>
+        <div>
+          <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">Author</div>
+          <input id="bkAddAuthor" class="form-input" style="width:100%;" placeholder="Author name" />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">Total Pages</div>
+            <input id="bkAddPages" type="number" class="form-input" style="width:100%;" placeholder="e.g. 320" />
+          </div>
+          <div>
+            <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">Add to</div>
+            <select id="bkAddStatus" class="form-input" style="width:100%;">
+              <option value="queue"   ${defaultStatus==="queue"   ?"selected":""}>Up Next</option>
+              <option value="reading" ${defaultStatus==="reading" ?"selected":""}>Currently Reading</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="bkSaveAdd()" class="form-submit" style="margin-top:4px;">Add Book</button>
+      </div>
     `);
-  }
+  };
 
-  // =====================================================
-  // CHARTS
-  // =====================================================
-
-  function renderProgressChart() {
-    const mount = document.getElementById(MOUNT_ID);
-    if (!mount) return;
-
-    const select = mount.querySelector("#bookSelect");
-    const canvas = mount.querySelector("#booksChart");
-    if (!select || !canvas) return;
-
-    const books = loadBooks();
-    const history = loadHistory();
-
-    const bookId = select.value;
-    const book = books.find(b => b.id === bookId);
-
-    const series = history
-      .filter(h => h.bookId === bookId)
-      .sort((a, b) => a.day - b.day);
-
-    const labels = series.map(h => new Date(h.day).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
-    const data = series.map(h => Number(h.page || 0));
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(canvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: book ? `${book.title} (page)` : "Progress",
-          data,
-          tension: 0.35
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-      }
+  window.bkSaveAdd = function() {
+    const title  = (document.getElementById("bkAddTitle")?.value  || "").trim();
+    const author = (document.getElementById("bkAddAuthor")?.value || "").trim();
+    const pages  = parseInt(document.getElementById("bkAddPages")?.value);
+    const status = document.getElementById("bkAddStatus")?.value || "queue";
+    if (!title) return alert("Title is required.");
+    const books = getBooks();
+    books.push({
+      id: uid(), title, author, status,
+      totalPages: isNaN(pages) ? 0 : pages,
+      currentPage: 0,
+      notes: [], rating: 0, takeaway: "",
+      createdAt: Date.now(),
     });
+    saveBooks(books);
+    window.closeModal?.();
+    if (status === "reading") activeTab = "reading";
+    else activeTab = "queue";
+    renderBooks();
+  };
 
-    select.onchange = renderBooks;
+  window.bkOpenNoteModal = function(bookId) {
+    const book = getBooks().find(b => b.id === bookId);
+    if (!book) return;
+    window.openModal(`
+      <h2 style="margin-bottom:4px;">Add Note</h2>
+      <div style="font-size:0.82rem; color:#6b7280; margin-bottom:14px;">${esc(book.title)}</div>
+      <textarea id="bkNoteText" class="form-input"
+        style="width:100%; min-height:120px; resize:vertical;"
+        placeholder="Thought, quote, or insight..."></textarea>
+      <button onclick="bkSaveNote('${bookId}')" class="form-submit"
+        style="margin-top:12px; width:100%;">Save Note</button>
+    `);
+  };
+
+  window.bkSaveNote = function(bookId) {
+    const text = (document.getElementById("bkNoteText")?.value || "").trim();
+    if (!text) return alert("Write something first.");
+    const books = getBooks();
+    const book  = books.find(b => b.id === bookId);
+    if (!book) return;
+    book.notes = book.notes || [];
+    book.notes.push({ id: uid(), text, createdAt: Date.now() });
+    saveBooks(books);
+    window.closeModal?.();
+    renderBooks();
+  };
+
+  window.bkOpenFinishModal = function(bookId) {
+    const book = getBooks().find(b => b.id === bookId);
+    if (!book) return;
+    const editing = book.status === "finished";
+    window.openModal(`
+      <h2 style="margin-bottom:4px;">${editing ? "Edit Entry" : "Finished!"} 🎉</h2>
+      <div style="font-size:0.82rem; color:#6b7280; margin-bottom:16px;">${esc(book.title)}</div>
+      <div style="display:grid; gap:12px;">
+        <div>
+          <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">Rating (1–5 stars)</div>
+          <select id="bkFinRating" class="form-input" style="width:100%;">
+            <option value="0">No rating</option>
+            ${[1,2,3,4,5].map(n =>
+              `<option value="${n}" ${book.rating===n?"selected":""}>${"★".repeat(n)} ${n}/5</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:0.82rem; color:#9ca3af; margin-bottom:6px;">One-line takeaway</div>
+          <input id="bkFinTakeaway" class="form-input" style="width:100%;"
+            placeholder="The one thing you'll remember"
+            value="${esc(book.takeaway||"")}" />
+        </div>
+        <button onclick="bkSaveFinish('${bookId}')" class="form-submit" style="margin-top:4px;">
+          ${editing ? "Save Changes" : "Mark as Finished"}
+        </button>
+      </div>
+    `);
+  };
+
+  window.bkSaveFinish = function(bookId) {
+    const rating   = parseInt(document.getElementById("bkFinRating")?.value   || "0");
+    const takeaway = (document.getElementById("bkFinTakeaway")?.value || "").trim();
+    const books = getBooks();
+    const book  = books.find(b => b.id === bookId);
+    if (!book) return;
+    book.status   = "finished";
+    book.rating   = isNaN(rating) ? 0 : rating;
+    book.takeaway = takeaway;
+    saveBooks(books);
+    window.closeModal?.();
+    activeTab = "library";
+    renderBooks();
+  };
+
+  // ── WIRE UP ───────────────────────────────────────────────────────────────
+
+  window.renderBooks = renderBooks;
+
+  if (App) {
+    App.features.books = { render: renderBooks };
+    App.on("books", renderBooks);
   }
 
-  function renderMonthlyChart() {
-    const mount = document.getElementById(MOUNT_ID);
-    if (!mount) return;
-
-    const canvas = mount.querySelector("#booksMonthlyChart");
-    if (!canvas) return;
-
-    const history = loadHistory();
-    const monthly = computeMonthlyAnalytics(history);
-
-    const last = monthly.monthTotals.slice(-8);
-    const labels = last.map(x => x.month);
-    const data = last.map(x => x.pages);
-
-    if (monthlyChart) monthlyChart.destroy();
-
-    monthlyChart = new Chart(canvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: "Pages per month",
-          data,
-          tension: 0.35
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-  }
-
-  // =====================================================
-  // NAV HOOK
-  // =====================================================
-
-  function hook() {
-    document.addEventListener("click", e => {
-      const tab = e.target.closest?.(".nav-tab");
-      if (!tab) return;
-      setTimeout(renderBooks, 100);
-    });
-  }
-
-  function boot() {
-    hook();
-    setTimeout(renderBooks, 120);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
-  }
+  document.addEventListener("click", e => {
+    if (e.target.closest?.(".nav-tab")) setTimeout(renderBooks, 80);
+  });
 
 })();
