@@ -1,267 +1,1022 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kings Protocol</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kings Protocol</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --gold:    #D4A853;
+      --gold-dim: rgba(212,168,83,0.18);
+      --gold-border: rgba(212,168,83,0.3);
+      --red:     #C8282A;
+      --blue:    #2B5AA0;
+      --bg:      #080A0F;
+      --bg2:     #0D1018;
+      --bg3:     #131720;
+      --border:  rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.12);
+      --text:    #E8E6E0;
+      --muted:   #5A6070;
+      --muted2:  #3A404E;
+      --green:   #22C55E;
+      --amber:   #F59E0B;
+    }
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grid texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(212,168,83,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212,168,83,0.015) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .kp-container {
+      position: relative;
+      z-index: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 16px 120px;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────────────── */
+    .kp-header {
+      padding: 20px 0 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .kp-header-left {}
+    .kp-wordmark {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.9rem;
+      letter-spacing: 0.08em;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .kp-header-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+    #kpLiveDate { color: var(--gold); }
+
+    .kp-header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .kp-clock {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .kp-location {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ── NAV ─────────────────────────────────────────────────────────── */
+    .kp-nav {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 2px 0 12px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .kp-nav::-webkit-scrollbar { display: none; }
+
+    .kp-nav-btn {
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      letter-spacing: 0.03em;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .kp-nav-btn:hover {
+      border-color: var(--border2);
+      color: var(--text);
+    }
+    .kp-nav-btn.active {
+      background: var(--gold-dim);
+      border-color: var(--gold-border);
+      color: var(--gold);
+    }
+
+    /* ── HERO BAND ───────────────────────────────────────────────────── */
+    .kp-hero {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: center;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--gold-border);
+      background: linear-gradient(135deg, rgba(212,168,83,0.06), rgba(212,168,83,0.02));
+      margin-bottom: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kp-hero::after {
+      content: '';
+      position: absolute;
+      right: -20px; top: -20px;
+      width: 120px; height: 120px;
+      background: radial-gradient(circle, rgba(212,168,83,0.08), transparent 70%);
+      pointer-events: none;
+    }
+
+    .kp-score-ring {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+    }
+    .kp-score-ring svg {
+      transform: rotate(-90deg);
+    }
+    .kp-score-ring-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      line-height: 1;
+    }
+    .kp-score-num {
+      font-size: 1.4rem;
+      color: var(--gold);
+    }
+    .kp-score-word {
+      font-size: 0.48rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+
+    .kp-hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .kp-hero-stat {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+    }
+    .kp-hero-stat-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.3rem;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .kp-hero-stat-lbl {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* ── SECTION ─────────────────────────────────────────────────────── */
+    .kp-section {
+      margin-bottom: 12px;
+    }
+    .kp-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
+    .kp-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .kp-section-title::before {
+      content: '';
+      display: block;
+      width: 3px;
+      height: 12px;
+      background: var(--gold);
+      border-radius: 2px;
+    }
+    .kp-section-action {
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      transition: all 0.15s;
+    }
+    .kp-section-action:hover {
+      border-color: var(--gold-border);
+      color: var(--gold);
+    }
+
+    /* ── CARD BASE ───────────────────────────────────────────────────── */
+    .kp-card {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 16px;
+    }
+    .kp-card-gold {
+      border-color: var(--gold-border);
+      background: linear-gradient(160deg, rgba(212,168,83,0.05), var(--bg2));
+    }
+
+    /* ── INSIGHTS SCROLL ─────────────────────────────────────────────── */
+    .kp-insights-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+    .kp-insights-scroll::-webkit-scrollbar { display: none; }
+
+    .kp-insight-card {
+      min-width: 240px;
+      max-width: 260px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      flex-shrink: 0;
+    }
+    .kp-insight-card.positive { border-color: rgba(34,197,94,0.25); background: rgba(34,197,94,0.05); }
+    .kp-insight-card.warning  { border-color: rgba(245,158,11,0.25); background: rgba(245,158,11,0.05); }
+    .kp-insight-card.insight  { border-color: rgba(212,168,83,0.25); background: rgba(212,168,83,0.05); }
+    .kp-insight-card.neutral  { border-color: var(--border); }
+
+    .kp-insight-icon { font-size: 1.2rem; margin-bottom: 8px; }
+    .kp-insight-title {
+      font-weight: 900;
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-bottom: 5px;
+      line-height: 1.2;
+    }
+    .kp-insight-body {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ── MOOD ────────────────────────────────────────────────────────── */
+    #moodTracker .kp-card { padding: 0; overflow: hidden; }
+
+    /* ── HABITS TABLE ────────────────────────────────────────────────── */
+    #habitGrid table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #habitGrid th {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    #habitGrid td {
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    #habitGrid tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* ── PLANNER ─────────────────────────────────────────────────────── */
+    .kp-planner-day-grid {
+      display: grid;
+      grid-template-columns: repeat(7,1fr);
+      gap: 5px;
+      margin-top: 14px;
+    }
+    .kp-planner-day {
+      padding: 8px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .kp-planner-day:hover { border-color: var(--gold-border); }
+    .kp-planner-day.active {
+      background: var(--gold-dim);
+      border-color: var(--gold-border);
+    }
+    .kp-planner-day-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .kp-planner-day-num {
+      font-weight: 900;
+      font-size: 0.95rem;
+      margin-top: 2px;
+    }
+    .kp-planner-day-pct {
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-top: 3px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .kp-planner-day.active .kp-planner-day-name,
+    .kp-planner-day.active .kp-planner-day-num,
+    .kp-planner-day.active .kp-planner-day-pct { color: var(--gold); }
+
+    .kp-task-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .kp-task-row:hover { border-color: var(--border2); }
+    .kp-task-row.done { background: rgba(34,197,94,0.04); border-color: rgba(34,197,94,0.15); }
+    .kp-task-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--gold);
+      width: 80px;
+      flex-shrink: 0;
+    }
+    .kp-task-text {
+      flex: 1;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+    .kp-task-row.done .kp-task-text {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+    .kp-task-del {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.12s;
+    }
+    .kp-task-del:hover { color: var(--red); }
+
+    /* ── INPUTS ──────────────────────────────────────────────────────── */
+    .kp-input {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .kp-input:focus { border-color: var(--gold-border); }
+    .kp-input::placeholder { color: var(--muted2); }
+
+    .kp-btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--gold-border);
+      background: var(--gold-dim);
+      color: var(--gold);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 800;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .kp-btn:hover { background: rgba(212,168,83,0.25); }
+
+    .kp-btn-ghost {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .kp-btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── WEEKLY REVIEW BUTTON ────────────────────────────────────────── */
+    .kp-weekly-review-btn {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 800;
+      font-size: 0.9rem;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .kp-weekly-review-btn:hover {
+      border-color: var(--gold-border);
+      background: var(--gold-dim);
+    }
+    .kp-weekly-review-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .kp-weekly-review-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    /* ── PAGES ───────────────────────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── MODAL ───────────────────────────────────────────────────────── */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-content {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .modal-content h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.06em;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+    .close {
+      position: absolute;
+      top: 14px; right: 18px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color 0.12s;
+    }
+    .close:hover { color: var(--text); }
+
+    /* Legacy form classes for compatibility */
+    .form-input {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--gold-border); }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; font-weight: 700; }
+    .form-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .form-submit {
+      padding: 10px 18px; border-radius: 8px;
+      border: 1px solid var(--gold-border); background: var(--gold-dim);
+      color: var(--gold); font-family: 'DM Sans', sans-serif; font-weight: 800;
+      font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+    }
+    .form-submit:hover { background: rgba(212,168,83,0.28); }
+    .form-cancel {
+      padding: 10px 18px; border-radius: 8px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-family: 'DM Sans', sans-serif; font-weight: 700;
+      font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+    }
+    .form-cancel:hover { border-color: var(--border2); color: var(--text); }
+
+    /* Drag handle */
+    .kp-task-row .drag-handle {
+      color: var(--muted2);
+      font-size: 0.75rem;
+      cursor: grab;
+      padding: 2px 4px;
+    }
+
+    /* Performance section (injected by performance.js) */
+    .habit-section { margin-bottom: 12px; }
+    .section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::before {
+      content: '';
+      display: block;
+      width: 3px;
+      height: 12px;
+      background: var(--gold);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-card {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .stat-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+    .idea-item {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      margin-bottom: 8px;
+    }
+
+    /* Widget (header stats) */
+    .widget {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .widget-icon { font-size: 1.2rem; }
+    .widget-value { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.04em; line-height: 1; }
+    .widget-label { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .widget-sublabel { font-size: 0.68rem; color: var(--muted2); }
+
+    /* Textarea */
+    textarea.form-input, textarea.kp-input {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    select.form-input, select.kp-input {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235A6070'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 30px;
+    }
+
+    /* Content/Books/etc page containers */
+    .content-stats { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 10px; }
+    .content-stat-card {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .kp-task { /* for workout.js compatibility */ }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 4px; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .kp-hero { grid-template-columns: 1fr; }
+      .kp-hero-stats { grid-template-columns: repeat(3,1fr); }
+      .kp-score-ring { display: none; }
+    }
+  </style>
 </head>
 
-<body class="fire-mode">
-<div class="container">
+<body>
+<div class="kp-container">
 
-    <!-- Header -->
-    <div style="margin-bottom: 30px;">
-        <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:20px;">
-            <div class="widget" style="flex:1;">
-                <div class="widget-icon">🕐</div>
-                <div>
-                    <div class="widget-value" id="currentTime">--:--</div>
-                    <div class="widget-label">New York</div>
-                    <div class="widget-sublabel" id="currentDate">---</div>
-                </div>
-            </div>
+  <!-- ── HEADER ──────────────────────────────────────────────────────── -->
+  <header class="kp-header">
+    <div class="kp-header-left">
+      <div class="kp-wordmark">Kings Protocol</div>
+      <div class="kp-header-sub">
+        <span id="kpLiveDate">---</span>
+        &nbsp;·&nbsp; New York
+      </div>
+    </div>
+    <div class="kp-header-right">
+      <div class="kp-clock" id="kpLiveClock">--:--</div>
+      <div class="kp-location">NYC</div>
+    </div>
+  </header>
 
-            <div class="widget" style="flex:1;">
-                <div class="widget-icon">🌤️</div>
-                <div>
-                    <div class="widget-value">72°F</div>
-                    <div class="widget-label">Yonkers</div>
-                </div>
-            </div>
+  <!-- ── NAV ─────────────────────────────────────────────────────────── -->
+  <nav class="kp-nav">
+    <button class="kp-nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="kp-nav-btn" onclick="showPage('workout')">Workouts</button>
+    <button class="kp-nav-btn" onclick="showPage('looksmaxxing')">Looksmaxxing</button>
+    <button class="kp-nav-btn" onclick="showPage('content')">Content</button>
+    <button class="kp-nav-btn" onclick="showPage('books')">Books</button>
+    <button class="kp-nav-btn" onclick="showPage('deadlines')">Deadlines</button>
+  </nav>
+
+  <!-- ── DASHBOARD PAGE ──────────────────────────────────────────────── -->
+  <div id="dashboardPage" class="page active">
+
+    <!-- Hero band — score ring + key stats -->
+    <div class="kp-hero" id="kpHeroBand">
+      <div class="kp-score-ring" id="kpScoreRing">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(212,168,83,0.12)" stroke-width="5"/>
+          <circle id="kpScoreArc" cx="36" cy="36" r="30" fill="none"
+            stroke="var(--gold)" stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="188.5" stroke-dashoffset="188.5"
+            style="transition:stroke-dashoffset 0.6s ease"/>
+        </svg>
+        <div class="kp-score-ring-label">
+          <div class="kp-score-num" id="kpScoreNum">--</div>
+          <div class="kp-score-word">TODAY</div>
         </div>
-
-        <h1 style="text-align:center; font-size:2.5em;">Kings Protocol</h1>
+      </div>
+      <div class="kp-hero-stats">
+        <div class="kp-hero-stat">
+          <div class="kp-hero-stat-val" id="kpHeroStreak">--</div>
+          <div class="kp-hero-stat-lbl">Day Streak</div>
+        </div>
+        <div class="kp-hero-stat">
+          <div class="kp-hero-stat-val" id="kpHeroHabits">--%</div>
+          <div class="kp-hero-stat-lbl">Habits</div>
+        </div>
+        <div class="kp-hero-stat">
+          <div class="kp-hero-stat-val" id="kpHeroEnergy">--</div>
+          <div class="kp-hero-stat-lbl">Energy</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Nav -->
-    <div class="nav-tabs">
-        <button class="nav-tab active" onclick="showPage('dashboard')">📊 Dashboard</button>
-        <button class="nav-tab" onclick="showPage('workout')">💪 Workouts</button>
-        <button class="nav-tab" onclick="showPage('looksmaxxing')">💎 Looksmaxxing</button>
-        <button class="nav-tab" onclick="showPage('content')">🎬 Content</button>
-        <button class="nav-tab" onclick="showPage('books')">📚 Books</button>
-        <button class="nav-tab" onclick="showPage('deadlines')">🎯 Deadlines</button>  <!-- ADDED -->
+    <!-- Weekly Review -->
+    <div class="kp-section" style="margin-bottom:12px;">
+      <button class="kp-weekly-review-btn" onclick="openWeeklyReview()">
+        <div class="kp-weekly-review-icon">📋</div>
+        <div>
+          <div>Weekly Review</div>
+          <div class="kp-weekly-review-sub">This week's full breakdown</div>
+        </div>
+        <span style="margin-left:auto; color:var(--muted); font-size:1rem;">›</span>
+      </button>
     </div>
 
-    <!-- Dashboard -->
-    <div id="dashboardPage" class="page active">
-
-        <!-- SCHEDULE -->
-        <div class="habit-section">
-            <div class="section-title">📅 Today's Schedule</div>
-            <div id="scheduleContainer"></div>
-        </div>
-
-        <!-- Weekly Review button -->
-        <div style="margin-bottom:16px;">
-            <button onclick="openWeeklyReview()" style="
-                width:100%; padding:16px 20px;
-                border-radius:16px;
-                border:1px solid rgba(99,102,241,0.4);
-                background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(236,72,153,0.10));
-                color:white; cursor:pointer;
-                display:flex; align-items:center; gap:12px;
-                font-size:1rem; font-weight:800;
-                box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-                transition: all 0.15s;
-            "
-            onmouseover="this.style.background='linear-gradient(135deg, rgba(99,102,241,0.28), rgba(236,72,153,0.18))'"
-            onmouseout="this.style.background='linear-gradient(135deg, rgba(99,102,241,0.15), rgba(236,72,153,0.10))'">
-                <span style="font-size:1.4rem;">📋</span>
-                <div style="text-align:left;">
-                    <div>Weekly Review</div>
-                    <div style="font-weight:500; font-size:0.82rem; color:rgba(255,255,255,0.5); margin-top:2px;">Tap to see this week's breakdown</div>
-                </div>
-                <span style="margin-left:auto; color:rgba(255,255,255,0.4); font-size:1.1rem;">›</span>
-            </button>
-        </div>
-
-        <!-- SMART INSIGHTS -->
-        <div class="habit-section">
-          <div class="section-title">🧠 Smart Insights</div>
-          <div id="insightsWidget"></div>
-        </div>
-
-        <!-- MOOD -->
-        <div class="habit-section">
-            <div class="section-title">😊 Energy & Mood</div>
-            <div id="moodTracker"></div>
-        </div>
-
-        <!-- HABITS -->
-        <div class="habit-section">
-            <div class="section-title">📋 Daily Habits - This Week</div>
-            <div id="habitGrid"></div>
-        </div>
-
+    <!-- Smart Insights (horizontal scroll) -->
+    <div class="kp-section">
+      <div class="kp-section-header">
+        <div class="kp-section-title">Insights</div>
+      </div>
+      <div id="insightsWidget"></div>
     </div>
 
-    <!-- Other Pages -->
-    <div id="workoutPage" class="page"><div id="exerciseCards"></div></div>
-    <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
-    <div id="contentPage" class="page"><div id="contentContainer"></div></div>
-    <div id="booksPage" class="page"><div id="booksContainer"></div></div>
-    <div id="deadlinesPage" class="page"><div id="deadlinesContainer"></div></div>  <!-- ADDED -->
+    <!-- Energy & Mood -->
+    <div class="kp-section">
+      <div class="kp-section-header">
+        <div class="kp-section-title">Energy & Mood</div>
+      </div>
+      <div id="moodTracker"></div>
+    </div>
+
+    <!-- Daily Planner -->
+    <div class="kp-section">
+      <div class="kp-section-header">
+        <div class="kp-section-title">Daily Planner</div>
+      </div>
+      <div id="scheduleContainer"></div>
+    </div>
+
+    <!-- Performance Engine (injected by performance.js) -->
+    <!-- inserted dynamically -->
+
+    <!-- Habits -->
+    <div class="kp-section">
+      <div class="kp-section-header">
+        <div class="kp-section-title">Daily Habits</div>
+      </div>
+      <div class="kp-card" style="overflow-x:auto;">
+        <div id="habitGrid"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── OTHER PAGES ──────────────────────────────────────────────────── -->
+  <div id="workoutPage"      class="page"><div id="exerciseCards"></div></div>
+  <div id="looksmaxxingPage" class="page"><div id="looksMaxxingContainer"></div></div>
+  <div id="contentPage"      class="page"><div id="contentContainer"></div></div>
+  <div id="booksPage"        class="page"><div id="booksContainer"></div></div>
+  <div id="deadlinesPage"    class="page"><div id="deadlinesContainer"></div></div>
 
 </div>
 
-<!-- Modal -->
+<!-- ── MODAL ────────────────────────────────────────────────────────── -->
 <div id="modal" class="modal" onclick="closeModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <div id="modalBody"></div>
-    </div>
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <div id="modalBody"></div>
+  </div>
 </div>
 
 <script>
-// ─── GLOBAL MODAL SYSTEM ─────────────────────────────────────────────────────
+// ── CLOCK + DATE ──────────────────────────────────────────────────────────
+(function() {
+  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function tick() {
+    const now = new Date();
+    const h   = String(now.getHours()).padStart(2,"0");
+    const m   = String(now.getMinutes()).padStart(2,"0");
+    const el  = document.getElementById("kpLiveClock");
+    if (el) el.textContent = `${h}:${m}`;
+
+    const de = document.getElementById("kpLiveDate");
+    if (de) de.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+
+    // Also legacy IDs
+    const lt = document.getElementById("currentTime");
+    if (lt) lt.textContent = `${h}:${m}`;
+    const ld = document.getElementById("currentDate");
+    if (ld) ld.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+// ── HERO BAND UPDATER ─────────────────────────────────────────────────────
+window.updateHeroBand = function() {
+  // Score ring
+  const scoreNum = document.getElementById("kpScoreNum");
+  const scoreArc = document.getElementById("kpScoreArc");
+  if (scoreNum && scoreArc) {
+    const score = parseInt(scoreNum.getAttribute("data-score") || scoreNum.textContent) || 0;
+    const circ  = 188.5;
+    const offset = circ - (score / 100) * circ;
+    scoreArc.style.strokeDashoffset = offset;
+  }
+
+  // Habits %
+  const habitEl = document.getElementById("kpHeroHabits");
+  if (habitEl && typeof window.getDayCompletion === "function") {
+    const r = window.getDayCompletion();
+    habitEl.textContent = (r?.percent ?? "--") + "%";
+  }
+
+  // Energy
+  const energyEl = document.getElementById("kpHeroEnergy");
+  if (energyEl && window.moodData) {
+    const pad = n => String(n).padStart(2,"0");
+    const d = new Date();
+    const k = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const e = window.moodData[k]?.energy;
+    energyEl.textContent = e ? `${e}/10` : "--";
+  }
+
+  // Streak
+  const stEl = document.getElementById("kpHeroStreak");
+  if (stEl && typeof window.calculateCurrentStreak === "function") {
+    stEl.textContent = window.calculateCurrentStreak();
+  }
+};
+
+// ── MODAL SYSTEM ──────────────────────────────────────────────────────────
 window.openModal = function(html) {
-    const modal = document.getElementById("modal");
-    const body  = document.getElementById("modalBody");
-    if (!modal || !body) return;
-    body.innerHTML = html;
-    modal.style.display = "flex";
-    document.body.style.overflow = "hidden";
+  const modal = document.getElementById("modal");
+  const body  = document.getElementById("modalBody");
+  if (!modal || !body) return;
+  body.innerHTML = html;
+  modal.style.display = "flex";
+  document.body.style.overflow = "hidden";
 };
 
 window.closeModal = function(e) {
-    if (e && e.target !== document.getElementById("modal")) return;
-    const modal = document.getElementById("modal");
-    if (modal) modal.style.display = "none";
-    document.body.style.overflow = "";
+  if (e && e.target !== document.getElementById("modal")) return;
+  const modal = document.getElementById("modal");
+  if (modal) modal.style.display = "none";
+  document.body.style.overflow = "";
 };
 
 document.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") {
-        const modal = document.getElementById("modal");
-        if (modal && modal.style.display !== "none") {
-            modal.style.display = "none";
-            document.body.style.overflow = "";
-        }
+  if (e.key === "Escape") {
+    const modal = document.getElementById("modal");
+    if (modal && modal.style.display !== "none") {
+      modal.style.display = "none";
+      document.body.style.overflow = "";
     }
+  }
 });
 
-// ─── WEEKLY REVIEW ────────────────────────────────────────────────────────────
+// ── WEEKLY REVIEW ─────────────────────────────────────────────────────────
 window.openWeeklyReview = function() {
-    function pad(n) { return String(n).padStart(2, "0"); }
-    function localKey(d) {
-        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  function pad(n) { return String(n).padStart(2,"0"); }
+  function localKey(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function energyColor(v) {
+    if (!v) return "#5A6070";
+    if (v <= 3) return "#C8282A"; if (v <= 5) return "#f97316";
+    if (v <= 7) return "#F59E0B"; return "#22C55E";
+  }
+  function bar(pct, color) {
+    return `<div style="height:4px;border-radius:4px;background:rgba(255,255,255,0.06);overflow:hidden;margin-top:5px;">
+      <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width 0.4s;"></div>
+    </div>`;
+  }
+
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay()); sunday.setHours(0,0,0,0);
+  const weekDays = Array.from({length:7},(_,i)=>{ const d=new Date(sunday); d.setDate(sunday.getDate()+i); return d; });
+  const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const habits     = JSON.parse(localStorage.getItem("habits")||"[]");
+  const completions= JSON.parse(localStorage.getItem("habitCompletions")||"{}");
+  const moodData   = JSON.parse(localStorage.getItem("moodData")||"{}");
+  const plannerRaw = JSON.parse(localStorage.getItem("weeklyPlannerData")||"{}");
+
+  const dayStats = weekDays.map((d,i) => {
+    const k = localKey(d);
+    const done = habits.filter(h => completions?.[k]?.[h.id]).length;
+    const habitPct = habits.length ? Math.round((done/habits.length)*100) : 0;
+    const energy = moodData[k]?.energy ?? null;
+    const mood   = moodData[k]?.mood ?? null;
+    const sleep  = moodData[k]?.sleep ?? null;
+    const why    = moodData[k]?.why ?? null;
+    let taskPct = 0;
+    for (const wk of Object.keys(plannerRaw)) {
+      const dd = plannerRaw[wk]?.days?.[k];
+      if (dd && Array.isArray(dd.tasks) && dd.tasks.length) {
+        const td = dd.tasks.filter(x=>x&&x.done).length;
+        taskPct = Math.max(taskPct, Math.round((td/dd.tasks.length)*100));
+      }
     }
-    function energyColor(v) {
-        if (!v) return "#4b5563";
-        if (v <= 3) return "#ef4444";
-        if (v <= 5) return "#f97316";
-        if (v <= 7) return "#eab308";
-        return "#22c55e";
-    }
-    function bar(pct, color) {
-        return `<div style="height:6px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:4px;">
-            <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width 0.4s ease;"></div>
-        </div>`;
-    }
+    return { k, name:dayNames[i], date:d.getDate(), habitPct, energy, mood, sleep, why, taskPct, isPast:d<=today };
+  });
 
-    const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
-    sunday.setHours(0,0,0,0);
+  const active = dayStats.filter(d=>d.isPast&&(d.habitPct>0||d.energy!==null));
+  const avgHabit = active.length ? Math.round(active.reduce((s,d)=>s+d.habitPct,0)/active.length) : 0;
+  const eDays = dayStats.filter(d=>d.energy!==null);
+  const avgEnergy = eDays.length ? (eDays.reduce((s,d)=>s+d.energy,0)/eDays.length).toFixed(1) : null;
+  const perfectDays = dayStats.filter(d=>d.habitPct>=80).length;
 
-    const weekDays = [];
-    for (let i = 0; i < 7; i++) {
-        const d = new Date(sunday);
-        d.setDate(sunday.getDate() + i);
-        weekDays.push(d);
-    }
-
-    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    const habits = JSON.parse(localStorage.getItem("habits") || "[]");
-    const completions = JSON.parse(localStorage.getItem("habitCompletions") || "{}");
-    const moodData = JSON.parse(localStorage.getItem("moodData") || "{}");
-    const plannerRaw = JSON.parse(localStorage.getItem("weeklyPlannerData") || "{}");
-
-    const dayStats = weekDays.map((d, i) => {
-        const k = localKey(d);
-        const done = habits.filter(h => completions?.[k]?.[h.id]).length;
-        const habitPct = habits.length ? Math.round((done / habits.length) * 100) : 0;
-        const energy = moodData[k]?.energy ?? null;
-        const mood = moodData[k]?.mood ?? null;
-        const sleep = moodData[k]?.sleep ?? null;
-        const why = moodData[k]?.why ?? null;
-
-        let taskPct = 0;
-        for (const wk of Object.keys(plannerRaw)) {
-            const dayData = plannerRaw[wk]?.days?.[k];
-            if (dayData && Array.isArray(dayData.tasks) && dayData.tasks.length) {
-                const td = dayData.tasks.filter(x => x && x.done).length;
-                taskPct = Math.max(taskPct, Math.round((td / dayData.tasks.length) * 100));
-            }
-        }
-        const isPast = d <= today;
-        return { k, name: dayNames[i], date: d.getDate(), habitPct, energy, mood, sleep, why, taskPct, isPast };
-    });
-
-    const activeDays = dayStats.filter(d => d.isPast && (d.habitPct > 0 || d.energy !== null));
-    const avgHabit = activeDays.length
-        ? Math.round(activeDays.reduce((s, d) => s + d.habitPct, 0) / activeDays.length) : 0;
-    const energyDays = dayStats.filter(d => d.energy !== null);
-    const avgEnergy = energyDays.length
-        ? (energyDays.reduce((s, d) => s + d.energy, 0) / energyDays.length).toFixed(1) : null;
-    const perfectDays = dayStats.filter(d => d.habitPct >= 80).length;
-
-    const html = `
-        <div style="font-size:1.2rem;font-weight:900;margin-bottom:4px;">📋 Weekly Review</div>
-        <div style="color:#9CA3AF;font-size:0.85rem;margin-bottom:18px;">
-            Week of ${sunday.toLocaleDateString("en-US", { month:"short", day:"numeric" })}
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-            <div style="padding:14px;border-radius:14px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);text-align:center;">
-                <div style="font-size:1.6rem;font-weight:900;">${avgHabit}%</div>
-                <div style="color:#9CA3AF;font-size:0.82rem;">Avg Habits</div>
+  window.openModal(`
+    <h2>Weekly Review</h2>
+    <div style="font-size:0.8rem;color:#5A6070;margin-bottom:16px;">
+      Week of ${sunday.toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+      ${[
+        [avgHabit+"%","Avg Habits","rgba(212,168,83,0.08)","rgba(212,168,83,0.25)"],
+        [perfectDays+"/7","80%+ Days","rgba(34,197,94,0.08)","rgba(34,197,94,0.25)"],
+        [(avgEnergy??"—"),"Avg Energy","rgba(200,40,42,0.08)","rgba(200,40,42,0.25)"],
+      ].map(([v,l,bg,bd])=>`
+        <div style="padding:12px;border-radius:10px;background:${bg};border:1px solid ${bd};text-align:center;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:#E8E6E0;">${v}</div>
+          <div style="font-size:0.7rem;color:#5A6070;margin-top:2px;">${l}</div>
+        </div>`).join("")}
+    </div>
+    <div style="display:grid;gap:8px;">
+      ${dayStats.map(d=>`
+        <div style="padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.07);background:#0D1018;opacity:${d.isPast?1:0.4};">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <div style="font-weight:800;font-size:0.88rem;">${d.name} ${d.date}</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              ${d.mood?`<span>${d.mood}</span>`:""}
+              ${d.energy!==null?`<span style="font-weight:800;color:${energyColor(d.energy)};font-size:0.85rem;">⚡${d.energy}</span>`:""}
+              ${d.sleep!==null?`<span style="color:#5A6070;font-size:0.82rem;">🛌${d.sleep}h</span>`:""}
+              ${d.habitPct>=80?`<span style="color:#22C55E;font-size:0.78rem;font-weight:800;">👑</span>`:""}
             </div>
-            <div style="padding:14px;border-radius:14px;background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.25);text-align:center;">
-                <div style="font-size:1.6rem;font-weight:900;">${perfectDays}/7</div>
-                <div style="color:#9CA3AF;font-size:0.82rem;">80%+ Days</div>
-            </div>
-            <div style="padding:14px;border-radius:14px;background:rgba(236,72,153,0.10);border:1px solid rgba(236,72,153,0.25);text-align:center;">
-                <div style="font-size:1.6rem;font-weight:900;">${avgEnergy ?? "—"}</div>
-                <div style="color:#9CA3AF;font-size:0.82rem;">Avg Energy</div>
-            </div>
-        </div>
-
-        <div style="display:grid;gap:10px;">
-            ${dayStats.map(d => `
-                <div style="padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);opacity:${d.isPast ? 1 : 0.45};">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                        <div style="font-weight:800;">${d.name} ${d.date}</div>
-                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                            ${d.mood ? `<span style="font-size:1.1rem;">${d.mood}</span>` : ""}
-                            ${d.energy !== null ? `<span style="font-weight:800;color:${energyColor(d.energy)};">⚡${d.energy}</span>` : ""}
-                            ${d.sleep !== null ? `<span style="color:#9CA3AF;font-size:0.85rem;">🛌${d.sleep}h</span>` : ""}
-                            ${d.habitPct >= 80 ? `<span style="color:#22c55e;font-size:0.82rem;font-weight:800;">👑 Perfect</span>` : ""}
-                        </div>
-                    </div>
-                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div>
-                            <div style="color:#9CA3AF;font-size:0.78rem;">Habits ${d.habitPct}%</div>
-                            ${bar(d.habitPct, "linear-gradient(90deg,#6366f1,#a78bfa)")}
-                        </div>
-                        <div>
-                            <div style="color:#9CA3AF;font-size:0.78rem;">Tasks ${d.taskPct}%</div>
-                            ${bar(d.taskPct, "linear-gradient(90deg,#ec4899,#f97316)")}
-                        </div>
-                    </div>
-                    ${d.why ? `<div style="margin-top:8px;color:#a78bfa;font-size:0.82rem;font-style:italic;">📝 ${d.why}</div>` : ""}
-                </div>
-            `).join("")}
-        </div>
-    `;
-
-    window.openModal(html);
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div><div style="font-size:0.72rem;color:#5A6070;">Habits ${d.habitPct}%</div>${bar(d.habitPct,"#D4A853")}</div>
+            <div><div style="font-size:0.72rem;color:#5A6070;">Tasks ${d.taskPct}%</div>${bar(d.taskPct,"#C8282A")}</div>
+          </div>
+          ${d.why?`<div style="margin-top:7px;color:#a78bfa;font-size:0.78rem;font-style:italic;">"${d.why}"</div>`:""}
+        </div>`).join("")}
+    </div>
+  `);
 };
 </script>
 
@@ -280,7 +1035,7 @@ window.openWeeklyReview = function() {
 <script src="./features/contentUpgrades.js"></script>
 <script src="./features/youtubeStats.js"></script>
 <script src="./features/notifications.js"></script>
-<script src="./features/deadlines.js"></script>  <!-- ADDED -->
+<script src="./features/deadlines.js"></script>
 
 </body>
 </html>
