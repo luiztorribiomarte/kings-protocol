@@ -388,9 +388,18 @@
               <div style="padding:12px 14px; border-radius:12px;
                 border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.03);
                 border-left:3px solid rgba(167,139,250,0.4);">
-                <div style="font-size:0.87rem; color:#e5e7eb; line-height:1.55;">${esc(n.text)}</div>
-                <div style="font-size:0.72rem; color:#4b5563; margin-top:6px;">
-                  ${new Date(n.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+                <div style="display:flex; align-items:flex-start; gap:10px;">
+                  <div style="flex:1;">
+                    <div style="font-size:0.87rem; color:#e5e7eb; line-height:1.55;">${esc(n.text)}</div>
+                    <div style="font-size:0.72rem; color:#4b5563; margin-top:6px;">
+                      ${new Date(n.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+                    </div>
+                  </div>
+                  <button onclick="bkDeleteNote('${n.bookId}','${n.id}')" style="
+                    width:26px; height:26px; border-radius:50%; flex-shrink:0; margin-top:2px;
+                    border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05);
+                    color:#ef4444; cursor:pointer; font-size:0.78rem;
+                    display:flex; align-items:center; justify-content:center;">✕</button>
                 </div>
               </div>
             `).join("")}
@@ -416,10 +425,21 @@
     const books = getBooks();
     const book  = books.find(b => b.id === bookId);
     if (!book) return;
+
+    // If "now on page" is filled, use it directly.
+    // If not, auto-advance: currentPage + pages read today.
     if (!isNaN(newPage) && newPage >= 0) {
       book.currentPage = newPage;
-      if (book.totalPages && book.currentPage >= book.totalPages) book.status = "finished";
+    } else {
+      book.currentPage = (book.currentPage || 0) + pages;
     }
+
+    // Cap at totalPages
+    if (book.totalPages && book.currentPage > book.totalPages) {
+      book.currentPage = book.totalPages;
+    }
+    if (book.totalPages && book.currentPage >= book.totalPages) book.status = "finished";
+
     saveBooks(books);
 
     // Save log
@@ -443,6 +463,16 @@
   window.bkDelete = function(bookId) {
     if (!confirm("Remove this book?")) return;
     saveBooks(getBooks().filter(b => b.id !== bookId));
+    renderBooks();
+  };
+
+  window.bkDeleteNote = function(bookId, noteId) {
+    if (!confirm("Delete this note?")) return;
+    const books = getBooks();
+    const book  = books.find(b => b.id === bookId);
+    if (!book) return;
+    book.notes = (book.notes || []).filter(n => n.id !== noteId);
+    saveBooks(books);
     renderBooks();
   };
 
